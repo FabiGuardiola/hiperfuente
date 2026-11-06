@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hiperfuente navegable</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -17,7 +18,9 @@
   --mono: "DM Mono", ui-monospace, "Courier New", monospace;
   color-scheme: dark;
 }
-html, body { height: 100%; }
+/* Reglas base: dentro de Claude las pone la plataforma, en GitHub Pages no. */
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
 body { background: var(--noche); color: var(--papel); font-family: var(--mono); font-size: 13px; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; }
 canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; }
 .barra {
