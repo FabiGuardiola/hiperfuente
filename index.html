@@ -1,0 +1,398 @@
+<meta charset="utf-8">
+<title>Hiperfuente navegable</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Pantalla completa: el espacio ocupa todo; la interfaz son tiras finas en los bordes, como marginalia. */
+@font-face { font-family: "FabiBlock"; src: url(data:font/otf;base64,T1RUTwAKAIAAAwAgQ0ZGIJZt8QkAAACsAAAeBU9TLzJpH4XgAAAetAAAAGBjbWFwTJrvDQAAHxQAAAD8Z2FzcAAAAAsAACAQAAAACGhlYWRjOEOOAAAgGAAAADZoaGVhCAEDzgAAIFAAAAAkaG10eCuNHUgAACB0AAABsG1heHAAbFAAAAAiJAAAAAZuYW1ln/BRSAAAIiwAAALZcG9zdP+fADIAACUIAAAAIAEABAQAAQEBEkZhYmlCbG9jay1SZWd1bGFyAAEBAS/4hgL4hwP4iASL+5j6fPpABR0AAAQ4ER0AAB0sDx0AAB4DEB0AAAAAHQAAHgUSAG4CAAEACAAPABYAHQAkACsAMgA5AEAARwBOAFUAXABjAGoAcQB4AH8AhgCNAJQAmwCiAKkAsAC3AL4AxQDMANMA2gDhAOgA7wD2AP0BBAELARIBGQEgAScBLgE1ATwBQwFKAVEBWAFfAWYBbQF0AXsBggGJAZABlwGeAaUBrAGzAboBwQHIAc8B1gHdAeQB6wHyAfkCAAIHAg4CFQIcAiMCKgIxAjgCPwJGAk0CVAJbAmICaQJwAncCfgKFAowCkwKaAqECqAKvArYCvQLEAssC0gLZAuAC5wLuAvgDAgMJdW5pMDAyMHVuaTAwMjF1bmkwMDIydW5pMDAyM3VuaTAwMjR1bmkwMDI1dW5pMDAyNnVuaTAwMjd1bmkwMDI4dW5pMDAyOXVuaTAwMkF1bmkwMDJCdW5pMDAyQ3VuaTAwMkR1bmkwMDJFdW5pMDAyRnVuaTAwMzB1bmkwMDMxdW5pMDAzMnVuaTAwMzN1bmkwMDM0dW5pMDAzNXVuaTAwMzZ1bmkwMDM3dW5pMDAzOHVuaTAwMzl1bmkwMDNBdW5pMDAzQnVuaTAwM0R1bmkwMDNGdW5pMDA0MHVuaTAwNDF1bmkwMDQydW5pMDA0M3VuaTAwNDR1bmkwMDQ1dW5pMDA0NnVuaTAwNDd1bmkwMDQ4dW5pMDA0OXVuaTAwNEF1bmkwMDRCdW5pMDA0Q3VuaTAwNER1bmkwMDRFdW5pMDA0RnVuaTAwNTB1bmkwMDUxdW5pMDA1MnVuaTAwNTN1bmkwMDU0dW5pMDA1NXVuaTAwNTZ1bmkwMDU3dW5pMDA1OHVuaTAwNTl1bmkwMDVBdW5pMDA1QnVuaTAwNUN1bmkwMDVEdW5pMDA1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) format("opentype"); font-display: swap; }
+:root {
+  --noche: #16191C;        /* fondo mientras carga */
+  --papel: #E9E3D6;
+  --piedra: #A8A398;
+  --lacre: #9B3D2E;
+  --tinta: #2F4858;
+  --velo: rgba(22, 25, 28, .62);
+  --hyper: "FabiBlock", "Arial Black", sans-serif;
+  --mono: "DM Mono", ui-monospace, "Courier New", monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--noche); color: var(--papel); font-family: var(--mono); font-size: 13px; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; }
+canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; }
+.barra {
+  position: fixed; left: 0; right: 0; top: 0; z-index: 2;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: linear-gradient(var(--velo), transparent);
+  pointer-events: none;
+}
+.barra > * { pointer-events: auto; }
+h1 { margin: 0; font-family: var(--hyper); font-weight: 400; font-size: 22px; letter-spacing: .02em; color: var(--papel); }
+.grupo { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rotulo { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--piedra); margin-right: 2px; }
+button {
+  font: inherit; font-size: 12px; color: var(--papel); background: var(--velo);
+  border: 1px solid rgba(233, 227, 214, .28); border-radius: 2px; padding: 7px 10px; cursor: pointer; min-height: 34px;
+}
+button[aria-pressed="true"] { background: var(--lacre); border-color: var(--lacre); }
+button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
+.ayuda {
+  position: fixed; z-index: 2; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  max-width: 300px; font-size: 11px; line-height: 1.5; color: var(--piedra); text-align: right; pointer-events: none;
+}
+#palanca {
+  position: fixed; z-index: 2; left: max(24px, env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 128px; height: 128px; border-radius: 50%; border: 1px solid rgba(233, 227, 214, .35); background: var(--velo);
+}
+#perilla { position: absolute; left: 44px; top: 44px; width: 40px; height: 40px; border-radius: 50%; background: var(--papel); opacity: .8; }
+.vertical { position: fixed; z-index: 2; left: calc(168px + env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; }
+.vertical button { width: 46px; }
+#carga { position: fixed; inset: 0; z-index: 3; display: grid; place-content: center; gap: 10px; text-align: center; background: var(--noche); }
+#carga strong { font-family: var(--hyper); font-weight: 400; font-size: 34px; color: var(--lacre); }
+#barraCarga { width: 220px; height: 2px; background: rgba(233, 227, 214, .2); }
+#barraCarga i { display: block; height: 100%; width: 0; background: var(--papel); }
+@media (max-width: 560px) { h1 { font-size: 17px; } .ayuda { display: none; } }
+</style>
+
+<div id="carga" role="status">
+  <strong>HIPERFUENTE</strong>
+  <span id="textoCarga">Cargando el espacio…</span>
+  <div id="barraCarga"><i></i></div>
+</div>
+
+<header class="barra">
+  <h1>HIPERFUENTE</h1>
+  <div class="grupo" role="group" aria-label="Modo de navegación">
+    <span class="rotulo">Modo</span>
+    <button id="modoOrbitar" aria-pressed="true">Orbitar</button>
+    <button id="modoCaminar" aria-pressed="false">Recorrer</button>
+  </div>
+  <div class="grupo" id="momentos" role="group" aria-label="Momentos del recorrido">
+    <span class="rotulo">Momentos</span>
+  </div>
+  <div class="grupo">
+    <button id="enderezar" title="Vuelve a poner el horizonte derecho">Enderezar</button>
+    <button id="rapido" aria-pressed="false">Rápido</button>
+  </div>
+</header>
+
+<div id="palanca" hidden aria-hidden="true"><div id="perilla"></div></div>
+<div class="vertical" id="vertical" hidden>
+  <button id="subir" aria-label="Subir">▲</button>
+  <button id="bajar" aria-label="Bajar">▼</button>
+</div>
+<p class="ayuda" id="ayuda">Arrastrá para girar · pellizcá para acercarte · dos dedos para desplazar.</p>
+
+<script>
+// Si algo falla, que se vea en la pantalla de carga en vez de quedar colgado.
+function mostrarError(texto) {
+  const t = document.getElementById("textoCarga");
+  if (t) t.textContent = "No se pudo abrir el espacio: " + texto;
+  const c = document.getElementById("carga");
+  if (c) c.hidden = false;
+}
+addEventListener("error", (e) => {
+  if (e.target && e.target.tagName === "SCRIPT") mostrarError("no cargó " + e.target.src);
+  else if (e.message) mostrarError(e.message);
+}, true);
+addEventListener("unhandledrejection", (e) => mostrarError(String(e.reason && e.reason.message || e.reason)));
+document.getElementById("textoCarga").textContent = "Cargando librerías…";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(async function () {
+if (!window.THREE || !THREE.GLTFLoader || !THREE.OrbitControls) { mostrarError("no cargaron las librerías de Three.js."); return; }
+const testGL = document.createElement("canvas");
+if (!(testGL.getContext("webgl2") || testGL.getContext("webgl"))) { mostrarError("este navegador no tiene WebGL activado."); return; }
+THREE.ColorManagement.legacyMode = false;
+
+// ---------- Escena ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.9;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+const NIEBLA = new THREE.Color(0x3a3833);
+scene.fog = new THREE.FogExp2(NIEBLA, 0.0016);
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.05, 4000);
+camera.position.set(260, 150, 260);
+
+// Blender es Z arriba; Three es Y arriba. Todo el modelo cuelga de esta raíz girada.
+const raiz = new THREE.Group();
+raiz.rotation.x = -Math.PI / 2;
+scene.add(raiz);
+const Q_RAIZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+const blenderAThree = (v) => new THREE.Vector3(v[0], v[2], -v[1]);
+
+// Cielo de atardecer apagado: un domo con degradé según la altura.
+const cielo = new THREE.Mesh(
+  new THREE.SphereGeometry(3000, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      cenit: { value: new THREE.Color(0x1d2a35) }, medio: { value: new THREE.Color(0x5d6466) },
+      horizonte: { value: new THREE.Color(0xb48a62) }, suelo: { value: new THREE.Color(0x2a2724) },
+    },
+    vertexShader: "varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position.z = gl_Position.w; }",
+    fragmentShader: `uniform vec3 cenit, medio, horizonte, suelo; varying vec3 d;
+      void main(){ float h = d.y;
+        vec3 c = h > 0.0 ? mix(mix(horizonte, medio, smoothstep(0.0, 0.18, h)), cenit, smoothstep(0.18, 0.8, h))
+                         : mix(horizonte * 0.6, suelo, smoothstep(0.0, 0.12, -h));
+        gl_FragColor = vec4(c, 1.0); }`,
+  })
+);
+cielo.renderOrder = -1;
+scene.add(cielo);
+
+// Luz: sol bajo (14°) y débil, cielo frío de relleno. Igual que 09_luz_y_materiales.py, simplificada.
+scene.add(new THREE.HemisphereLight(0x8a96a0, 0x2e2a25, 0.75));
+const sol = new THREE.DirectionalLight(0xffc48a, 1.6);
+const el = THREE.MathUtils.degToRad(14), az = THREE.MathUtils.degToRad(30);
+sol.position.copy(blenderAThree([Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)])).multiplyScalar(500);
+scene.add(sol);
+
+// ---------- Materiales (color plano de la paleta) ----------
+const materiales = {};
+function material(nombre, rgba) {
+  if (materiales[nombre]) return materiales[nombre];
+  const color = new THREE.Color().setRGB(rgba[0], rgba[1], rgba[2]);
+  let m;
+  if (nombre.startsWith("Lampara") || nombre === "Color_ffd159") {
+    m = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.8, 0.55).multiplyScalar(1.6), fog: true });
+  } else {
+    m = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
+    if (rgba[3] < 0.99) { m.transparent = true; m.opacity = 0.35; m.depthWrite = false; }
+  }
+  return (materiales[nombre] = m);
+}
+
+// ---------- Carga ----------
+const textoCarga = document.getElementById("textoCarga");
+const relleno = document.querySelector("#barraCarga i");
+const matriz = (f) => new THREE.Matrix4().set(...f);
+
+textoCarga.textContent = "Cargando el espacio…";
+const datos = await fetch("escena.json").then((r) => { if (!r.ok) throw new Error("escena.json respondió " + r.status); return r.json(); });
+// El glTF trae la geometría embebida como data URI, y el Artifact no deja pedir data: con fetch.
+// Así que se descarga el .json, se decodifica el buffer acá y se arma un GLB en memoria.
+async function cargarModelo(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(url + " respondió " + r.status);
+  const total = Number(r.headers.get("content-length")) || 12.9e6;
+  const lector = r.body.getReader();
+  const partes = [];
+  let leido = 0;
+  for (;;) {
+    const { done, value } = await lector.read();
+    if (done) break;
+    partes.push(value);
+    leido += value.length;
+    relleno.style.width = Math.min(100, 100 * leido / total).toFixed(0) + "%";
+    textoCarga.textContent = "Cargando el espacio… " + (leido / 1e6).toFixed(1) + " MB";
+  }
+  textoCarga.textContent = "Armando el espacio…";
+  const crudo = new Uint8Array(leido);
+  let p = 0;
+  for (const parte of partes) { crudo.set(parte, p); p += parte.length; }
+  const gl = JSON.parse(new TextDecoder().decode(crudo));
+  if (gl.buffers.length !== 1) throw new Error("el modelo trae " + gl.buffers.length + " buffers");
+  const b64 = atob(gl.buffers[0].uri.slice(gl.buffers[0].uri.indexOf(",") + 1));
+  const bin = new Uint8Array(b64.length);
+  for (let i = 0; i < b64.length; i++) bin[i] = b64.charCodeAt(i);
+  delete gl.buffers[0].uri;
+  gl.buffers[0].byteLength = bin.length;
+  const json = new TextEncoder().encode(JSON.stringify(gl));
+  const largoJson = Math.ceil(json.length / 4) * 4, largoBin = Math.ceil(bin.length / 4) * 4;
+  const glb = new Uint8Array(12 + 8 + largoJson + 8 + largoBin);
+  const dv = new DataView(glb.buffer);
+  dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, glb.length, true);
+  dv.setUint32(12, largoJson, true); dv.setUint32(16, 0x4E4F534A, true);
+  glb.fill(0x20, 20, 20 + largoJson); glb.set(json, 20);
+  const b = 20 + largoJson;
+  dv.setUint32(b, largoBin, true); dv.setUint32(b + 4, 0x004E4942, true);
+  glb.set(bin, b + 8);
+  return new Promise((ok, mal) => new THREE.GLTFLoader().parse(glb.buffer, "", ok, mal));
+}
+const gltf = await cargarModelo("modelo.gltf.json");
+
+const pieza = {};
+gltf.scene.traverse((o) => {
+  if (o.isMesh) {
+    o.material = material(o.material.name, datos.materiales[o.material.name] || [0.5, 0.5, 0.5, 1]);
+  }
+  if (o.name === "MODULO_Z" || o.name === "ESTRUCTURA" || o.name === "UNICO") pieza[o.name] = o;
+});
+
+function fijar(obj, m) { obj.matrixAutoUpdate = false; obj.matrix.copy(m); return obj; }
+
+// Una estructura = módulo z + sus copias giradas (gravedades x e y) + el núcleo.
+const estructura = new THREE.Group();
+estructura.add(fijar(pieza.MODULO_Z.clone(), new THREE.Matrix4()));
+for (const f of datos.modulo) estructura.add(fijar(pieza.MODULO_Z.clone(), matriz(f)));
+if (pieza.ESTRUCTURA) estructura.add(fijar(pieza.ESTRUCTURA.clone(), new THREE.Matrix4()));
+raiz.add(estructura);
+// Las otras 7 habitaciones: la misma estructura reflejada en los planos.
+for (const f of Object.values(datos.habitaciones)) raiz.add(fijar(estructura.clone(), matriz(f)));
+raiz.add(fijar(pieza.UNICO, new THREE.Matrix4()));
+raiz.updateMatrixWorld(true);
+document.getElementById("carga").hidden = true;
+
+// ---------- Navegación ----------
+const orbita = new THREE.OrbitControls(camera, renderer.domElement);
+orbita.target.set(0, 0, 0);
+orbita.enableDamping = true;
+orbita.maxDistance = 900;
+orbita.update();
+
+let modo = "orbitar";
+let rapido = false;
+const btnOrbitar = document.getElementById("modoOrbitar");
+const btnCaminar = document.getElementById("modoCaminar");
+const palanca = document.getElementById("palanca");
+const perilla = document.getElementById("perilla");
+const vertical = document.getElementById("vertical");
+const ayuda = document.getElementById("ayuda");
+
+function ponerModo(m) {
+  modo = m;
+  orbita.enabled = m === "orbitar";
+  btnOrbitar.setAttribute("aria-pressed", m === "orbitar");
+  btnCaminar.setAttribute("aria-pressed", m === "caminar");
+  palanca.hidden = vertical.hidden = m !== "caminar";
+  ayuda.textContent = m === "orbitar"
+    ? "Arrastrá para girar · pellizcá para acercarte · dos dedos para desplazar."
+    : "Arrastrá para mirar · palanca para avanzar · ▲▼ para subir o bajar. En compu: WASD, Q/E y el mouse.";
+  if (m === "orbitar") {
+    camera.up.set(0, 1, 0);
+    const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    orbita.target.copy(camera.position).addScaledVector(delante, 40);
+    orbita.update();
+  }
+}
+btnOrbitar.onclick = () => ponerModo("orbitar");
+btnCaminar.onclick = () => ponerModo("caminar");
+document.getElementById("rapido").onclick = (e) => { rapido = !rapido; e.currentTarget.setAttribute("aria-pressed", rapido); };
+
+function fovVertical(lente) {
+  const horizontal = 2 * Math.atan(18 / lente);
+  return THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(horizontal / 2) / Math.max(camera.aspect, 1)));
+}
+
+// Momentos: las mismas cámaras de 07_tomas.py.
+const cajaMomentos = document.getElementById("momentos");
+datos.momentos.forEach((mo, i) => {
+  const b = document.createElement("button");
+  b.textContent = (i + 1) + " " + mo.titulo;
+  b.onclick = () => irA(mo);
+  cajaMomentos.append(b);
+});
+function irA(mo) {
+  ponerModo(mo.titulo === "Dron" ? "orbitar" : "caminar");
+  camera.position.copy(blenderAThree(mo.pos));
+  camera.quaternion.copy(Q_RAIZ).multiply(new THREE.Quaternion(...mo.quat));
+  camera.fov = fovVertical(mo.lente);
+  camera.updateProjectionMatrix();
+  if (modo === "orbitar") {
+    const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    orbita.target.copy(camera.position).addScaledVector(delante, camera.position.length() * 0.9);
+    orbita.update();
+  }
+}
+
+// Enderezar: deja la mirada y pone "arriba" en la vertical del mundo.
+document.getElementById("enderezar").onclick = () => {
+  const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(camera.position.clone().add(delante));
+};
+
+// Mirada libre en 3 ejes (conserva el giro de cada gravedad).
+let arrastre = null;
+renderer.domElement.addEventListener("pointerdown", (e) => {
+  if (modo !== "caminar") return;
+  arrastre = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  renderer.domElement.setPointerCapture(e.pointerId);
+});
+renderer.domElement.addEventListener("pointermove", (e) => {
+  if (!arrastre || e.pointerId !== arrastre.id) return;
+  const dx = e.clientX - arrastre.x, dy = e.clientY - arrastre.y;
+  arrastre.x = e.clientX; arrastre.y = e.clientY;
+  const k = 0.0035;
+  camera.rotateOnAxis(new THREE.Vector3(0, 1, 0), dx * k);
+  camera.rotateOnAxis(new THREE.Vector3(1, 0, 0), dy * k);
+});
+const soltar = (e) => { if (arrastre && e.pointerId === arrastre.id) arrastre = null; };
+renderer.domElement.addEventListener("pointerup", soltar);
+renderer.domElement.addEventListener("pointercancel", soltar);
+
+// Palanca táctil.
+const empuje = { x: 0, y: 0 };
+let dedoPalanca = null;
+function moverPalanca(e) {
+  const r = palanca.getBoundingClientRect();
+  let x = (e.clientX - r.left - r.width / 2) / (r.width / 2);
+  let y = (e.clientY - r.top - r.height / 2) / (r.height / 2);
+  const l = Math.hypot(x, y);
+  if (l > 1) { x /= l; y /= l; }
+  empuje.x = x; empuje.y = y;
+  perilla.style.transform = `translate(${x * 44}px, ${y * 44}px)`;
+}
+palanca.addEventListener("pointerdown", (e) => { dedoPalanca = e.pointerId; palanca.setPointerCapture(e.pointerId); moverPalanca(e); });
+palanca.addEventListener("pointermove", (e) => { if (e.pointerId === dedoPalanca) moverPalanca(e); });
+const soltarPalanca = (e) => { if (e.pointerId !== dedoPalanca) return; dedoPalanca = null; empuje.x = empuje.y = 0; perilla.style.transform = ""; };
+palanca.addEventListener("pointerup", soltarPalanca);
+palanca.addEventListener("pointercancel", soltarPalanca);
+
+let altura = 0;
+for (const [id, v] of [["subir", 1], ["bajar", -1]]) {
+  const b = document.getElementById(id);
+  b.addEventListener("pointerdown", () => (altura = v));
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, () => (altura = 0));
+}
+
+const teclas = new Set();
+addEventListener("keydown", (e) => teclas.add(e.code));
+addEventListener("keyup", (e) => teclas.delete(e.code));
+
+// ---------- Bucle ----------
+const reloj = new THREE.Clock();
+function cuadro() {
+  const dt = Math.min(reloj.getDelta(), 0.1);
+  if (modo === "caminar") {
+    let f = -empuje.y, s = empuje.x, u = altura;
+    if (teclas.has("KeyW") || teclas.has("ArrowUp")) f += 1;
+    if (teclas.has("KeyS") || teclas.has("ArrowDown")) f -= 1;
+    if (teclas.has("KeyD") || teclas.has("ArrowRight")) s += 1;
+    if (teclas.has("KeyA") || teclas.has("ArrowLeft")) s -= 1;
+    if (teclas.has("KeyE")) u += 1;
+    if (teclas.has("KeyQ")) u -= 1;
+    const v = (rapido || teclas.has("ShiftLeft") ? 18 : 4) * dt;
+    camera.translateZ(-f * v);
+    camera.translateX(s * v);
+    camera.translateY(u * v);
+  } else {
+    orbita.update();
+  }
+  cielo.position.copy(camera.position);
+  renderer.render(scene, camera);
+  requestAnimationFrame(cuadro);
+}
+irA(datos.momentos[0]);
+cuadro();
+window.visor = { scene, camera, renderer, raiz, irA, datos };   // para depurar desde la consola
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+})().catch((err) => mostrarError(err && err.message || String(err)));
+</script>
