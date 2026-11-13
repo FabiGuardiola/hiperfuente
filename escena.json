@@ -1,4 +1,15 @@
 {
+ "portal": {
+  "x": 51.955,
+  "y": [
+   6.071,
+   14.24
+  ],
+  "z": [
+   1.755,
+   8.376
+  ]
+ },
  "modulo": [
   [
    -0.0,
@@ -204,7 +215,7 @@
   },
   {
    "titulo": "La H",
-   "nota": "El portal es una H gigante y se entra por su contraforma. Hexágono: la unidad de la Biblioteca.",
+   "nota": "El portal es una H gigante (hexágono, la unidad de la Biblioteca). Caminá a través de su contraforma: pasás al otro lado del mismo piso.",
    "pos": [
     86.0,
     10.2,

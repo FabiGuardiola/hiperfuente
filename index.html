@@ -56,6 +56,8 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 #carga strong { font-family: var(--hyper); font-weight: 400; font-size: 34px; color: var(--lacre); }
 #barraCarga { width: 220px; height: 2px; background: rgba(233, 227, 214, .2); }
 #barraCarga i { display: block; height: 100%; width: 0; background: var(--papel); }
+.grav { min-width: 34px; font-weight: 500; }
+#destello { position: fixed; inset: 0; z-index: 1; background: var(--papel); opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
 .chip { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 8px 10px; border: 1px solid var(--lacre); color: var(--papel); background: rgba(155, 61, 46, .35); border-radius: 2px; }
 /* Las 10 instancias en una sola fila, a todo el ancho. */
 .tira { order: 9; flex-basis: 100%; display: grid; grid-template-columns: auto repeat(10, minmax(0, 1fr)); gap: 6px; align-items: center; }
@@ -102,7 +104,14 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
     <span class="rotulo">Instancias</span>
   </nav>
   <div class="grupo">
-    <span id="gravedad" class="chip" title="El piso que funciona como piso desde donde mirás. Se ilumina, y sus textos se ven más.">Gravedad z</span>
+  </div>
+  <div class="grupo" role="group" aria-label="Gravedad" title="La gravedad activa: su piso se ilumina y sus textos se ven más. Tocá otra para girar hacia ese piso.">
+    <span class="rotulo">Gravedad</span>
+    <button class="grav" data-eje="x" aria-pressed="false">X</button>
+    <button class="grav" data-eje="y" aria-pressed="false">Y</button>
+    <button class="grav" data-eje="z" aria-pressed="true">Z</button>
+  </div>
+  <div class="grupo">
     <button id="enderezar" title="Vuelve a poner el horizonte derecho">Enderezar</button>
     <button id="rapido" aria-pressed="false">Rápido</button>
   </div>
@@ -114,6 +123,7 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
   <button id="bajar" aria-label="Bajar">▼</button>
 </div>
 <p class="ayuda" id="ayuda">Arrastrá para girar · pellizcá para acercarte · dos dedos para desplazar.</p>
+<div id="destello"></div>
 <div id="nota" hidden>
   <strong id="notaTitulo"></strong>
   <span id="notaTexto"></span>
@@ -441,7 +451,7 @@ function animarTitular(t) {
 }
 
 // ---------- Gravedad activa: la que tiene el "arriba" de la mirada. Su piso se ilumina y sus textos se ven más ----------
-const chipGravedad = document.getElementById("gravedad");
+const botonesGravedad = [...document.querySelectorAll(".grav")];
 const vArriba = new THREE.Vector3();
 const brillo = { x: 0, y: 0, z: 1 };
 let ejeActivo = "";
@@ -449,7 +459,10 @@ function gravedadActiva(dt) {
   vArriba.set(0, 1, 0).applyQuaternion(camera.quaternion);
   const b = [Math.abs(vArriba.x), Math.abs(vArriba.z), Math.abs(vArriba.y)];      // en ejes de Blender
   const eje = "xyz"[b.indexOf(Math.max(...b))];
-  if (eje !== ejeActivo) { ejeActivo = eje; chipGravedad.textContent = "Gravedad " + eje; }
+  if (eje !== ejeActivo) {
+    ejeActivo = eje;
+    for (const b of botonesGravedad) b.setAttribute("aria-pressed", b.dataset.eje === eje);
+  }
   for (const e of "xyz") {
     brillo[e] += ((e === eje ? 1 : 0) - brillo[e]) * Math.min(1, dt * 3);
     const piso = materiales["Fotocopia_Plano_" + e + "0"];
@@ -485,7 +498,7 @@ function ponerModo(m) {
   palanca.hidden = vertical.hidden = m !== "caminar";
   ayuda.textContent = m === "orbitar"
     ? "Arrastrá para girar · pellizcá para acercarte · dos dedos para desplazar."
-    : "Arrastrá para mirar · palanca para avanzar · ▲▼ para subir o bajar. En compu: WASD, Q/E y el mouse.";
+    : "Arrastrá para mirar · palanca para avanzar · ▲▼ para subir o bajar · X Y Z para girar de gravedad. Las H son portales: atravesalas. En compu: WASD, Q/E y el mouse.";
   if (m === "orbitar") {
     camera.up.set(0, 1, 0);
     const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -572,7 +585,81 @@ function pasoVuelo(ahora) {
   camera.quaternion.slerpQuaternions(vuelo.q0, vuelo.d.q, e);
   camera.fov = vuelo.f0 + (vuelo.d.f - vuelo.f0) * e;
   camera.updateProjectionMatrix();
-  if (u >= 1) { const i = vuelo.i; vuelo = null; llegar(i); }
+  if (u >= 1) {
+    const i = vuelo.i;
+    vuelo = null;
+    if (i === null) ponerModo("caminar"); else llegar(i);
+  }
+}
+
+// ---------- Girar a otra gravedad dentro de la misma habitación (botones X, Y, Z) ----------
+// La cámara "cae" sobre el piso de esa gravedad: gira lo mínimo para que su arriba sea el nuevo y se apoya
+// a la altura de los ojos sobre ese plano, del lado de la habitación donde está.
+const MEDIO_PLANO = 1.755, OJOS = 1.6;
+const aBlender = (v) => [v.x, -v.z, v.y];
+const deBlender = (b) => new THREE.Vector3(b[0], b[2], -b[1]);
+function girarA(eje) {
+  if (vuelo || eje === ejeActivo) return;
+  const i = "xyz".indexOf(eje);
+  const posB = aBlender(camera.position);
+  const signo = Math.sign(posB[i]) || 1;
+  const arribaB = [0, 0, 0];
+  arribaB[i] = signo;
+  posB[i] = signo * (MEDIO_PLANO + OJOS);
+  const destino = deBlender(posB);
+  const actual = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+  const q = new THREE.Quaternion().setFromUnitVectors(actual, deBlender(arribaB).normalize()).multiply(camera.quaternion);
+  ponerModo("caminar");
+  vuelo = { t0: performance.now(), dur: 1800, p0: camera.position.clone(), c: camera.position.clone().add(destino).multiplyScalar(0.5),
+            q0: camera.quaternion.clone(), f0: camera.fov, d: { p: destino, q, f: camera.fov }, i: null };
+}
+for (const b of botonesGravedad) b.onclick = () => girarA(b.dataset.eje);
+
+// ---------- Portales: la contraforma de cada H ----------
+// Al atravesar la H caminando se pasa al otro lado del mismo piso: la habitación espejada a través de ese plano,
+// con la gravedad invertida. Es el mismo piso visto desde abajo (y, en el sistema sonoro, la misma tónica en otro acorde).
+const portal = datos.portal;
+const pasos = [];
+{
+  const salas = [new THREE.Matrix4(), ...Object.values(datos.habitaciones).map(matriz)];
+  const mods = [new THREE.Matrix4(), ...datos.modulo.map(matriz)];
+  for (const S of salas) mods.forEach((M, g) => pasos.push({ inv: S.clone().multiply(M).invert(), eje: "zxy"[g], prev: null }));
+}
+const destello = document.getElementById("destello");
+let enfriar = 0;
+const vB = new THREE.Vector3();
+function revisarPortales() {
+  if (!portal || vuelo || modo !== "caminar" || performance.now() < enfriar) return;
+  const camB = aBlender(camera.position);
+  for (const p of pasos) {
+    const L = vB.set(camB[0], camB[1], camB[2]).applyMatrix4(p.inv);
+    const dentro = L.y > portal.y[0] && L.y < portal.y[1] && L.z > portal.z[0] - 1 && L.z < portal.z[1];
+    const lado = Math.sign(L.x - portal.x);
+    if (dentro && p.prev && p.prev.dentro && p.prev.lado !== lado) { cruzar(p); return; }
+    p.prev = { dentro, lado };
+  }
+}
+function cruzar(p) {
+  const i = "xyz".indexOf(p.eje);
+  const espejo = (v) => { const b = aBlender(v); b[i] = -b[i]; return deBlender(b); };
+  const adelante = espejo(new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion));
+  const arriba = espejo(new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion));
+  camera.position.copy(espejo(camera.position));
+  camera.up.copy(arriba);
+  camera.lookAt(camera.position.clone().add(adelante));
+  for (const q of pasos) q.prev = null;
+  enfriar = performance.now() + 1200;
+  destello.style.transition = "none";
+  destello.style.opacity = 0.85;
+  requestAnimationFrame(() => { destello.style.transition = ""; destello.style.opacity = 0; });
+  const s = aBlender(camera.position).map((c) => (c >= 0 ? "+" : "−")).join("");
+  actual = -1;
+  botonesInst.forEach((b) => b.setAttribute("aria-pressed", false));
+  notaTitulo.textContent = "Portal · gravedad " + p.eje + " invertida";
+  notaTexto.textContent = "Atravesaste la H: estás del otro lado del mismo piso, en la habitación " + s +
+    ", que es su espejo. El piso es el mismo; ahora lo pisás desde abajo.";
+  legibCaja.hidden = true;
+  nota.hidden = false;
 }
 
 // Legibilidad de la anamorfosis: máxima parado en el punto y mirando hacia donde mira la frase.
@@ -677,13 +764,15 @@ function cuadro() {
     orbita.update();
   }
   legibilidad();
+  revisarPortales();
   cielo.position.copy(camera.position);
   renderer.render(scene, camera);
-  requestAnimationFrame(cuadro);
 }
+function bucle() { cuadro(); requestAnimationFrame(bucle); }
 irAInstancia(0, true);
-cuadro();
-window.visor = { scene, camera, renderer, raiz, irAInstancia, instancias, datos, uTiempo, entorno };   // para depurar desde la consola
+bucle();
+// Para depurar desde la consola (paso = un cuadro sin esperar a requestAnimationFrame).
+window.visor = { scene, camera, renderer, raiz, irAInstancia, instancias, datos, uTiempo, entorno, girarA, paso: cuadro };
 
 function ajustarTamano() {
   if (!innerWidth || !innerHeight) return;
