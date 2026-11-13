@@ -60,14 +60,14 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 /* Mapa lateral: el icosaedro en miniatura, con el piso de la gravedad activa siempre abajo, y la ficha del lugar. */
 #mapa {
   position: fixed; z-index: 2; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(112px + env(safe-area-inset-top, 0px));
-  width: 236px; padding: 10px 12px 12px; background: rgba(22, 25, 28, .5); border-left: 1px solid rgba(233, 227, 214, .25);
-  color: #fff; font-family: var(--mono); font-size: 11px; line-height: 1.45; pointer-events: none;
+  width: 190px; padding: 8px 10px 10px; background: rgba(22, 25, 28, .5); border-left: 1px solid rgba(233, 227, 214, .25);
+  color: #fff; font-family: var(--mono); font-size: 9.5px; line-height: 1.4; pointer-events: none;
 }
-#mapaLienzo { display: block; position: static; inset: auto; width: 212px; height: 212px; }
-#ficha { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 8px 0 0; }
-#ficha dt { color: #bdb8ad; text-transform: uppercase; font-size: 9.5px; letter-spacing: .1em; padding-top: 2px; }
+#mapaLienzo { display: block; position: static; inset: auto; width: 170px; height: 170px; }
+#ficha { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 6px 0 0; }
+#ficha dt { color: #bdb8ad; text-transform: uppercase; font-size: 8px; letter-spacing: .1em; padding-top: 2px; }
 #ficha dd { margin: 0; color: #fff; }
-@media (max-width: 900px) { #mapa { width: 140px; padding: 6px; } #mapaLienzo { width: 128px; height: 128px; } #ficha { display: none; } }
+@media (max-width: 900px) { #mapa { width: 112px; padding: 5px; } #mapaLienzo { width: 102px; height: 102px; } #ficha { display: none; } }
 #destello { position: fixed; inset: 0; z-index: 1; background: var(--papel); opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
 .chip { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 8px 10px; border: 1px solid var(--lacre); color: var(--papel); background: rgba(155, 61, 46, .35); border-radius: 2px; }
 /* Las 10 instancias en una sola fila, a todo el ancho. */
@@ -123,6 +123,7 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
     <button class="grav" data-eje="z" aria-pressed="true">Z</button>
   </div>
   <div class="grupo">
+    <button id="sonido" aria-pressed="false" title="El espacio donde estás suena: su tónica (el piso), su tríada y su modo">Escuchar</button>
     <button id="enderezar" title="Vuelve a poner el horizonte derecho">Enderezar</button>
     <button id="rapido" aria-pressed="false">Rápido</button>
   </div>
@@ -136,7 +137,7 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 <p class="ayuda" id="ayuda">Arrastrá para girar · pellizcá para acercarte · dos dedos para desplazar.</p>
 <div id="destello"></div>
 <aside id="mapa" aria-label="Mapa: dónde estás en el icosaedro">
-  <canvas id="mapaLienzo" width="424" height="424"></canvas>
+  <canvas id="mapaLienzo" width="340" height="340"></canvas>
   <dl id="ficha"></dl>
 </aside>
 <div id="nota" hidden>
@@ -726,7 +727,7 @@ for (const b of botonesGravedad) b.onclick = () => girarA(b.dataset.eje);
 // ---------- Mapa lateral: el icosaedro en miniatura y la ficha del lugar ----------
 const mapaRender = new THREE.WebGLRenderer({ canvas: document.getElementById("mapaLienzo"), antialias: true, alpha: true });
 mapaRender.setPixelRatio(1);
-mapaRender.setSize(424, 424, false);
+mapaRender.setSize(340, 340, false);
 mapaRender.outputEncoding = THREE.sRGBEncoding;
 const mapa = new THREE.Scene();
 const mapaCam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
@@ -739,6 +740,14 @@ const enMapa = (b) => deBlender(b.map((c) => c / CORTO));
   const columnas = [];
   for (const v of VERTICES) columnas.push(enMapa(v.p.map((c) => (Math.abs(c) > LARGO - 1 ? 0 : c))), enMapa(v.p));
   mapa.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(columnas), new THREE.LineBasicMaterial({ color: 0xffffff })));
+  // Pisos y paredes de las habitaciones: el cuadrado central de cada rectángulo y las tres líneas donde se cruzan.
+  const C = CORTO, pisos = [];
+  const cuadrado = (esq) => { for (let k = 0; k < 4; k++) pisos.push(enMapa(esq[k]), enMapa(esq[(k + 1) % 4])); };
+  cuadrado([[0, -C, -C], [0, C, -C], [0, C, C], [0, -C, C]]);
+  cuadrado([[-C, 0, -C], [C, 0, -C], [C, 0, C], [-C, 0, C]]);
+  cuadrado([[-C, -C, 0], [C, -C, 0], [C, C, 0], [-C, C, 0]]);
+  for (const [a, b] of [[[-C, 0, 0], [C, 0, 0]], [[0, -C, 0], [0, C, 0]], [[0, 0, -C], [0, 0, C]]]) pisos.push(enMapa(a), enMapa(b));
+  mapa.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pisos), new THREE.LineBasicMaterial({ color: 0xffffff })));
   const punto = new THREE.SphereGeometry(0.045, 10, 6);
   for (const v of VERTICES) { const s = new THREE.Mesh(punto, new THREE.MeshBasicMaterial({ color: 0xffffff })); s.position.copy(enMapa(v.p)); mapa.add(s); }
 }
@@ -794,6 +803,7 @@ function actualizarMapa(dt) {
   fichaReloj = 0.25;
   const A = window.Audio24;
   const sp = A && A.SPACES.find((s) => s.roomSign === sala && s.p === i);
+  espacioActual = sp || null;
   const filas = [["Habitación", "( " + sala.split(" ").join(" , ") + " )"],
                  ["Gravedad", ejeActivo + " · piso " + ejeActivo + " = 0"],
                  ["Cuento", CUENTO[ejeActivo]]];
@@ -814,6 +824,52 @@ function actualizarMapa(dt) {
     return [dt_, dd];
   }));
 }
+
+// ---------- Sonido: suena el espacio donde estás (audio/engine.js) ----------
+// Bajo en la tónica (el piso), las otras dos notas de la tríada de la habitación en afinación justa y una melodía
+// de 7 notas en 12 unidades con el ritmo del modo, la nota característica acentuada en la cuarta y cierre en la tónica.
+// Timbre según el plano del piso: x órgano de flautas, y cuerda frotada, z voz. Al cambiar de espacio (otra
+// gravedad, un portal, otra habitación), el motor se renueva y el anterior se desvanece.
+// En las anamorfosis, el acorde se desafina cuando la frase se desarma: leer es afinar.
+let espacioActual = null, desafino = 0;
+const botonSonido = document.getElementById("sonido");
+let audio = null;
+function sonidoPaso() {
+  if (!audio || !espacioActual || audio.ctx.state !== "running") return;
+  const A = window.Audio24, ahora = audio.ctx.currentTime;
+  if (!audio.sp || audio.sp.i !== espacioActual.i) {
+    if (audio.eng) audio.eng.fadeOut(ahora);
+    audio.eng = A.makeEngine(audio.ctx, audio.bus.in, A.TIMBRES[espacioActual.p]);
+    audio.eng.fadeIn(ahora);
+    audio.sp = espacioActual;
+    audio.rep = 0;
+    audio.prox = ahora + 0.08;
+  }
+  while (audio.prox < ahora + 0.7) {
+    A.schedulePhrase(audio.eng, audio.sp, audio.prox, audio.rep++);
+    audio.prox += A.PHRASE;
+  }
+  const cents = 30 * desafino;
+  audio.eng.padA.c.detune.setTargetAtTime(cents, ahora, 0.2);
+  audio.eng.padB.c.detune.setTargetAtTime(-cents, ahora, 0.2);
+}
+setInterval(sonidoPaso, 120);
+botonSonido.onclick = async () => {
+  try {
+    if (!audio) {
+      const Contexto = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Contexto();
+      audio = { ctx, bus: window.Audio24.makeBus(ctx, ctx.destination), eng: null, sp: null, rep: 0, prox: 0 };
+    }
+    const sonando = botonSonido.getAttribute("aria-pressed") === "true";
+    if (sonando) await audio.ctx.suspend(); else await audio.ctx.resume();
+    botonSonido.setAttribute("aria-pressed", !sonando);
+    botonSonido.textContent = sonando ? "Escuchar" : "Silenciar";
+    sonidoPaso();
+  } catch (e) {
+    botonSonido.textContent = "Sin sonido";
+  }
+};
 
 // ---------- Portales: la contraforma de cada H ----------
 // Al atravesar la H caminando se pasa al otro lado del mismo piso: la habitación espejada a través de ese plano,
@@ -865,13 +921,14 @@ function cruzar(p) {
 // Legibilidad de la anamorfosis: máxima parado en el punto y mirando hacia donde mira la frase.
 const vF = new THREE.Vector3(), vT = new THREE.Vector3();
 function legibilidad() {
-  if (actual < 0 || !instancias[actual].anamorfosis) return;
+  if (actual < 0 || !instancias[actual].anamorfosis) { desafino = 0; return; }
   const p = poses[actual];
   vF.set(0, 0, -1).applyQuaternion(camera.quaternion);
   vT.set(0, 0, -1).applyQuaternion(p.q);
   const ang = Math.acos(Math.min(1, Math.max(-1, vF.dot(vT))));
   const l = Math.max(0, 1 - camera.position.distanceTo(p.p) / 6) * Math.max(0, 1 - ang / 0.6);
   legibBarra.style.width = (l * 100).toFixed(0) + "%";
+  desafino = 1 - l;
 }
 
 // Enderezar: deja la mirada y pone "arriba" en la vertical del mundo.
@@ -973,7 +1030,7 @@ function bucle() { cuadro(); requestAnimationFrame(bucle); }
 irAInstancia(0, true);
 bucle();
 // Para depurar desde la consola (paso = un cuadro sin esperar a requestAnimationFrame).
-window.visor = { scene, camera, renderer, raiz, irAInstancia, instancias, datos, uTiempo, entorno, girarA, paso: cuadro };
+window.visor = { scene, camera, renderer, raiz, irAInstancia, instancias, datos, uTiempo, entorno, girarA, paso: cuadro, get audio() { return audio; } };
 
 function ajustarTamano() {
   if (!innerWidth || !innerHeight) return;
