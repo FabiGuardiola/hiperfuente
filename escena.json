@@ -165,128 +165,209 @@
    1.0
   ]
  },
- "momentos": [
+ "instancias": [
   {
    "titulo": "Dron",
+   "nota": "El objeto completo: tres planos áureos, ocho habitaciones, tres gravedades y, alrededor, las cuatro partes del relato.",
    "pos": [
-    222.93748474121094,
-    57.39284896850586,
-    76.09697723388672
+    196.852,
+    -118.717,
+    89.4405
    ],
    "quat": [
-    0.3587600290775299,
-    0.4225562810897827,
-    0.6348786354064941,
-    0.5382068753242493
+    0.505844,
+    0.237901,
+    0.352881,
+    0.750333
    ],
-   "lente": 35.0
+   "lente": 35.0,
+   "modo": "orbitar",
+   "anamorfosis": false
+  },
+  {
+   "titulo": "El titular",
+   "nota": "El periódico del prólogo, impreso sobre el piso: cuatro muertos en la Biblioteca Babel.",
+   "pos": [
+    204.4322,
+    105.3921,
+    72.2727
+   ],
+   "quat": [
+    0.294931,
+    0.471042,
+    0.704623,
+    0.441182
+   ],
+   "lente": 35.0,
+   "modo": "caminar",
+   "anamorfosis": false
   },
   {
    "titulo": "La H",
+   "nota": "El portal es una H gigante y se entra por su contraforma. Hexágono: la unidad de la Biblioteca.",
    "pos": [
-    58.0,
-    10.154999732971191,
-    3.3550000190734863
+    63.1594,
+    10.155,
+    3.5686
    ],
    "quat": [
-    0.5473736524581909,
-    0.5473736524581909,
-    0.447640597820282,
-    0.447640597820282
+    0.541587,
+    0.535275,
+    0.449824,
+    0.466715
    ],
-   "lente": 22.0
+   "lente": 22.0,
+   "modo": "caminar",
+   "anamorfosis": false
   },
   {
    "titulo": "Escalera",
+   "nota": "Cada escalón es un renglón. Las letras giran como en un cartel de aeropuerto y se detienen cuando te parás de frente.",
    "pos": [
-    44.20000076293945,
-    10.154999732971191,
-    23.958999633789062
+    48.7735,
+    10.155,
+    20.009
    ],
    "quat": [
-    0.574932336807251,
-    0.5859026312828064,
-    0.4076366424560547,
-    0.4000040888786316
+    0.547368,
+    0.58461,
+    0.437555,
+    0.408859
    ],
-   "lente": 22.0
+   "lente": 22.0,
+   "modo": "caminar",
+   "anamorfosis": false
   },
   {
    "titulo": "El muro",
+   "nota": "Cambio de gravedad: el muro de texto de Babel pasa a ser piso y la hyper cambia de peso.",
    "pos": [
-    36.10499954223633,
-    9.154999732971191,
-    33.755001068115234
+    36.105,
+    9.0186,
+    35.1649
    ],
    "quat": [
-    0.6973916888237,
-    0.6839016675949097,
-    0.11681114137172699,
-    0.1796623021364212
+    0.697751,
+    0.685394,
+    0.115649,
+    0.173217
    ],
-   "lente": 22.0
-  },
-  {
-   "titulo": "El Aleph",
-   "pos": [
-    9.5,
-    9.0,
-    3.6549999713897705
-   ],
-   "quat": [
-    0.861219048500061,
-    -0.12061798572540283,
-    -0.06847867369651794,
-    0.4889414608478546
-   ],
-   "lente": 22.0
+   "lente": 22.0,
+   "modo": "caminar",
+   "anamorfosis": false
   },
   {
    "titulo": "Mirada z",
+   "nota": "Anamorfosis de la gravedad z. Las letras están a distintas profundidades: desde este punto forman la frase; si te movés, se desarman.",
    "pos": [
     66.0,
     30.0,
-    3.3550000190734863
+    3.355
    ],
    "quat": [
-    0.6033821105957031,
-    -0.47110649943351746,
-    -0.3959681987762451,
-    0.5071467757225037
+    0.603382,
+    -0.471106,
+    -0.395968,
+    0.507147
    ],
-   "lente": 22.0
+   "lente": 22.0,
+   "modo": "caminar",
+   "anamorfosis": true
   },
   {
    "titulo": "Mirada x",
+   "nota": "Anamorfosis de la gravedad x: el mismo punto, girado. Parado en otro piso, la frase de este lado se ordena.",
    "pos": [
-    3.3550000190734863,
+    3.355,
     66.0,
     30.0
    ],
    "quat": [
-    0.592833399772644,
-    0.5176955461502075,
-    -0.48165497183799744,
-    0.38541990518569946
+    0.592833,
+    0.517696,
+    -0.481655,
+    0.38542
    ],
-   "lente": 22.0
+   "lente": 22.0,
+   "modo": "caminar",
+   "anamorfosis": true
   },
   {
    "titulo": "Mirada y",
+   "nota": "Anamorfosis de la gravedad y. Tres pisos, tres frases, un solo punto de vista cada una.",
    "pos": [
     30.0,
-    3.3550000190734863,
+    3.355,
     66.0
    ],
    "quat": [
-    0.010548517107963562,
-    -0.9888018369674683,
-    0.08568675816059113,
-    0.12172702699899673
+    0.010549,
+    -0.988802,
+    0.085687,
+    0.121727
    ],
-   "lente": 22.0
+   "lente": 22.0,
+   "modo": "caminar",
+   "anamorfosis": true
+  },
+  {
+   "titulo": "Horizonte",
+   "nota": "«Todos los caminos parecen posibles»: tan grande y tan lejos que se lee.",
+   "pos": [
+    -135.0,
+    -50.0,
+    75.0
+   ],
+   "quat": [
+    0.408686,
+    0.583545,
+    0.5748,
+    0.402562
+   ],
+   "lente": 22.0,
+   "modo": "caminar",
+   "anamorfosis": false
+  },
+  {
+   "titulo": "El Aleph",
+   "nota": "El núcleo, donde se tocan las tres gravedades y todas las versiones conviven.",
+   "pos": [
+    11.1535,
+    8.9667,
+    3.655
+   ],
+   "quat": [
+    0.531433,
+    0.731053,
+    0.342438,
+    0.256664
+   ],
+   "lente": 22.0,
+   "modo": "caminar",
+   "anamorfosis": false
   }
  ],
+ "puntos": {
+  "z": [
+   66.0,
+   30.0,
+   3.355
+  ],
+  "x": [
+   3.355,
+   66.0,
+   30.0
+  ],
+  "y": [
+   30.0,
+   3.355,
+   66.0
+  ]
+ },
+ "codigo": {
+  "min": -20.0,
+  "rango": 120.0
+ },
  "materiales": {
   "Color_1c4056": [
    0.108,
