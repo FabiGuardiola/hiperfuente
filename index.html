@@ -804,6 +804,7 @@ function actualizarMapa(dt) {
   const A = window.Audio24;
   const sp = A && A.SPACES.find((s) => s.roomSign === sala && s.p === i);
   espacioActual = sp || null;
+  plagalActual = sala.split(" ")[i] === "-";            // del lado negativo del plano del piso: plagal
   const filas = [["Habitación", "( " + sala.split(" ").join(" , ") + " )"],
                  ["Gravedad", ejeActivo + " · piso " + ejeActivo + " = 0"],
                  ["Cuento", CUENTO[ejeActivo]]];
@@ -812,7 +813,7 @@ function actualizarMapa(dt) {
     const triada = [0, sp.q === "M" ? 4 : 3, 7].map((d) => N[(sp.root + d) % 12]);
     filas.push(["Tónica", N[sp.tonic] + " (el piso)"],
                ["Tríada", N[sp.root] + (sp.q === "M" ? " mayor" : " menor") + " · " + triada.join(" ")],
-               ["Modo", sp.mode + " · tónica en la " + sp.role],
+               ["Modo", nombreModo(sp.mode, plagalActual) + " · " + (plagalActual ? "plagal" : "auténtico") + " · tónica en la " + sp.role],
                ["Característica", N[(sp.tonic + md.semi[md.c]) % 12] + " · " + md.cname],
                ["Timbre", A.TIMBRES[sp.p].name.toLowerCase()],
                ["Espacio", (sp.i + 1) + " de 24"]);
@@ -825,51 +826,117 @@ function actualizarMapa(dt) {
   }));
 }
 
-// ---------- Sonido: suena el espacio donde estás (audio/engine.js) ----------
-// Bajo en la tónica (el piso), las otras dos notas de la tríada de la habitación en afinación justa y una melodía
-// de 7 notas en 12 unidades con el ritmo del modo, la nota característica acentuada en la cuarta y cierre en la tónica.
-// Timbre según el plano del piso: x órgano de flautas, y cuerda frotada, z voz. Al cambiar de espacio (otra
-// gravedad, un portal, otra habitación), el motor se renueva y el anterior se desvanece.
-// En las anamorfosis, el acorde se desafina cuando la frase se desarma: leer es afinar.
-let espacioActual = null, desafino = 0;
+// ---------- Sonido: una sola pieza que modula según dónde estás (sistema de audio/engine.js) ----------
+// Un consort de tres voces, una por plano y con su timbre (x órgano de flautas, y cuerda frotada, z voz):
+//   · cada pared suena su nota (las tres paredes de la habitación son su tríada, en afinación justa) y
+//     suena más fuerte cuanto más cerca está el lector de esa pared: al moverse, cambia la mezcla;
+//   · el piso es la tónica: bajo una octava abajo y la melodía, en el timbre del piso;
+//   · la melodía tiene 4 frases de 12 unidades (ascenso, arco, descenso y cláusula sobre la final), con el
+//     ritmo del modo (tono = 2, semitono = 1) y la nota característica acentuada en cada frase.
+// Modos de Glarean (Dodecachordon, 1547): 6 especies, auténtico o plagal. Del lado positivo del plano del piso
+// el modo es auténtico (de la final a la octava); del lado negativo, plagal (una cuarta abajo de la final a la
+// quinta arriba). Cruzar una H cambia de auténtico a plagal sobre el mismo piso.
+// Hay un solo reloj: un cambio de espacio espera al comienzo de la frase siguiente y entra deslizando las
+// notas (modula dentro de la misma pieza, sin cortar el pulso). En las anamorfosis, el acorde se desafina
+// cuando la frase se desarma: leer es afinar.
+let espacioActual = null, plagalActual = false, desafino = 0;
 const botonSonido = document.getElementById("sonido");
+const CONTORNOS = [[0, 2, 4, "C", 4, 5, 4], [4, 5, 7, "C", 6, 5, 4], [7, 6, 4, "C", 3, 2, 1], [2, 4, 3, "C", 2, 1, 0]];
+const nombreModo = (modo, plagal) => (plagal ? "Hipo" + modo.toLowerCase() : modo);
+function melodia(sp, plagal, k) {
+  const A = window.Audio24, md = A.MODES[sp.mode];
+  const [lo, hi] = plagal ? [-4, 5] : [0, 8];
+  let prev = k === 0 ? 0 : (plagal ? 1 : 4), inicio = 0;
+  return CONTORNOS[k].map((d0, i) => {
+    const d = d0 === "C" ? md.c : d0;
+    let mejor = null;
+    for (let o = -2; o <= 2; o++) {
+      const pos = (d % 7) + 7 * o;
+      if (pos < lo || pos > hi) continue;
+      if (mejor === null || Math.abs(pos - prev) < Math.abs(mejor - prev)) mejor = pos;
+    }
+    if (mejor === null) mejor = d % 7;
+    prev = mejor;
+    const grado = ((mejor % 7) + 7) % 7, octava = Math.floor(mejor / 7);
+    const nota = { inicio, dur: md.cells[i], f: sp.f0 * md.ratio[grado] * Math.pow(2, octava), acento: i === 3 };
+    inicio += md.cells[i];
+    return nota;
+  });
+}
+// Razón justa de la nota de cada pared respecto de la tónica (la del piso es 1).
+function razonesDeParedes(sp) {
+  return [0, 1, 2].map((q) => {
+    if (q === sp.p) return 1;
+    const semi = (sp.pcs[q] - sp.tonic + 12) % 12;
+    return sp.padR.find((r) => Math.round(12 * Math.log2(r)) % 12 === semi) || Math.pow(2, semi / 12);
+  });
+}
 let audio = null;
+function afinar(eng, T, v, t, f, tc) {
+  v.c.frequency.setTargetAtTime(f, t, tc);
+  v.m.frequency.setTargetAtTime(f * T.ratio, t, tc);
+  v.mg.gain.setTargetAtTime(f * T.index, t, tc);
+}
+function aplicarEspacio(sp, plagal, t, primera) {
+  const A = window.Audio24, tc = primera ? 0.02 : 0.22;        // al modular, las notas se deslizan
+  const r = razonesDeParedes(sp);
+  audio.motores.forEach((eng, q) => {
+    afinar(eng, A.TIMBRES[q], eng.padA, t, sp.f0 * r[q], tc);
+    const esPiso = q === sp.p;
+    if (esPiso) afinar(eng, A.TIMBRES[q], eng.bass, t, sp.f0 / 2, tc);
+    eng.bass.vca.gain.setTargetAtTime(esPiso ? 0.15 : 0, t, 0.5);
+  });
+  audio.sp = sp;
+  audio.plagal = plagal;
+  audio.frase = 0;
+}
+function programarFrase(t) {
+  const A = window.Audio24, sp = audio.sp, eng = audio.motores[sp.p];
+  for (const n of melodia(sp, audio.plagal, audio.frase % 4))
+    eng.note(eng.lead, t + n.inicio * A.UNIT, n.dur * A.UNIT, n.f, n.acento ? 0.32 : 0.22, n.acento ? 1.4 : 1);
+  audio.frase++;
+}
 function sonidoPaso() {
   if (!audio || !espacioActual || audio.ctx.state !== "running") return;
   const A = window.Audio24, ahora = audio.ctx.currentTime;
-  if (!audio.sp || audio.sp.i !== espacioActual.i) {
-    if (audio.eng) audio.eng.fadeOut(ahora);
-    audio.eng = A.makeEngine(audio.ctx, audio.bus.in, A.TIMBRES[espacioActual.p]);
-    audio.eng.fadeIn(ahora);
-    audio.sp = espacioActual;
-    audio.rep = 0;
-    audio.prox = ahora + 0.08;
-  }
-  while (audio.prox < ahora + 0.7) {
-    A.schedulePhrase(audio.eng, audio.sp, audio.prox, audio.rep++);
+  if (!audio.sp) { aplicarEspacio(espacioActual, plagalActual, ahora + 0.05, true); audio.prox = ahora + 0.1; }
+  while (audio.prox < ahora + 0.6) {
+    if (audio.sp.i !== espacioActual.i || audio.plagal !== plagalActual) aplicarEspacio(espacioActual, plagalActual, audio.prox, false);
+    programarFrase(audio.prox);
     audio.prox += A.PHRASE;
   }
-  const cents = 30 * desafino;
-  audio.eng.padA.c.detune.setTargetAtTime(cents, ahora, 0.2);
-  audio.eng.padB.c.detune.setTargetAtTime(-cents, ahora, 0.2);
+  // Mezcla continua: cada pared suena más cuanto más cerca está el lector.
+  const b = aBlender(camera.position), cents = 30 * desafino;
+  audio.motores.forEach((eng, q) => {
+    const cerca = 1 - THREE.MathUtils.smoothstep(Math.abs(b[q]) - MEDIO_PLANO, 3, 45);
+    eng.padA.vca.gain.setTargetAtTime(0.025 + 0.11 * cerca, ahora, 0.4);
+    eng.padA.c.detune.setTargetAtTime(q % 2 ? cents : -cents, ahora, 0.2);
+  });
 }
-setInterval(sonidoPaso, 120);
+setInterval(sonidoPaso, 100);
+function pintarBotonSonido(encendido) {
+  botonSonido.setAttribute("aria-pressed", encendido);
+  botonSonido.textContent = encendido ? "Sonido: sí" : "Sonido: no";
+}
 botonSonido.onclick = async () => {
   try {
+    const encendido = botonSonido.getAttribute("aria-pressed") === "true";
     if (!audio) {
       const Contexto = window.AudioContext || window.webkitAudioContext;
       const ctx = new Contexto();
-      audio = { ctx, bus: window.Audio24.makeBus(ctx, ctx.destination), eng: null, sp: null, rep: 0, prox: 0 };
+      const bus = window.Audio24.makeBus(ctx, ctx.destination);
+      const motores = [0, 1, 2].map((q) => window.Audio24.makeEngine(ctx, bus.in, window.Audio24.TIMBRES[q]));
+      motores.forEach((m) => m.fadeIn(ctx.currentTime));
+      audio = { ctx, bus, motores, sp: null, plagal: false, frase: 0, prox: 0 };
     }
-    const sonando = botonSonido.getAttribute("aria-pressed") === "true";
-    if (sonando) await audio.ctx.suspend(); else await audio.ctx.resume();
-    botonSonido.setAttribute("aria-pressed", !sonando);
-    botonSonido.textContent = sonando ? "Escuchar" : "Silenciar";
+    if (encendido) await audio.ctx.suspend(); else await audio.ctx.resume();
+    pintarBotonSonido(!encendido);
     sonidoPaso();
   } catch (e) {
     botonSonido.textContent = "Sin sonido";
   }
 };
+pintarBotonSonido(false);
 
 // ---------- Portales: la contraforma de cada H ----------
 // Al atravesar la H caminando se pasa al otro lado del mismo piso: la habitación espejada a través de ese plano,
