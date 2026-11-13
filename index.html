@@ -56,6 +56,7 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 #carga strong { font-family: var(--hyper); font-weight: 400; font-size: 34px; color: var(--lacre); }
 #barraCarga { width: 220px; height: 2px; background: rgba(233, 227, 214, .2); }
 #barraCarga i { display: block; height: 100%; width: 0; background: var(--papel); }
+.chip { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 8px 10px; border: 1px solid var(--lacre); color: var(--papel); background: rgba(155, 61, 46, .35); border-radius: 2px; }
 /* Las 10 instancias en una sola fila, a todo el ancho. */
 .tira { order: 9; flex-basis: 100%; display: grid; grid-template-columns: auto repeat(10, minmax(0, 1fr)); gap: 6px; align-items: center; }
 .tira button { padding: 7px 6px; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
@@ -101,6 +102,7 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
     <span class="rotulo">Instancias</span>
   </nav>
   <div class="grupo">
+    <span id="gravedad" class="chip" title="El piso que funciona como piso desde donde mirás. Se ilumina, y sus textos se ven más.">Gravedad z</span>
     <button id="enderezar" title="Vuelve a poner el horizonte derecho">Enderezar</button>
     <button id="rapido" aria-pressed="false">Rápido</button>
   </div>
@@ -265,6 +267,7 @@ const gltf = await cargarModelo("modelo.gltf.json");
 
 const pieza = {};
 const nodosEntorno = [];
+const nodosTitular = [];
 gltf.scene.traverse((o) => {
   if (o.isMesh) {
     o.userData.mat = o.material.name;
@@ -272,6 +275,7 @@ gltf.scene.traverse((o) => {
   }
   if (["MODULO_Z", "ESTRUCTURA", "ESCALERAS", "UNICO"].includes(o.name)) pieza[o.name] = o;
   else if (o.isMesh && o.name.startsWith("E_")) nodosEntorno.push(o);
+  else if (o.isMesh && o.name.startsWith("T_")) nodosTitular.push(o);
 });
 
 // ---------- Escaleras: cartel de aeropuerto ----------
@@ -337,22 +341,31 @@ raiz.add(fijar(pieza.UNICO, new THREE.Matrix4()));
 // punto), así sigue alineada y se lee desde ahí aunque se mueva. Palabras del relato: flotan despacio.
 const colorDe = (n) => { const c = datos.materiales[n] || [0.5, 0.5, 0.5]; return new THREE.Color().setRGB(c[0], c[1], c[2]); };
 const matsEntorno = {};
-function materialEntorno(tipo, nombre) {
-  const k = tipo + nombre;
+const matsPorEje = { x: [], y: [], z: [] };     // los textos de cada gravedad: se ven más cuando esa gravedad está activa
+function materialEntorno(tipo, nombre, eje) {
+  const k = tipo + nombre + (eje || "");
   if (matsEntorno[k]) return matsEntorno[k];
   const base = colorDe(nombre);
-  return (matsEntorno[k] = new THREE.MeshBasicMaterial({
+  const Clase = tipo === "pie" ? THREE.MeshLambertMaterial : THREE.MeshBasicMaterial;
+  const m = new Clase({
     color: tipo === "hor" ? base.lerp(NIEBLA, 0.04) : base,
-    transparent: true, opacity: { ana: 0.82, pal: 0.55, hor: 0.95 }[tipo],
-    depthWrite: false, side: THREE.DoubleSide, fog: tipo !== "hor",
-  }));
+    transparent: true, opacity: { ana: 0.82, pal: 0.55, hor: 0.95, pie: 1 }[tipo],
+    depthWrite: tipo === "pie", side: THREE.DoubleSide, fog: tipo !== "hor",
+  });
+  if (eje) {
+    m.userData.op = tipo === "ana" ? [0.22, 0.95] : [0.3, 1.0];
+    matsPorEje[eje].push(m);
+  }
+  return (matsEntorno[k] = m);
 }
 const entorno = [];
 nodosEntorno.forEach((nodo, i) => {
   const n = nodo.name;
-  const tipo = n.startsWith("E_Anamorfosis_") ? "ana" : n.startsWith("E_Palabra_") ? "pal" : "hor";
-  const eje = tipo === "ana" ? n.split("_")[2] : null;
-  nodo.material = materialEntorno(tipo, nodo.userData.mat);
+  const tipo = n.startsWith("E_Anamorfosis_") ? "ana" : n.startsWith("E_Palabra_") ? "pal" : n.startsWith("E_Pie_") ? "pie" : "hor";
+  const eje = tipo === "ana" || tipo === "pie" ? n.split("_")[2] : null;
+  nodo.material = materialEntorno(tipo, nodo.userData.mat, eje);
+  nodo.geometry.computeBoundingBox();
+  nodo.userData.centro = nodo.geometry.boundingBox.getCenter(new THREE.Vector3());
   nodo.updateMatrix();
   nodo.matrixAutoUpdate = false;
   nodo.renderOrder = 10;
@@ -361,25 +374,26 @@ nodosEntorno.forEach((nodo, i) => {
   raiz.add(nodo);
 });
 const mA = new THREE.Matrix4(), mB = new THREE.Matrix4();
-// Cuánto se dispersa cada anamorfosis según lo lejos que está el lector de su punto (0 = en el punto).
-const dispersion = {};
-const puntosThree = Object.fromEntries(Object.entries(datos.puntos).map(([k, p]) => [k, blenderAThree(p)]));
+const mC = new THREE.Matrix4();
 function animarEntorno(t) {
-  for (const [eje, p] of Object.entries(puntosThree)) {
-    const d = camera.position.distanceTo(p);
-    dispersion[eje] = THREE.MathUtils.smoothstep(d, 2, 30);
-  }
   for (const e of entorno) {
     if (e.tipo === "ana" && e.P) {
-      // Lejos del punto: las letras van y vienen sobre su rayo y se desvían. Al acercarse se calman y,
-      // en el punto, forman la frase (escalar alrededor del punto conserva la alineación).
-      const a = dispersion[e.eje] ?? 1;
-      const s = 1 + (0.06 + 0.4 * a) * Math.sin(t * (0.5 + 0.4 * a) + e.fase);
-      mA.makeTranslation(a * 2.5 * Math.sin(t * 0.7 + e.fase * 3), a * 2.5 * Math.cos(t * 0.6 + e.fase * 2), a * 1.8 * Math.sin(t * 0.9 + e.fase));
-      mA.multiply(mB.makeTranslation(e.P.x, e.P.y, e.P.z));
+      // Las letras quedan quietas en su desorden: solo desde el punto se alinean. Pero nunca del todo
+      // estáticas: van y vienen un poco sobre su rayo (eso no se ve desde el punto) y tiemblan apenas
+      // alrededor de su centro (eso sí se ve, incluso cuando la frase se lee).
+      const s = 1 + 0.08 * Math.sin(t * 0.45 + e.fase);
+      const c = e.nodo.userData.centro;
+      mA.makeTranslation(e.P.x, e.P.y, e.P.z);
       mA.multiply(mB.makeScale(s, s, s));
       mA.multiply(mB.makeTranslation(-e.P.x, -e.P.y, -e.P.z));
-      e.nodo.matrix.multiplyMatrices(mA, e.base);
+      mA.multiply(e.base);
+      mA.multiply(mB.makeTranslation(c.x, c.y + 0.025 * Math.sin(t * 1.3 + e.fase * 2), c.z));
+      mA.multiply(mB.makeRotationZ(0.045 * Math.sin(t * 0.9 + e.fase * 3)));
+      mA.multiply(mC.makeTranslation(-c.x, -c.y, -c.z));
+      e.nodo.matrix.copy(mA);
+    } else if (e.tipo === "pie") {
+      // Las palabras de pie respiran apenas (se estiran hacia arriba y vuelven), siempre apoyadas en el piso.
+      e.nodo.matrix.multiplyMatrices(e.base, mB.makeScale(1, 1 + 0.03 * Math.sin(t * 0.8 + e.fase), 1));
     } else if (e.tipo === "pal") {
       // Las cuatro partes del relato flotan y giran despacio sobre su eje, siempre.
       mA.makeTranslation(6 * Math.sin(t * 0.17 + e.fase * 2), 6 * Math.cos(t * 0.13 + e.fase), 10 * Math.sin(t * 0.25 + e.fase));
@@ -392,6 +406,58 @@ function animarEntorno(t) {
     e.nodo.matrixWorldNeedsUpdate = true;
   }
 }
+// ---------- Titular: escritura ploteada, la más efímera. Se imprime, se lee y el bombardeo lo borra ----------
+const titulares = nodosTitular.map((nodo, i) => {
+  const m = new THREE.MeshLambertMaterial({ color: colorDe(nodo.userData.mat), side: THREE.DoubleSide });
+  const u = { uDesde: { value: -1e4 }, uHasta: { value: 1e4 } };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying float vLX;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLX = position.x;");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying float vLX;\nuniform float uDesde, uHasta;")
+      .replace("void main() {", "void main() {\nif (vLX < uDesde || vLX > uHasta) discard;");
+  };
+  m.customProgramCacheKey = () => "titular";
+  nodo.material = m;
+  nodo.geometry.computeBoundingBox();
+  const bb = nodo.geometry.boundingBox;
+  raiz.add(nodo);
+  const orden = nodo.name.includes("bajada") ? 2 : nodo.name.endsWith("_2") ? 1 : 0;
+  return { u, min: bb.min.x - 0.5, max: bb.max.x + 0.5, retraso: orden * 1.4 };
+});
+const CICLO = 24;       // s: 7 imprimiéndose, 10 para leer, 3 borrándose, 4 en blanco
+function animarTitular(t) {
+  for (const e of titulares) {
+    const c = (((t - e.retraso) % CICLO) + CICLO) % CICLO;
+    const ancho = e.max - e.min;
+    let desde = e.min - 1, hasta = e.max + 1;
+    if (c < 7) hasta = e.min + ancho * Math.floor((c / 7) * 60) / 60;      // de a golpes, como una máquina
+    else if (c < 17) { /* se lee */ }
+    else if (c < 20) desde = e.min + ancho * ((c - 17) / 3);                // el bombardeo lo borra
+    else hasta = e.min - 1;
+    e.u.uDesde.value = desde;
+    e.u.uHasta.value = hasta;
+  }
+}
+
+// ---------- Gravedad activa: la que tiene el "arriba" de la mirada. Su piso se ilumina y sus textos se ven más ----------
+const chipGravedad = document.getElementById("gravedad");
+const vArriba = new THREE.Vector3();
+const brillo = { x: 0, y: 0, z: 1 };
+let ejeActivo = "";
+function gravedadActiva(dt) {
+  vArriba.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  const b = [Math.abs(vArriba.x), Math.abs(vArriba.z), Math.abs(vArriba.y)];      // en ejes de Blender
+  const eje = "xyz"[b.indexOf(Math.max(...b))];
+  if (eje !== ejeActivo) { ejeActivo = eje; chipGravedad.textContent = "Gravedad " + eje; }
+  for (const e of "xyz") {
+    brillo[e] += ((e === eje ? 1 : 0) - brillo[e]) * Math.min(1, dt * 3);
+    const piso = materiales["Fotocopia_Plano_" + e + "0"];
+    if (piso && piso.emissive) piso.emissive.setRGB(0.42, 0.27, 0.12).multiplyScalar(brillo[e]);
+    for (const m of matsPorEje[e]) m.opacity = m.userData.op[0] + (m.userData.op[1] - m.userData.op[0]) * brillo[e];
+  }
+}
+
 raiz.updateMatrixWorld(true);
 document.getElementById("carga").hidden = true;
 
@@ -586,6 +652,8 @@ function cuadro() {
   const dt = Math.min(reloj.getDelta(), 0.1);
   uTiempo.value = reloj.elapsedTime;
   uCamara.value.copy(camera.position);
+  animarTitular(reloj.elapsedTime);
+  gravedadActiva(dt);
   // Si la página se abrió en una pestaña oculta, el lienzo quedó en 0 × 0: se corrige apenas hay tamaño.
   if (innerWidth > 0 && (renderer.domElement.clientWidth !== innerWidth || renderer.domElement.width === 0)) ajustarTamano();
   const tt = reloj.elapsedTime, parpadeo = 0.55 + 0.25 * Math.sin(tt * 2.3) + 0.2 * Math.sin(tt * 7.1 + 1.3) * Math.sin(tt * 0.9);

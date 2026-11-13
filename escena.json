@@ -186,7 +186,7 @@
   },
   {
    "titulo": "Titular",
-   "nota": "El periódico del prólogo, impreso sobre el piso: cuatro muertos en la Biblioteca Babel.",
+   "nota": "Escritura ploteada, la más efímera: el titular del prólogo se imprime sobre el piso, se lee y el bombardeo lo borra. Y vuelve a empezar.",
    "pos": [
     92.0,
     24.0,
@@ -222,17 +222,17 @@
   },
   {
    "titulo": "Escalera",
-   "nota": "Cada escalón es un renglón. Las letras se dan vuelta como en un cartel de aeropuerto y se quedan quietas cuando te parás de frente.",
+   "nota": "Cada escalón es un renglón y el texto sigue de uno al otro: se lee subiendo. Las letras se dan vuelta como en un cartel de aeropuerto y se quedan quietas cuando te parás de frente.",
    "pos": [
-    57.0,
-    27.0,
-    16.0
+    37.0,
+    10.16,
+    46.3
    ],
    "quat": [
-    0.273248,
-    0.727236,
-    0.58942,
-    0.221466
+    0.50677,
+    0.50677,
+    0.493137,
+    0.493137
    ],
    "lente": 24.0,
    "modo": "caminar",
@@ -260,15 +260,15 @@
    "titulo": "Mirada z",
    "nota": "Anamorfosis de la gravedad z. Las letras están a distintas profundidades: desde este punto forman la frase; si te movés, se desarman.",
    "pos": [
-    66.0,
-    30.0,
+    64.0,
+    40.0,
     3.355
    ],
    "quat": [
-    0.603382,
-    -0.471106,
-    -0.395968,
-    0.507147
+    0.413714,
+    0.723344,
+    0.479878,
+    0.274464
    ],
    "lente": 22.0,
    "modo": "caminar",
@@ -279,14 +279,14 @@
    "nota": "Anamorfosis de la gravedad x: el mismo punto, girado. Parado en otro piso, la frase de este lado se ordena.",
    "pos": [
     3.355,
-    66.0,
-    30.0
+    64.0,
+    40.0
    ],
    "quat": [
-    0.592833,
-    0.517696,
-    -0.481655,
-    0.38542
+    -0.222356,
+    -0.465822,
+    -0.531986,
+    0.671236
    ],
    "lente": 22.0,
    "modo": "caminar",
@@ -296,15 +296,15 @@
    "titulo": "Mirada y",
    "nota": "Anamorfosis de la gravedad y. Tres pisos, tres frases, un solo punto de vista cada una.",
    "pos": [
-    30.0,
+    40.0,
     3.355,
-    66.0
+    64.0
    ],
    "quat": [
-    0.010549,
-    -0.988802,
-    0.085687,
-    0.121727
+    0.191358,
+    0.257522,
+    -0.052108,
+    0.9457
    ],
    "lente": 22.0,
    "modo": "caminar",
@@ -349,19 +349,19 @@
  ],
  "puntos": {
   "z": [
-   66.0,
-   30.0,
+   64.0,
+   40.0,
    3.355
   ],
   "x": [
    3.355,
-   66.0,
-   30.0
+   64.0,
+   40.0
   ],
   "y": [
-   30.0,
+   40.0,
    3.355,
-   66.0
+   64.0
   ]
  },
  "codigo": {
