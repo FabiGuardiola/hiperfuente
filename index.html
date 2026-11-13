@@ -64,10 +64,14 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
   color: #fff; font-family: var(--mono); font-size: 9.5px; line-height: 1.4; pointer-events: none;
 }
 #mapaLienzo { display: block; position: static; inset: auto; width: 170px; height: 170px; }
+#sonido { pointer-events: auto; display: block; width: 100%; margin-bottom: 6px; font-size: 12px; font-weight: 500; letter-spacing: .06em; padding: 9px 8px; text-align: left; }
+#sonido[aria-pressed="true"] { background: var(--lacre); border-color: var(--lacre); }
+#aviso { min-height: 0; font-size: 10.5px; line-height: 1.35; color: #fff; background: rgba(155, 61, 46, .85); padding: 0 6px; max-height: 0; overflow: hidden; transition: max-height .4s, padding .4s; }
+#aviso.visible { max-height: 60px; padding: 5px 6px; }
 #ficha { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 6px 0 0; }
 #ficha dt { color: #bdb8ad; text-transform: uppercase; font-size: 8px; letter-spacing: .1em; padding-top: 2px; }
 #ficha dd { margin: 0; color: #fff; }
-@media (max-width: 900px) { #mapa { width: 112px; padding: 5px; } #mapaLienzo { width: 102px; height: 102px; } #ficha { display: none; } }
+@media (max-width: 900px) { #mapa { width: 112px; padding: 5px; } #mapaLienzo { width: 102px; height: 102px; } #ficha { display: none; } #sonido { font-size: 10.5px; padding: 8px 5px; } }
 #destello { position: fixed; inset: 0; z-index: 1; background: var(--papel); opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
 .chip { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 8px 10px; border: 1px solid var(--lacre); color: var(--papel); background: rgba(155, 61, 46, .35); border-radius: 2px; }
 /* Las 10 instancias en una sola fila, a todo el ancho. */
@@ -123,7 +127,6 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
     <button class="grav" data-eje="z" aria-pressed="true">Z</button>
   </div>
   <div class="grupo">
-    <button id="sonido" aria-pressed="false" title="El espacio donde estás suena: su tónica (el piso), su tríada y su modo">Escuchar</button>
     <button id="enderezar" title="Vuelve a poner el horizonte derecho">Enderezar</button>
     <button id="rapido" aria-pressed="false">Rápido</button>
   </div>
@@ -137,6 +140,8 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 <p class="ayuda" id="ayuda">Arrastrá para girar · pellizcá para acercarte · dos dedos para desplazar.</p>
 <div id="destello"></div>
 <aside id="mapa" aria-label="Mapa: dónde estás en el icosaedro">
+  <button id="sonido" aria-pressed="false" title="Prende o apaga el sonido: suena el espacio donde estás">♪ Sonido · OFF</button>
+  <div id="aviso" aria-live="polite"></div>
   <canvas id="mapaLienzo" width="340" height="340"></canvas>
   <dl id="ficha"></dl>
 </aside>
@@ -877,15 +882,46 @@ function afinar(eng, T, v, t, f, tc) {
   v.m.frequency.setTargetAtTime(f * T.ratio, t, tc);
   v.mg.gain.setTargetAtTime(f * T.index, t, tc);
 }
+const avisoSonido = document.getElementById("aviso");
+let avisoReloj = null;
 function aplicarEspacio(sp, plagal, t, primera) {
   const A = window.Audio24, tc = primera ? 0.02 : 0.22;        // al modular, las notas se deslizan
+  const md = A.MODES[sp.mode], N = A.NOTE;
   const r = razonesDeParedes(sp);
+  // Cuarta voz: la nota característica del modo, sostenida (lo que distingue a un modo de otro con el mismo acorde).
+  const fCaract = sp.f0 * md.ratio[md.c] * (plagal ? 0.5 : 1);
   audio.motores.forEach((eng, q) => {
     afinar(eng, A.TIMBRES[q], eng.padA, t, sp.f0 * r[q], tc);
     const esPiso = q === sp.p;
-    if (esPiso) afinar(eng, A.TIMBRES[q], eng.bass, t, sp.f0 / 2, tc);
+    if (esPiso) {
+      afinar(eng, A.TIMBRES[q], eng.bass, t, sp.f0 / 2, tc);
+      afinar(eng, A.TIMBRES[q], eng.padB, t, fCaract, tc);
+    }
     eng.bass.vca.gain.setTargetAtTime(esPiso ? 0.15 : 0, t, 0.5);
+    eng.padB.vca.gain.setTargetAtTime(esPiso ? 0.11 : 0, t, 0.6);
   });
+  if (!primera) {
+    // Señal de la modulación, en el tiempo fuerte: un arpegio agudo de las cuatro notas (tónica, las otras dos
+    // de la tríada y la característica) en los timbres de las paredes, y el bajo que se hincha.
+    const otros = audio.motores.filter((e, q) => q !== sp.p);
+    const arpegio = [1, r[(sp.p + 1) % 3], r[(sp.p + 2) % 3], md.ratio[md.c]].map((x) => sp.f0 * 2 * (x < 1 ? x * 2 : x));
+    arpegio.forEach((f, k) => {
+      const e = otros[k % 2];
+      e.note(e.lead, t + k * A.UNIT, 2.2 * A.UNIT, f, 0.3, 1.6);
+    });
+    const piso = audio.motores[sp.p];
+    piso.bass.vca.gain.setTargetAtTime(0.26, t, 0.05);
+    piso.bass.vca.gain.setTargetAtTime(0.15, t + 3 * A.UNIT, 0.4);
+  }
+  // Aviso visible en el mapa, en el momento en que suena el cambio.
+  const texto = (primera ? "Suena: " : "Modula a: ") + N[sp.tonic] + " " + nombreModo(sp.mode, plagal).toLowerCase() +
+    " · característica " + N[(sp.tonic + md.semi[md.c]) % 12] + " (" + md.cname + ")";
+  clearTimeout(avisoReloj);
+  setTimeout(() => {
+    avisoSonido.textContent = texto;
+    avisoSonido.classList.add("visible");
+    avisoReloj = setTimeout(() => avisoSonido.classList.remove("visible"), 4500);
+  }, Math.max(0, (t - audio.ctx.currentTime) * 1000));
   audio.sp = sp;
   audio.plagal = plagal;
   audio.frase = 0;
@@ -893,7 +929,7 @@ function aplicarEspacio(sp, plagal, t, primera) {
 function programarFrase(t) {
   const A = window.Audio24, sp = audio.sp, eng = audio.motores[sp.p];
   for (const n of melodia(sp, audio.plagal, audio.frase % 4))
-    eng.note(eng.lead, t + n.inicio * A.UNIT, n.dur * A.UNIT, n.f, n.acento ? 0.32 : 0.22, n.acento ? 1.4 : 1);
+    eng.note(eng.lead, t + n.inicio * A.UNIT, n.dur * A.UNIT, n.f, n.acento ? 0.36 : 0.22, n.acento ? 1.8 : 1);
   audio.frase++;
 }
 function sonidoPaso() {
@@ -909,14 +945,14 @@ function sonidoPaso() {
   const b = aBlender(camera.position), cents = 30 * desafino;
   audio.motores.forEach((eng, q) => {
     const cerca = 1 - THREE.MathUtils.smoothstep(Math.abs(b[q]) - MEDIO_PLANO, 3, 45);
-    eng.padA.vca.gain.setTargetAtTime(0.025 + 0.11 * cerca, ahora, 0.4);
+    eng.padA.vca.gain.setTargetAtTime(0.025 + 0.11 * cerca + (q === audio.sp.p ? 0.04 : 0), ahora, 0.4);
     eng.padA.c.detune.setTargetAtTime(q % 2 ? cents : -cents, ahora, 0.2);
   });
 }
 setInterval(sonidoPaso, 100);
 function pintarBotonSonido(encendido) {
   botonSonido.setAttribute("aria-pressed", encendido);
-  botonSonido.textContent = encendido ? "Sonido: sí" : "Sonido: no";
+  botonSonido.textContent = encendido ? "♪ Sonido · ON" : "♪ Sonido · OFF";
 }
 botonSonido.onclick = async () => {
   try {
