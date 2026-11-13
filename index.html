@@ -119,12 +119,12 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.9;
+renderer.toneMappingExposure = 1.0;
 document.body.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
-const NIEBLA = new THREE.Color(0x3a3833);
-scene.fog = new THREE.FogExp2(NIEBLA, 0.0016);
+const NIEBLA = new THREE.Color(0xd9d6cc);
+scene.fog = new THREE.FogExp2(NIEBLA, 0.0007);
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.05, 4000);
 camera.position.set(260, 150, 260);
 
@@ -135,14 +135,14 @@ scene.add(raiz);
 const Q_RAIZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
 const blenderAThree = (v) => new THREE.Vector3(v[0], v[2], -v[1]);
 
-// Cielo de atardecer apagado: un domo con degradé según la altura.
+// Cielo claro y nublado (luz de día pareja): un domo con degradé según la altura.
 const cielo = new THREE.Mesh(
   new THREE.SphereGeometry(3000, 32, 16),
   new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
     uniforms: {
-      cenit: { value: new THREE.Color(0x1d2a35) }, medio: { value: new THREE.Color(0x5d6466) },
-      horizonte: { value: new THREE.Color(0xb48a62) }, suelo: { value: new THREE.Color(0x2a2724) },
+      cenit: { value: new THREE.Color(0x8fa3b3) }, medio: { value: new THREE.Color(0xc4ccd0) },
+      horizonte: { value: new THREE.Color(0xe6e1d6) }, suelo: { value: new THREE.Color(0xb3ada1) },
     },
     vertexShader: "varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position.z = gl_Position.w; }",
     fragmentShader: `uniform vec3 cenit, medio, horizonte, suelo; varying vec3 d;
@@ -155,10 +155,10 @@ const cielo = new THREE.Mesh(
 cielo.renderOrder = -1;
 scene.add(cielo);
 
-// Luz: sol bajo (14°) y débil, cielo frío de relleno. Igual que 09_luz_y_materiales.py, simplificada.
-scene.add(new THREE.HemisphereLight(0x8a96a0, 0x2e2a25, 0.75));
-const sol = new THREE.DirectionalLight(0xffc48a, 1.6);
-const el = THREE.MathUtils.degToRad(14), az = THREE.MathUtils.degToRad(30);
+// Luz de día pareja: cielo claro de relleno y un sol alto (42°) que marca las caras sin oscurecer los textos.
+scene.add(new THREE.HemisphereLight(0xf2f0ea, 0x8a8478, 1.6));
+const sol = new THREE.DirectionalLight(0xfff3e0, 1.8);
+const el = THREE.MathUtils.degToRad(42), az = THREE.MathUtils.degToRad(30);
 sol.position.copy(blenderAThree([Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)])).multiplyScalar(500);
 scene.add(sol);
 
@@ -170,6 +170,9 @@ function material(nombre, rgba) {
   let m;
   if (nombre.startsWith("Lampara") || nombre === "Color_ffd159") {
     m = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.8, 0.55).multiplyScalar(1.6), fog: true });
+  } else if (nombre === "Horizonte") {
+    // La frase del horizonte está a 1,8 km: la niebla normal la borraría. Se le da un velo fijo.
+    m = new THREE.MeshBasicMaterial({ color: color.clone().lerp(NIEBLA, 0.22), fog: false });
   } else {
     m = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
     if (rgba[3] < 0.99) { m.transparent = true; m.opacity = 0.35; m.depthWrite = false; }
