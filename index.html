@@ -57,6 +57,17 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 #barraCarga { width: 220px; height: 2px; background: rgba(233, 227, 214, .2); }
 #barraCarga i { display: block; height: 100%; width: 0; background: var(--papel); }
 .grav { min-width: 34px; font-weight: 500; }
+/* Mapa lateral: el icosaedro en miniatura, con el piso de la gravedad activa siempre abajo, y la ficha del lugar. */
+#mapa {
+  position: fixed; z-index: 2; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(112px + env(safe-area-inset-top, 0px));
+  width: 236px; padding: 10px 12px 12px; background: rgba(22, 25, 28, .5); border-left: 1px solid rgba(233, 227, 214, .25);
+  color: #fff; font-family: var(--mono); font-size: 11px; line-height: 1.45; pointer-events: none;
+}
+#mapaLienzo { display: block; position: static; inset: auto; width: 212px; height: 212px; }
+#ficha { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 8px 0 0; }
+#ficha dt { color: #bdb8ad; text-transform: uppercase; font-size: 9.5px; letter-spacing: .1em; padding-top: 2px; }
+#ficha dd { margin: 0; color: #fff; }
+@media (max-width: 900px) { #mapa { width: 140px; padding: 6px; } #mapaLienzo { width: 128px; height: 128px; } #ficha { display: none; } }
 #destello { position: fixed; inset: 0; z-index: 1; background: var(--papel); opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
 .chip { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 8px 10px; border: 1px solid var(--lacre); color: var(--papel); background: rgba(155, 61, 46, .35); border-radius: 2px; }
 /* Las 10 instancias en una sola fila, a todo el ancho. */
@@ -124,6 +135,10 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 </div>
 <p class="ayuda" id="ayuda">Arrastrá para girar · pellizcá para acercarte · dos dedos para desplazar.</p>
 <div id="destello"></div>
+<aside id="mapa" aria-label="Mapa: dónde estás en el icosaedro">
+  <canvas id="mapaLienzo" width="424" height="424"></canvas>
+  <dl id="ficha"></dl>
+</aside>
 <div id="nota" hidden>
   <strong id="notaTitulo"></strong>
   <span id="notaTexto"></span>
@@ -148,6 +163,8 @@ document.getElementById("textoCarga").textContent = "Cargando librerías…";
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<!-- Sistema sonoro de los 24 espacios (audio/engine.js del proyecto): notas, tríadas, modos y timbres. -->
+<script src="audio24.js"></script>
 <script>
 (async function () {
 if (!window.THREE || !THREE.GLTFLoader || !THREE.OrbitControls) { mostrarError("no cargaron las librerías de Three.js."); return; }
@@ -416,6 +433,97 @@ function animarEntorno(t) {
     e.nodo.matrixWorldNeedsUpdate = true;
   }
 }
+// ---------- El icosaedro de cristal: encierra todo el objeto ----------
+// Sus 12 vértices son las 12 esquinas de los rectángulos áureos y las puntas de las 12 columnas
+// (cada columna va por la arista larga de un rectángulo, del pie, donde cruza otro plano, hasta el vértice).
+// En cada vértice está la nota de su columna (sistema sonoro de los 24 espacios).
+const CORTO = 69.6, LARGO = 112.6;            // medio lado corto y medio lado largo de los rectángulos
+const VERTICES = [];                           // [x, y, z] en Blender, plano y nota
+for (const a of [1, -1]) for (const b of [1, -1]) {
+  VERTICES.push({ p: [0, a * CORTO, b * LARGO], plano: 0, clave: [a, b] });   // x = 0: corto en y, largo en z
+  VERTICES.push({ p: [b * LARGO, 0, a * CORTO], plano: 1, clave: [a, b] });   // y = 0: corto en z, largo en x
+  VERTICES.push({ p: [a * CORTO, b * LARGO, 0], plano: 2, clave: [a, b] });   // z = 0: corto en x, largo en y
+}
+const NOTAS_POR_PLANO = [   // igual que BY_PLANE de audio/engine.js (clave = signos de los ejes corto y largo)
+  { "++": 0, "+-": 3, "-+": 9, "--": 6 }, { "++": 4, "+-": 5, "-+": 10, "--": 11 }, { "++": 7, "+-": 1, "-+": 8, "--": 2 },
+];
+const sg = (n) => (n > 0 ? "+" : "-");
+for (const v of VERTICES) {
+  const [s, l] = v.clave;                        // signo en el eje corto, signo en el eje largo
+  // engine.js: x=0 por (y,z); y=0 por (z,x); z=0 por (x,y) → siempre (corto, largo)
+  v.nota = NOTAS_POR_PLANO[v.plano][sg(s) + sg(l)];
+}
+const ARISTAS = [];
+for (let i = 0; i < 12; i++) for (let j = i + 1; j < 12; j++) {
+  const d = Math.hypot(...VERTICES[i].p.map((c, k) => c - VERTICES[j].p[k]));
+  if (Math.abs(d - 2 * CORTO) < 1) ARISTAS.push([i, j]);
+}
+const vecinos = (i, j) => ARISTAS.some(([a, b]) => (a === i && b === j) || (a === j && b === i));
+const CARAS = [];
+for (const [i, j] of ARISTAS) for (let k = j + 1; k < 12; k++) if (vecinos(i, k) && vecinos(j, k)) CARAS.push([i, j, k]);
+
+const cristal = new THREE.Group();
+cristal.name = "cristal";
+{
+  const pos = [];
+  for (const c of CARAS) for (const i of c) pos.push(...VERTICES[i].p);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  const vidrio = new THREE.Mesh(g, new THREE.MeshPhongMaterial({
+    color: 0xf4f6f6, specular: 0xffffff, shininess: 90, transparent: true, opacity: 0.09,
+    side: THREE.DoubleSide, depthWrite: false, fog: false,
+  }));
+  vidrio.renderOrder = 20;
+  cristal.add(vidrio);
+  const barra = (a, b, radio, mat) => {
+    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(radio, radio, A.distanceTo(B), 6, 1, true), mat);
+    m.position.copy(A).add(B).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize());
+    cristal.add(m);
+  };
+  const matArista = new THREE.MeshLambertMaterial({ color: 0xe4e2dc, transparent: true, opacity: 0.55 });
+  for (const [i, j] of ARISTAS) barra(VERTICES[i].p, VERTICES[j].p, 0.35, matArista);
+  // Las 12 columnas: del pie (donde la arista larga cruza el otro plano) al vértice.
+  const matColumna = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+  for (const v of VERTICES) {
+    const pie = v.p.map((c) => (Math.abs(c) > LARGO - 1 ? 0 : c));
+    barra(pie, v.p, 0.9, matColumna);
+  }
+  const esfera = new THREE.SphereGeometry(2.4, 20, 12);
+  const matPunta = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x777777 });
+  for (const v of VERTICES) {
+    const s = new THREE.Mesh(esfera, matPunta);
+    s.position.set(...v.p);
+    cristal.add(s);
+  }
+}
+raiz.add(cristal);
+
+// Las notas, junto a cada vértice (texto en la subsidiaria de la web, en blanco).
+async function etiquetasDeNotas() {
+  try { await document.fonts.load("600 72px 'DM Mono'"); } catch (e) { /* sigue con la de respaldo */ }
+  for (const v of VERTICES) {
+    const lienzo = document.createElement("canvas");
+    lienzo.width = 256; lienzo.height = 128;
+    const c = lienzo.getContext("2d");
+    c.font = "500 72px 'DM Mono', monospace";
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 8;
+    c.fillStyle = "#ffffff";
+    c.fillText(window.Audio24 ? Audio24.NOTE[v.nota] : "", 128, 64);
+    const tex = new THREE.CanvasTexture(lienzo);
+    tex.encoding = THREE.sRGBEncoding;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
+    sp.scale.set(18, 9, 1);
+    sp.position.set(...v.p.map((c) => c * 1.09));
+    sp.renderOrder = 21;
+    cristal.add(sp);
+  }
+}
+etiquetasDeNotas();
+
 // ---------- Titular: escritura ploteada, la más efímera. Se imprime, se lee y el bombardeo lo borra ----------
 const titulares = nodosTitular.map((nodo, i) => {
   const m = new THREE.MeshLambertMaterial({ color: colorDe(nodo.userData.mat), side: THREE.DoubleSide });
@@ -615,6 +723,98 @@ function girarA(eje) {
 }
 for (const b of botonesGravedad) b.onclick = () => girarA(b.dataset.eje);
 
+// ---------- Mapa lateral: el icosaedro en miniatura y la ficha del lugar ----------
+const mapaRender = new THREE.WebGLRenderer({ canvas: document.getElementById("mapaLienzo"), antialias: true, alpha: true });
+mapaRender.setPixelRatio(1);
+mapaRender.setSize(424, 424, false);
+mapaRender.outputEncoding = THREE.sRGBEncoding;
+const mapa = new THREE.Scene();
+const mapaCam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
+const enMapa = (b) => deBlender(b.map((c) => c / CORTO));
+{
+  const lineas = [];
+  for (const [i, j] of ARISTAS) lineas.push(enMapa(VERTICES[i].p), enMapa(VERTICES[j].p));
+  mapa.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(lineas),
+    new THREE.LineBasicMaterial({ color: 0xd8d6d0, transparent: true, opacity: 0.7 })));
+  const columnas = [];
+  for (const v of VERTICES) columnas.push(enMapa(v.p.map((c) => (Math.abs(c) > LARGO - 1 ? 0 : c))), enMapa(v.p));
+  mapa.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(columnas), new THREE.LineBasicMaterial({ color: 0xffffff })));
+  const punto = new THREE.SphereGeometry(0.045, 10, 6);
+  for (const v of VERTICES) { const s = new THREE.Mesh(punto, new THREE.MeshBasicMaterial({ color: 0xffffff })); s.position.copy(enMapa(v.p)); mapa.add(s); }
+}
+// Los tres rectángulos áureos, en grises sutiles; el de la gravedad activa, más claro.
+const PHI = LARGO / CORTO;
+const rectMapa = {};
+for (const [eje, esquinas] of Object.entries({
+  x: [[0, -1, -PHI], [0, 1, -PHI], [0, 1, PHI], [0, -1, PHI]],
+  y: [[-PHI, 0, -1], [PHI, 0, -1], [PHI, 0, 1], [-PHI, 0, 1]],
+  z: [[-1, -PHI, 0], [1, -PHI, 0], [1, PHI, 0], [-1, PHI, 0]],
+})) {
+  const [a, b, c, d] = esquinas.map((e) => deBlender(e));
+  const g = new THREE.BufferGeometry().setFromPoints([a, b, c, a, c, d]);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false }));
+  rectMapa[eje] = m;
+  mapa.add(m);
+}
+const marca = new THREE.Mesh(new THREE.SphereGeometry(0.09, 14, 10), new THREE.MeshBasicMaterial({ color: 0x9b3d2e }));
+const rumbo = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -0.45)]),
+  new THREE.LineBasicMaterial({ color: 0x9b3d2e }));
+marca.add(rumbo);
+mapa.add(marca);
+
+const ficha = document.getElementById("ficha");
+const CUENTO = { x: "El jardín de senderos que se bifurcan", y: "El Aleph", z: "La biblioteca de Babel" };
+let fichaClave = "", fichaReloj = 0;
+const vM = new THREE.Vector3(), vMu = new THREE.Vector3(), vMf = new THREE.Vector3();
+function actualizarMapa(dt) {
+  // Cámara del mapa: el piso de la gravedad activa abajo y el lector de espaldas, como en su vista.
+  vMu.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  const ub = aBlender(vMu), i = "xyz".indexOf(ejeActivo);
+  const arribaB = [0, 0, 0];
+  arribaB[i] = Math.sign(ub[i]) || 1;
+  const arriba = deBlender(arribaB);
+  vMf.set(0, 0, -1).applyQuaternion(camera.quaternion).addScaledVector(arriba, -vMf.dot(arriba));
+  if (vMf.lengthSq() < 1e-4) vMf.set(1, 0, 0).addScaledVector(arriba, -arriba.x);
+  vMf.normalize();
+  mapaCam.position.copy(vMf).multiplyScalar(-6.2).addScaledVector(arriba, 3.4);
+  mapaCam.up.copy(arriba);
+  mapaCam.lookAt(0, 0, 0);
+  marca.position.copy(camera.position).multiplyScalar(1 / CORTO).clampLength(0, 2.2);   // fuera del icosaedro, en el borde
+  marca.quaternion.copy(camera.quaternion);
+  for (const e of "xyz") rectMapa[e].material.opacity = e === ejeActivo ? 0.42 : 0.12;
+  mapaRender.render(mapa, mapaCam);
+
+  // Ficha: habitación (octante), gravedad, y lo que dice el sistema sonoro de ese espacio.
+  fichaReloj -= dt;
+  const b = aBlender(camera.position);
+  const sala = b.map((c) => (c >= 0 ? "+" : "-")).join(" ");
+  const clave = sala + ejeActivo;
+  if (clave === fichaClave && fichaReloj > 0) return;
+  fichaClave = clave;
+  fichaReloj = 0.25;
+  const A = window.Audio24;
+  const sp = A && A.SPACES.find((s) => s.roomSign === sala && s.p === i);
+  const filas = [["Habitación", "( " + sala.split(" ").join(" , ") + " )"],
+                 ["Gravedad", ejeActivo + " · piso " + ejeActivo + " = 0"],
+                 ["Cuento", CUENTO[ejeActivo]]];
+  if (sp) {
+    const md = A.MODES[sp.mode], N = A.NOTE;
+    const triada = [0, sp.q === "M" ? 4 : 3, 7].map((d) => N[(sp.root + d) % 12]);
+    filas.push(["Tónica", N[sp.tonic] + " (el piso)"],
+               ["Tríada", N[sp.root] + (sp.q === "M" ? " mayor" : " menor") + " · " + triada.join(" ")],
+               ["Modo", sp.mode + " · tónica en la " + sp.role],
+               ["Característica", N[(sp.tonic + md.semi[md.c]) % 12] + " · " + md.cname],
+               ["Timbre", A.TIMBRES[sp.p].name.toLowerCase()],
+               ["Espacio", (sp.i + 1) + " de 24"]);
+  }
+  filas.push(["Posición", b.map((c, k) => "xyz"[k] + " " + Math.round(c)).join("  ") + " m"]);
+  ficha.replaceChildren(...filas.flatMap(([k, v]) => {
+    const dt_ = document.createElement("dt"), dd = document.createElement("dd");
+    dt_.textContent = k; dd.textContent = v;
+    return [dt_, dd];
+  }));
+}
+
 // ---------- Portales: la contraforma de cada H ----------
 // Al atravesar la H caminando se pasa al otro lado del mismo piso: la habitación espejada a través de ese plano,
 // con la gravedad invertida. Es el mismo piso visto desde abajo (y, en el sistema sonoro, la misma tónica en otro acorde).
@@ -741,6 +941,7 @@ function cuadro() {
   uCamara.value.copy(camera.position);
   animarTitular(reloj.elapsedTime);
   gravedadActiva(dt);
+  actualizarMapa(dt);
   // Si la página se abrió en una pestaña oculta, el lienzo quedó en 0 × 0: se corrige apenas hay tamaño.
   if (innerWidth > 0 && (renderer.domElement.clientWidth !== innerWidth || renderer.domElement.width === 0)) ajustarTamano();
   const tt = reloj.elapsedTime, parpadeo = 0.55 + 0.25 * Math.sin(tt * 2.3) + 0.2 * Math.sin(tt * 7.1 + 1.3) * Math.sin(tt * 0.9);
