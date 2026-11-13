@@ -795,7 +795,10 @@ function actualizarMapa(dt) {
   mapaCam.lookAt(0, 0, 0);
   marca.position.copy(camera.position).multiplyScalar(1 / CORTO).clampLength(0, 2.2);   // fuera del icosaedro, en el borde
   marca.quaternion.copy(camera.quaternion);
-  for (const e of "xyz") rectMapa[e].material.opacity = e === ejeActivo ? 0.42 : 0.12;
+  for (const e of "xyz") {                       // la gravedad activa, en rojizo (lacre); las otras, en grises
+    rectMapa[e].material.color.setHex(e === ejeActivo ? 0xc0533f : 0xffffff);
+    rectMapa[e].material.opacity = e === ejeActivo ? 0.62 : 0.12;
+  }
   mapaRender.render(mapa, mapaCam);
 
   // Ficha: habitación (octante), gravedad, y lo que dice el sistema sonoro de ese espacio.

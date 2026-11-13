@@ -217,15 +217,15 @@
    "titulo": "La H",
    "nota": "El portal es una H gigante (hexágono, la unidad de la Biblioteca). Caminá a través de su contraforma: pasás al otro lado del mismo piso.",
    "pos": [
-    86.0,
-    10.2,
+    -86.0,
+    -10.2,
     4.2
    ],
    "quat": [
-    0.537127,
+    -0.537127,
     0.537127,
     0.459885,
-    0.459885
+    -0.459885
    ],
    "lente": 20.0,
    "modo": "caminar",
@@ -235,15 +235,15 @@
    "titulo": "Escalera",
    "nota": "Cada escalón es un renglón y el texto sigue de uno al otro: se lee subiendo. Las letras se dan vuelta como en un cartel de aeropuerto y se quedan quietas cuando te parás de frente.",
    "pos": [
-    37.0,
+    -37.0,
     10.16,
-    46.3
+    -46.3
    ],
    "quat": [
+    -0.493137,
+    -0.493137,
     0.50677,
-    0.50677,
-    0.493137,
-    0.493137
+    0.50677
    ],
    "lente": 24.0,
    "modo": "caminar",
