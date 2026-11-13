@@ -167,38 +167,38 @@
  },
  "instancias": [
   {
-   "titulo": "Dron",
+   "titulo": "Panorama",
    "nota": "El objeto completo: tres planos áureos, ocho habitaciones, tres gravedades y, alrededor, las cuatro partes del relato.",
    "pos": [
-    196.852,
-    -118.717,
-    89.4405
+    250.0,
+    -190.0,
+    170.0
    ],
    "quat": [
-    0.505844,
-    0.237901,
-    0.352881,
-    0.750333
+    0.458506,
+    0.227431,
+    0.381751,
+    0.769619
    ],
-   "lente": 35.0,
+   "lente": 30.0,
    "modo": "orbitar",
    "anamorfosis": false
   },
   {
-   "titulo": "El titular",
+   "titulo": "Titular",
    "nota": "El periódico del prólogo, impreso sobre el piso: cuatro muertos en la Biblioteca Babel.",
    "pos": [
-    204.4322,
-    105.3921,
-    72.2727
+    92.0,
+    24.0,
+    24.0
    ],
    "quat": [
-    0.294931,
-    0.471042,
-    0.704623,
-    0.441182
+    0.327868,
+    0.327868,
+    0.6265,
+    0.6265
    ],
-   "lente": 35.0,
+   "lente": 20.0,
    "modo": "caminar",
    "anamorfosis": false
   },
@@ -206,53 +206,53 @@
    "titulo": "La H",
    "nota": "El portal es una H gigante y se entra por su contraforma. Hexágono: la unidad de la Biblioteca.",
    "pos": [
-    63.1594,
-    10.155,
-    3.5686
+    86.0,
+    10.2,
+    4.2
    ],
    "quat": [
-    0.541587,
-    0.535275,
-    0.449824,
-    0.466715
+    0.537127,
+    0.537127,
+    0.459885,
+    0.459885
    ],
-   "lente": 22.0,
+   "lente": 20.0,
    "modo": "caminar",
    "anamorfosis": false
   },
   {
    "titulo": "Escalera",
-   "nota": "Cada escalón es un renglón. Las letras giran como en un cartel de aeropuerto y se detienen cuando te parás de frente.",
+   "nota": "Cada escalón es un renglón. Las letras se dan vuelta como en un cartel de aeropuerto y se quedan quietas cuando te parás de frente.",
    "pos": [
-    48.7735,
-    10.155,
-    20.009
+    57.0,
+    27.0,
+    16.0
    ],
    "quat": [
-    0.547368,
-    0.58461,
-    0.437555,
-    0.408859
+    0.273248,
+    0.727236,
+    0.58942,
+    0.221466
    ],
-   "lente": 22.0,
+   "lente": 24.0,
    "modo": "caminar",
    "anamorfosis": false
   },
   {
-   "titulo": "El muro",
-   "nota": "Cambio de gravedad: el muro de texto de Babel pasa a ser piso y la hyper cambia de peso.",
+   "titulo": "Gravedad",
+   "nota": "Desde la esquina de la habitación: las tres estructuras, una por gravedad, se entrelazan sin chocar.",
    "pos": [
-    36.105,
-    9.0186,
-    35.1649
+    66.0,
+    66.0,
+    64.0
    ],
    "quat": [
-    0.697751,
-    0.685394,
-    0.115649,
-    0.173217
+    0.178708,
+    0.431439,
+    0.816954,
+    0.338393
    ],
-   "lente": 22.0,
+   "lente": 18.0,
    "modo": "caminar",
    "anamorfosis": false
   },
@@ -312,25 +312,25 @@
   },
   {
    "titulo": "Horizonte",
-   "nota": "«Todos los caminos parecen posibles»: tan grande y tan lejos que se lee.",
+   "nota": "«Todos los caminos parecen posibles»: tan grande y tan lejos que se lee, detrás de las columnatas de palabras.",
    "pos": [
-    -135.0,
-    -50.0,
-    75.0
+    170.0,
+    60.0,
+    160.0
    ],
    "quat": [
-    0.408686,
-    0.583545,
-    0.5748,
-    0.402562
+    0.395399,
+    0.564304,
+    0.593524,
+    0.415873
    ],
-   "lente": 22.0,
+   "lente": 26.0,
    "modo": "caminar",
    "anamorfosis": false
   },
   {
-   "titulo": "El Aleph",
-   "nota": "El núcleo, donde se tocan las tres gravedades y todas las versiones conviven.",
+   "titulo": "Aleph",
+   "nota": "Dentro del núcleo, donde se tocan las tres gravedades: las declaraciones de los testigos, una por pared.",
    "pos": [
     11.1535,
     8.9667,
