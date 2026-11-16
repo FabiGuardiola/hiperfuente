@@ -72,6 +72,7 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 #ficha dt { color: #bdb8ad; text-transform: uppercase; font-size: 8px; letter-spacing: .1em; padding-top: 2px; }
 #ficha dd { margin: 0; color: #fff; }
 @media (max-width: 900px) { #mapa { width: 112px; padding: 5px; } #mapaLienzo { width: 102px; height: 102px; } #ficha { display: none; } #sonido { font-size: 10.5px; padding: 8px 5px; } }
+#velo { position: fixed; inset: 0; z-index: 1; opacity: 0; pointer-events: none; }
 #destello { position: fixed; inset: 0; z-index: 1; background: var(--papel); opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
 .chip { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 8px 10px; border: 1px solid var(--lacre); color: var(--papel); background: rgba(155, 61, 46, .35); border-radius: 2px; }
 /* Las 10 instancias en una sola fila, a todo el ancho. */
@@ -139,6 +140,7 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 </div>
 <p class="ayuda" id="ayuda">Arrastrá para girar · pellizcá para acercarte · dos dedos para desplazar.</p>
 <div id="destello"></div>
+<div id="velo"></div>
 <aside id="mapa" aria-label="Mapa: dónde estás en el icosaedro">
   <button id="sonido" aria-pressed="false" title="Prende o apaga el sonido: suena el espacio donde estás">♪ Sonido · OFF</button>
   <div id="aviso" aria-live="polite"></div>
@@ -154,6 +156,8 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 <script>
 // Si algo falla, que se vea en la pantalla de carga en vez de quedar colgado.
 function mostrarError(texto) {
+  // Una vez abierto el espacio, un error suelto no tapa la pantalla: queda en la consola.
+  if (window.__espacioAbierto) { console.warn("Hiperfuente:", texto); return; }
   const t = document.getElementById("textoCarga");
   if (t) t.textContent = "No se pudo abrir el espacio: " + texto;
   const c = document.getElementById("carga");
@@ -366,7 +370,8 @@ for (const f of [null, ...datos.modulo]) {
 if (pieza.ESTRUCTURA) estructura.add(fijar(pieza.ESTRUCTURA.clone(), new THREE.Matrix4()));
 raiz.add(estructura);
 // Las otras 7 habitaciones: la misma estructura reflejada en los planos.
-for (const f of Object.values(datos.habitaciones)) raiz.add(fijar(estructura.clone(), matriz(f)));
+const salasObj = [estructura];          // las 8 estructuras-habitación, en el mismo orden que datos.habitaciones
+for (const f of Object.values(datos.habitaciones)) { const c = fijar(estructura.clone(), matriz(f)); salasObj.push(c); raiz.add(c); }
 raiz.add(fijar(pieza.UNICO, new THREE.Matrix4()));
 
 // ---------- Entorno: letras y palabras sueltas, translúcidas y en movimiento ----------
@@ -590,6 +595,7 @@ function gravedadActiva(dt) {
 
 raiz.updateMatrixWorld(true);
 document.getElementById("carga").hidden = true;
+window.__espacioAbierto = true;
 
 // ---------- Navegación ----------
 const orbita = new THREE.OrbitControls(camera, renderer.domElement);
@@ -703,9 +709,10 @@ function pasoVuelo(ahora) {
   camera.fov = vuelo.f0 + (vuelo.d.f - vuelo.f0) * e;
   camera.updateProjectionMatrix();
   if (u >= 1) {
-    const i = vuelo.i;
+    const i = vuelo.i, lectura = vuelo.lectura;
     vuelo = null;
     if (i === null) ponerModo("caminar"); else llegar(i);
+    if (lectura) iniciarVelo(lectura);
   }
 }
 
@@ -1044,36 +1051,38 @@ function cruzar(p) {
 }
 
 // ---------- Puntos de lectura: las esferas ----------
-// Cada esfera (lámpara) de cada estructura es un disparador: al acercarse a menos de RADIO m, la cámara viaja
-// hasta el punto exacto desde donde se lee la pieza que le corresponde (como una instancia, pero encontrada
-// caminando). Las poses están en coordenadas del módulo z y se llevan a las 24 estructuras con sus matrices.
-const RADIO_LECTURA = 5, SALIDA_LECTURA = 11;
+// Cada esfera (lámpara) de cada estructura se toca (clic o tap) y la cámara viaja hasta el punto exacto desde
+// donde se lee la pieza que le corresponde. Al llegar, por un instante todo lo que no es ese texto se vuelve un
+// plano de color: desaparece lo tridimensional y el texto queda como una página. Después el velo se levanta y
+// el lector sigue navegando. Las poses están en coordenadas del módulo z y se llevan a las 24 estructuras.
+// tipo: "escalera" muestra en el velo los renglones de las escaleras; "texto", los textos del módulo.
+// segundos: cuánto dura el velo, según el largo del texto.
 const LECTURAS = [
-  { esfera: [42.3, 10.2, 22.3], titulo: "Escalera 1", nota: "Los bolsillos de Yu Tsun, un renglón por escalón.", pos: [57.5, 10.16, 21.2], mira: [41, 10.16, 21.6] },
-  { esfera: [40.3, 16.8, 26.8], titulo: "El muro de Babel", nota: "El muro es texto. De frente, a esta distancia, se lee.", pos: [58, 10.2, 34.5], mira: [34.5, 10.2, 34.5] },
-  { esfera: [32.4, 10.2, 46.4], titulo: "Escalera 2", nota: "El hexágono: anaqueles, libros, páginas, renglones.", pos: [37, 10.16, 46.3], mira: [26, 10.16, 46.6] },
-  { esfera: [22.3, 10.2, 49.3], titulo: "Escalera 3", nota: "Lo que se vio en el Aleph.", pos: [31, 16.15, 49.6], mira: [20, 16.15, 51.6] },
-  { esfera: [32.8, 9.0, 5.3], titulo: "El índice", nota: "En el piso, al pasar la H.", pos: [50.8, 7.75, 8.7], mira: [45.7, 7.75, 1.8] },
-  { esfera: [25.2, 9.8, 11.8], titulo: "La cita del descanso", nota: "Una cita en bloque, en el piso del descanso.", pos: [42.6, 9.5, 31.2], mira: [36.1, 9.5, 25.0] },
-  { esfera: [57.3, 54.8, 4.8], titulo: "El glosario", nota: "Entradas de diccionario sobre la pared.", pos: [46.6, 12, 13.2], mira: [46.6, 1.8, 13.2] },
-  { esfera: [49.8, 62.8, 14.8], titulo: "La cita del friso", nota: "«La Biblioteca es ilimitada y periódica.»", pos: [46, 56.5, 18.4], mira: [46, 62.4, 18.4] },
+  { tipo: "escalera", segundos: 5, esfera: [42.3, 10.2, 22.3], titulo: "Escalera 1", nota: "Los bolsillos de Yu Tsun, un renglón por escalón.", pos: [57.5, 10.16, 21.2], mira: [41, 10.16, 21.6] },
+  { tipo: "texto", segundos: 8, esfera: [40.3, 16.8, 26.8], titulo: "El muro de Babel", nota: "El muro es texto. De frente, a esta distancia, se lee.", pos: [58, 10.2, 34.5], mira: [34.5, 10.2, 34.5] },
+  { tipo: "escalera", segundos: 5, esfera: [32.4, 10.2, 46.4], titulo: "Escalera 2", nota: "El hexágono: anaqueles, libros, páginas, renglones.", pos: [37, 10.16, 46.3], mira: [26, 10.16, 46.6] },
+  { tipo: "escalera", segundos: 4, esfera: [22.3, 10.2, 49.3], titulo: "Escalera 3", nota: "Lo que se vio en el Aleph.", pos: [31, 16.15, 49.6], mira: [20, 16.15, 51.6] },
+  { tipo: "texto", segundos: 6, esfera: [32.8, 9.0, 5.3], titulo: "El índice", nota: "En el piso, al pasar la H.", pos: [50.8, 7.75, 8.7], mira: [45.7, 7.75, 1.8] },
+  { tipo: "texto", segundos: 5, esfera: [25.2, 9.8, 11.8], titulo: "La cita del descanso", nota: "Una cita en bloque, en el piso del descanso.", pos: [42.6, 9.5, 31.2], mira: [36.1, 9.5, 25.0] },
+  { tipo: "texto", segundos: 7, esfera: [57.3, 54.8, 4.8], titulo: "El glosario", nota: "Entradas de diccionario sobre la pared.", pos: [46.6, 12, 13.2], mira: [46.6, 1.8, 13.2] },
+  { tipo: "texto", segundos: 3.5, esfera: [49.8, 62.8, 14.8], titulo: "La cita del friso", nota: "«La Biblioteca es ilimitada y periódica.»", pos: [46, 56.5, 18.4], mira: [46, 62.4, 18.4] },
 ];
 const disparadores = [];
 {
   const salas = [new THREE.Matrix4(), ...Object.values(datos.habitaciones).map(matriz)];
   const mods = [new THREE.Matrix4(), ...datos.modulo.map(matriz)];
   const aMundo = (W, p) => deBlender(new THREE.Vector3(...p).applyMatrix4(W).toArray());
-  for (const S of salas) for (const M of mods) {
+  salas.forEach((S, r) => mods.forEach((M, g) => {
     const W = S.clone().multiply(M);
+    const mz = salasObj[r].children[2 * g], esc = salasObj[r].children[2 * g + 1];   // el módulo y sus escaleras
     for (const L of LECTURAS) {
       const ojo = aMundo(W, L.pos), blanco = aMundo(W, L.mira);
       const arriba = aMundo(W, [L.pos[0], L.pos[1], L.pos[2] + 1]).sub(ojo).normalize();
       const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(ojo, blanco, arriba));
-      disparadores.push({ L, centro: aMundo(W, L.esfera), pose: { p: ojo, q, f: fovVertical(24) } });
+      disparadores.push({ L, mz, esc, centro: aMundo(W, L.esfera), pose: { p: ojo, q, f: fovVertical(24) } });
     }
-  }
+  }));
 }
-let lecturaBloqueada = new Set();
 function irALectura(d) {
   actual = -1;
   botonesInst.forEach((b) => b.setAttribute("aria-pressed", false));
@@ -1087,18 +1096,73 @@ function irALectura(d) {
             d: { p: d.pose.p, q: d.pose.q, f: fovVertical(24) }, i: null, lectura: d };
   arrastre = null;
 }
-function revisarLecturas() {
-  if (vuelo || modo !== "caminar" || window.__sinLecturas) return;    // __sinLecturas: solo para depurar
+// Tocar una esfera: un clic o tap corto (sin arrastrar) sobre ella. La tolerancia crece con la distancia.
+const rayo = new THREE.Raycaster(), vNdc = new THREE.Vector2();
+function esferaBajo(x, y) {
+  vNdc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
+  rayo.setFromCamera(vNdc, camera);
+  let mejor = null, mejorT = 160;
   for (const d of disparadores) {
-    const dist = camera.position.distanceTo(d.centro);
-    if (lecturaBloqueada.has(d)) { if (dist > SALIDA_LECTURA) lecturaBloqueada.delete(d); continue; }
-    if (dist < RADIO_LECTURA) {
-      // al llegar, las esferas cercanas quedan bloqueadas hasta alejarse, para no encadenar viajes
-      for (const e of disparadores) if (e.centro.distanceTo(d.pose.p) < SALIDA_LECTURA || e === d) lecturaBloqueada.add(e);
-      irALectura(d);
-      return;
-    }
+    const t = rayo.ray.origin.distanceTo(d.centro);
+    if (t > mejorT || d.centro.clone().sub(rayo.ray.origin).dot(rayo.ray.direction) < 0) continue;
+    if (rayo.ray.distanceToPoint(d.centro) < 1.4 + t * 0.012) { mejor = d; mejorT = t; }
   }
+  return mejor;
+}
+let toque = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { toque = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+renderer.domElement.addEventListener("pointerup", (e) => {
+  if (!toque) return;
+  const corto = Math.hypot(e.clientX - toque.x, e.clientY - toque.y) < 8 && performance.now() - toque.t < 500;
+  toque = null;
+  if (!corto || vuelo || velo) return;
+  const d = esferaBajo(e.clientX, e.clientY);
+  if (d) irALectura(d);
+});
+renderer.domElement.addEventListener("pointermove", (e) => {
+  if (e.buttons || e.pointerType !== "mouse") return;
+  renderer.domElement.style.cursor = esferaBajo(e.clientX, e.clientY) ? "pointer" : "";
+});
+
+// El velo: por un instante, todo lo que no es el texto se vuelve un plano de color y el texto queda plano.
+const capaVelo = document.getElementById("velo");
+let velo = null;
+const PAPEL = new THREE.Color(0xe9e3d6), NEGRO = new THREE.Color(0x0d0d0d);
+function iniciarVelo(d) {
+  const mostrar = new Map();                      // malla → color plano del texto
+  if (d.L.tipo === "escalera") mostrar.set(d.esc, new THREE.Color(0x1e6973));
+  else d.mz.traverse((o) => { if (o.isMesh && (o.userData.mat || "").startsWith("Tinta_")) mostrar.set(o, colorDe(o.userData.mat)); });
+  // Fondo que contraste: si la mayoría del texto es oscuro → papel; si es claro o rojo → negro.
+  const colores = [...mostrar.values()];
+  const claro = colores.filter((c) => c.r + c.g + c.b > 0.9 || (c.r > 0.25 && c.g < 0.1)).length > colores.length / 2;
+  const fondo = claro ? NEGRO : PAPEL;
+  const ocultos = [], materiales = [];
+  scene.traverse((o) => {
+    if (!(o.isMesh || o.isLine || o.isSprite || o.isPoints) || !o.visible) return;
+    if (mostrar.has(o)) { materiales.push([o, o.material]); o.material = new THREE.MeshBasicMaterial({ color: mostrar.get(o), side: THREE.DoubleSide }); }
+    else { ocultos.push(o); o.visible = false; }
+  });
+  velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + d.L.segundos * 1000 };
+  scene.fog = null;
+  scene.background = fondo;
+  capaVelo.style.background = "#" + fondo.getHexString();
+  capaVelo.style.transition = "none";
+  capaVelo.style.opacity = 1;                      // se entra desde el plano de color…
+  requestAnimationFrame(() => { capaVelo.style.transition = "opacity .5s"; capaVelo.style.opacity = 0; });   // …y aparece el texto
+}
+function terminarVelo() {
+  if (!velo) return;
+  const v = velo;
+  velo = null;
+  capaVelo.style.transition = "opacity .35s";
+  capaVelo.style.opacity = 1;
+  setTimeout(() => {
+    for (const o of v.ocultos) o.visible = true;
+    for (const [o, m] of v.materiales) { o.material.dispose(); o.material = m; }
+    scene.fog = v.niebla;
+    scene.background = null;
+    capaVelo.style.opacity = 0;                    // se levanta el velo y el lector queda suelto
+  }, 380);
 }
 
 // Legibilidad de la anamorfosis: máxima parado en el punto y mirando hacia donde mira la frase.
@@ -1126,7 +1190,7 @@ let arrastre = null;
 renderer.domElement.addEventListener("pointerdown", (e) => {
   if (modo !== "caminar") return;
   arrastre = { id: e.pointerId, x: e.clientX, y: e.clientY };
-  renderer.domElement.setPointerCapture(e.pointerId);
+  try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) { /* puntero sintético o ya liberado */ }
 });
 renderer.domElement.addEventListener("pointermove", (e) => {
   if (!arrastre || e.pointerId !== arrastre.id) return;
@@ -1152,7 +1216,7 @@ function moverPalanca(e) {
   empuje.x = x; empuje.y = y;
   perilla.style.transform = `translate(${x * 44}px, ${y * 44}px)`;
 }
-palanca.addEventListener("pointerdown", (e) => { dedoPalanca = e.pointerId; palanca.setPointerCapture(e.pointerId); moverPalanca(e); });
+palanca.addEventListener("pointerdown", (e) => { dedoPalanca = e.pointerId; try { palanca.setPointerCapture(e.pointerId); } catch (err) { /* nada */ } moverPalanca(e); });
 palanca.addEventListener("pointermove", (e) => { if (e.pointerId === dedoPalanca) moverPalanca(e); });
 const soltarPalanca = (e) => { if (e.pointerId !== dedoPalanca) return; dedoPalanca = null; empuje.x = empuje.y = 0; perilla.style.transform = ""; };
 palanca.addEventListener("pointerup", soltarPalanca);
@@ -1189,6 +1253,8 @@ function cuadro() {
   animarEntorno(reloj.elapsedTime);
   if (vuelo) {
     pasoVuelo(performance.now());
+  } else if (velo) {
+    // durante el velo la cámara queda quieta
   } else if (modo === "caminar") {
     let f = -empuje.y, s = empuje.x, u = altura;
     if (teclas.has("KeyW") || teclas.has("ArrowUp")) f += 1;
@@ -1206,7 +1272,7 @@ function cuadro() {
   }
   legibilidad();
   revisarPortales();
-  revisarLecturas();
+  if (velo && performance.now() > velo.fin) terminarVelo();
   cielo.position.copy(camera.position);
   renderer.render(scene, camera);
 }
