@@ -572,7 +572,10 @@ let ejeActivo = "";
 function gravedadActiva(dt) {
   vArriba.set(0, 1, 0).applyQuaternion(camera.quaternion);
   const b = [Math.abs(vArriba.x), Math.abs(vArriba.z), Math.abs(vArriba.y)];      // en ejes de Blender
-  const eje = "xyz"[b.indexOf(Math.max(...b))];
+  let eje = "xyz"[b.indexOf(Math.max(...b))];
+  // Histéresis: mirar hacia abajo (para leer un piso) inclina el "arriba" de la cámara; la gravedad no
+  // cambia mientras el eje actual siga teniendo un peso razonable.
+  if (ejeActivo && eje !== ejeActivo && b["xyz".indexOf(ejeActivo)] > 0.42) eje = ejeActivo;
   if (eje !== ejeActivo) {
     ejeActivo = eje;
     for (const b of botonesGravedad) b.setAttribute("aria-pressed", b.dataset.eje === eje);
@@ -770,6 +773,24 @@ for (const [eje, esquinas] of Object.entries({
   rectMapa[eje] = m;
   mapa.add(m);
 }
+// El piso de la habitación actual (el cuadrado del plano activo en ese octante), en rojizo.
+const pisoActual = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({
+  color: 0xc0533f, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false }));
+pisoActual.geometry.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(18), 3));
+mapa.add(pisoActual);
+let pisoClave = "";
+function marcarPiso(eje, signos) {
+  const clave = eje + signos.join("");
+  if (clave === pisoClave) return;
+  pisoClave = clave;
+  const i = "xyz".indexOf(eje), j = (i + 1) % 3, k = (i + 2) % 3;
+  const esquina = (a, b) => { const p = [0, 0, 0]; p[j] = a * signos[j]; p[k] = b * signos[k]; return deBlender(p); };
+  const [A, B, C, D] = [esquina(0, 0), esquina(1, 0), esquina(1, 1), esquina(0, 1)];
+  const arr = pisoActual.geometry.attributes.position;
+  [A, B, C, A, C, D].forEach((v, n) => arr.setXYZ(n, v.x, v.y, v.z));
+  arr.needsUpdate = true;
+  pisoActual.geometry.computeBoundingSphere();
+}
 const marca = new THREE.Mesh(new THREE.SphereGeometry(0.09, 14, 10), new THREE.MeshBasicMaterial({ color: 0x9b3d2e }));
 const rumbo = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -0.45)]),
   new THREE.LineBasicMaterial({ color: 0x9b3d2e }));
@@ -795,10 +816,8 @@ function actualizarMapa(dt) {
   mapaCam.lookAt(0, 0, 0);
   marca.position.copy(camera.position).multiplyScalar(1 / CORTO).clampLength(0, 2.2);   // fuera del icosaedro, en el borde
   marca.quaternion.copy(camera.quaternion);
-  for (const e of "xyz") {                       // la gravedad activa, en rojizo (lacre); las otras, en grises
-    rectMapa[e].material.color.setHex(e === ejeActivo ? 0xc0533f : 0xffffff);
-    rectMapa[e].material.opacity = e === ejeActivo ? 0.62 : 0.12;
-  }
+  for (const e of "xyz") rectMapa[e].material.opacity = e === ejeActivo ? 0.22 : 0.1;
+  marcarPiso(ejeActivo, aBlender(camera.position).map((c) => (c >= 0 ? 1 : -1)));   // solo el piso de esta habitación
   mapaRender.render(mapa, mapaCam);
 
   // Ficha: habitación (octante), gravedad, y lo que dice el sistema sonoro de ese espacio.
@@ -1024,6 +1043,64 @@ function cruzar(p) {
   nota.hidden = false;
 }
 
+// ---------- Puntos de lectura: las esferas ----------
+// Cada esfera (lámpara) de cada estructura es un disparador: al acercarse a menos de RADIO m, la cámara viaja
+// hasta el punto exacto desde donde se lee la pieza que le corresponde (como una instancia, pero encontrada
+// caminando). Las poses están en coordenadas del módulo z y se llevan a las 24 estructuras con sus matrices.
+const RADIO_LECTURA = 5, SALIDA_LECTURA = 11;
+const LECTURAS = [
+  { esfera: [42.3, 10.2, 22.3], titulo: "Escalera 1", nota: "Los bolsillos de Yu Tsun, un renglón por escalón.", pos: [57.5, 10.16, 21.2], mira: [41, 10.16, 21.6] },
+  { esfera: [40.3, 16.8, 26.8], titulo: "El muro de Babel", nota: "El muro es texto. De frente, a esta distancia, se lee.", pos: [58, 10.2, 34.5], mira: [34.5, 10.2, 34.5] },
+  { esfera: [32.4, 10.2, 46.4], titulo: "Escalera 2", nota: "El hexágono: anaqueles, libros, páginas, renglones.", pos: [37, 10.16, 46.3], mira: [26, 10.16, 46.6] },
+  { esfera: [22.3, 10.2, 49.3], titulo: "Escalera 3", nota: "Lo que se vio en el Aleph.", pos: [31, 16.15, 49.6], mira: [20, 16.15, 51.6] },
+  { esfera: [32.8, 9.0, 5.3], titulo: "El índice", nota: "En el piso, al pasar la H.", pos: [50.8, 7.75, 8.7], mira: [45.7, 7.75, 1.8] },
+  { esfera: [25.2, 9.8, 11.8], titulo: "La cita del descanso", nota: "Una cita en bloque, en el piso del descanso.", pos: [42.6, 9.5, 31.2], mira: [36.1, 9.5, 25.0] },
+  { esfera: [57.3, 54.8, 4.8], titulo: "El glosario", nota: "Entradas de diccionario sobre la pared.", pos: [46.6, 12, 13.2], mira: [46.6, 1.8, 13.2] },
+  { esfera: [49.8, 62.8, 14.8], titulo: "La cita del friso", nota: "«La Biblioteca es ilimitada y periódica.»", pos: [46, 56.5, 18.4], mira: [46, 62.4, 18.4] },
+];
+const disparadores = [];
+{
+  const salas = [new THREE.Matrix4(), ...Object.values(datos.habitaciones).map(matriz)];
+  const mods = [new THREE.Matrix4(), ...datos.modulo.map(matriz)];
+  const aMundo = (W, p) => deBlender(new THREE.Vector3(...p).applyMatrix4(W).toArray());
+  for (const S of salas) for (const M of mods) {
+    const W = S.clone().multiply(M);
+    for (const L of LECTURAS) {
+      const ojo = aMundo(W, L.pos), blanco = aMundo(W, L.mira);
+      const arriba = aMundo(W, [L.pos[0], L.pos[1], L.pos[2] + 1]).sub(ojo).normalize();
+      const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(ojo, blanco, arriba));
+      disparadores.push({ L, centro: aMundo(W, L.esfera), pose: { p: ojo, q, f: fovVertical(24) } });
+    }
+  }
+}
+let lecturaBloqueada = new Set();
+function irALectura(d) {
+  actual = -1;
+  botonesInst.forEach((b) => b.setAttribute("aria-pressed", false));
+  notaTitulo.textContent = "Lectura · " + d.L.titulo;
+  notaTexto.textContent = d.L.nota;
+  legibCaja.hidden = true;
+  nota.hidden = false;
+  const dist = camera.position.distanceTo(d.pose.p);
+  vuelo = { t0: performance.now(), dur: Math.min(5000, 1800 + dist * 40), p0: camera.position.clone(),
+            c: camera.position.clone().add(d.pose.p).multiplyScalar(0.5), q0: camera.quaternion.clone(), f0: camera.fov,
+            d: { p: d.pose.p, q: d.pose.q, f: fovVertical(24) }, i: null, lectura: d };
+  arrastre = null;
+}
+function revisarLecturas() {
+  if (vuelo || modo !== "caminar" || window.__sinLecturas) return;    // __sinLecturas: solo para depurar
+  for (const d of disparadores) {
+    const dist = camera.position.distanceTo(d.centro);
+    if (lecturaBloqueada.has(d)) { if (dist > SALIDA_LECTURA) lecturaBloqueada.delete(d); continue; }
+    if (dist < RADIO_LECTURA) {
+      // al llegar, las esferas cercanas quedan bloqueadas hasta alejarse, para no encadenar viajes
+      for (const e of disparadores) if (e.centro.distanceTo(d.pose.p) < SALIDA_LECTURA || e === d) lecturaBloqueada.add(e);
+      irALectura(d);
+      return;
+    }
+  }
+}
+
 // Legibilidad de la anamorfosis: máxima parado en el punto y mirando hacia donde mira la frase.
 const vF = new THREE.Vector3(), vT = new THREE.Vector3();
 function legibilidad() {
@@ -1129,6 +1206,7 @@ function cuadro() {
   }
   legibilidad();
   revisarPortales();
+  revisarLecturas();
   cielo.position.copy(camera.position);
   renderer.render(scene, camera);
 }
@@ -1136,7 +1214,7 @@ function bucle() { cuadro(); requestAnimationFrame(bucle); }
 irAInstancia(0, true);
 bucle();
 // Para depurar desde la consola (paso = un cuadro sin esperar a requestAnimationFrame).
-window.visor = { scene, camera, renderer, raiz, irAInstancia, instancias, datos, uTiempo, entorno, girarA, paso: cuadro, get audio() { return audio; } };
+window.visor = { scene, camera, renderer, raiz, irAInstancia, instancias, datos, uTiempo, entorno, girarA, paso: cuadro, get audio() { return audio; }, disparadores, irALectura };
 
 function ajustarTamano() {
   if (!innerWidth || !innerHeight) return;
