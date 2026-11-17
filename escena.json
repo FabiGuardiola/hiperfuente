@@ -179,7 +179,7 @@
  "instancias": [
   {
    "titulo": "Panorama",
-   "nota": "El objeto completo: tres planos áureos, ocho habitaciones, tres gravedades y, alrededor, las cuatro partes del relato.",
+   "nota": "El objeto completo: tres planos áureos y ocho habitaciones, una por capítulo, con tres gravedades cada una.",
    "pos": [
     250.0,
     -190.0,
@@ -210,7 +210,7 @@
     0.6265
    ],
    "lente": 20.0,
-   "modo": "caminar",
+   "modo": "orbitar",
    "anamorfosis": false
   },
   {
@@ -264,7 +264,7 @@
     0.338393
    ],
    "lente": 18.0,
-   "modo": "caminar",
+   "modo": "orbitar",
    "anamorfosis": false
   },
   {
@@ -336,7 +336,7 @@
     0.415873
    ],
    "lente": 26.0,
-   "modo": "caminar",
+   "modo": "orbitar",
    "anamorfosis": false
   },
   {

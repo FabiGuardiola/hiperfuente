@@ -42,14 +42,21 @@ button {
 button[aria-pressed="true"] { background: var(--lacre); border-color: var(--lacre); }
 button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 .ayuda {
-  position: fixed; z-index: 2; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  max-width: 300px; font-size: 11px; line-height: 1.5; color: var(--piedra); text-align: right; pointer-events: none;
+  position: fixed; z-index: 2; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(176px + env(safe-area-inset-bottom, 0px));
+  max-width: 300px; font-size: 11px; margin: 0; line-height: 1.5; color: var(--piedra); text-align: right; pointer-events: none;
 }
-#palanca {
-  position: fixed; z-index: 2; left: max(24px, env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
-  width: 128px; height: 128px; border-radius: 50%; border: 1px solid rgba(233, 227, 214, .35); background: var(--velo);
+.palanca {
+  position: fixed; z-index: 2; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 128px; height: 128px; border-radius: 50%; border: 1px solid rgba(233, 227, 214, .35); background: var(--velo); touch-action: none;
 }
-#perilla { position: absolute; left: 44px; top: 44px; width: 40px; height: 40px; border-radius: 50%; background: var(--papel); opacity: .8; }
+#palanca { left: max(24px, env(safe-area-inset-left, 0px)); }
+#mirarPalanca { right: max(24px, env(safe-area-inset-right, 0px)); }
+.palanca span { position: absolute; left: 0; right: 0; top: -18px; text-align: center; font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--piedra); pointer-events: none; }
+.perilla { position: absolute; left: 44px; top: 44px; width: 40px; height: 40px; border-radius: 50%; background: var(--papel); opacity: .8; pointer-events: none; }
+#mira { position: fixed; z-index: 2; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; pointer-events: none; }
+#mira::before, #mira::after { content: ""; position: absolute; background: var(--papel); opacity: .85; }
+#mira::before { left: 6px; top: 0; width: 2px; height: 14px; }
+#mira::after { top: 6px; left: 0; height: 2px; width: 14px; }
 .vertical { position: fixed; z-index: 2; left: calc(168px + env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; }
 .vertical button { width: 46px; }
 #carga { position: fixed; inset: 0; z-index: 3; display: grid; place-content: center; gap: 10px; text-align: center; background: var(--noche); }
@@ -133,7 +140,9 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
   </div>
 </header>
 
-<div id="palanca" hidden aria-hidden="true"><div id="perilla"></div></div>
+<div id="palanca" class="palanca" hidden aria-hidden="true"><span>Caminar</span><div class="perilla"></div></div>
+<div id="mirarPalanca" class="palanca" hidden aria-hidden="true"><span>Mirar</span><div class="perilla"></div></div>
+<div id="mira" hidden></div>
 <div class="vertical" id="vertical" hidden>
   <button id="subir" aria-label="Subir">▲</button>
   <button id="bajar" aria-label="Bajar">▼</button>
@@ -305,6 +314,7 @@ const gltf = await cargarModelo("modelo.gltf.json");
 const pieza = {};
 const nodosEntorno = [];
 const nodosTitular = [];
+const colNodos = {};
 gltf.scene.traverse((o) => {
   if (o.isMesh) {
     o.userData.mat = o.material.name;
@@ -313,6 +323,7 @@ gltf.scene.traverse((o) => {
   if (["MODULO_Z", "ESTRUCTURA", "ESCALERAS", "UNICO"].includes(o.name)) pieza[o.name] = o;
   else if (o.isMesh && o.name.startsWith("E_")) nodosEntorno.push(o);
   else if (o.isMesh && o.name.startsWith("T_")) nodosTitular.push(o);
+  else if (["COL_MODULO", "COL_ESTRUCTURA", "COL_UNICO"].includes(o.name)) colNodos[o.name] = o;
 });
 
 // ---------- Escaleras: cartel de aeropuerto ----------
@@ -594,6 +605,93 @@ function gravedadActiva(dt) {
 }
 
 raiz.updateMatrixWorld(true);
+
+// ---------- Colisión para caminar ----------
+// Una sopa de triángulos en coordenadas del mundo (las 24 estructuras, los 8 núcleos y los planos), repartida
+// en una grilla de celdas de 4 m. Los rayos de la física son cortos, así que cada uno revisa pocas celdas.
+const COL = { C: 4, tri: null, n: 0, celdas: new Map() };
+{
+  const tris = [];
+  const agregar = (nodo, W) => {
+    if (!nodo) return;
+    nodo.updateMatrixWorld(true);
+    const v = new THREE.Vector3();
+    nodo.traverse((o) => {
+      if (!o.isMesh) return;
+      const M = W.clone().multiply(o.matrixWorld), pos = o.geometry.attributes.position, idx = o.geometry.index;
+      const n = idx ? idx.count : pos.count;
+      for (let k = 0; k < n; k++) {
+        v.fromBufferAttribute(pos, idx ? idx.getX(k) : k).applyMatrix4(M);
+        tris.push(v.x, v.y, v.z);
+      }
+    });
+  };
+  const R = raiz.matrixWorld;
+  const salasM = [new THREE.Matrix4(), ...Object.values(datos.habitaciones).map(matriz)];
+  const modsM = [new THREE.Matrix4(), ...datos.modulo.map(matriz)];
+  for (const S of salasM) {
+    for (const M of modsM) agregar(colNodos.COL_MODULO, R.clone().multiply(S).multiply(M));
+    agregar(colNodos.COL_ESTRUCTURA, R.clone().multiply(S));
+  }
+  agregar(colNodos.COL_UNICO, R.clone());
+  COL.tri = new Float32Array(tris);
+  COL.n = COL.tri.length / 9;
+  const t = COL.tri, C = COL.C;
+  for (let i = 0; i < COL.n; i++) {
+    const o = i * 9;
+    const lo = [0, 1, 2].map((k) => Math.floor(Math.min(t[o + k], t[o + 3 + k], t[o + 6 + k]) / C));
+    const hi = [0, 1, 2].map((k) => Math.floor(Math.max(t[o + k], t[o + 3 + k], t[o + 6 + k]) / C));
+    for (let x = lo[0]; x <= hi[0]; x++) for (let y = lo[1]; y <= hi[1]; y++) for (let z = lo[2]; z <= hi[2]; z++) {
+      const key = x + "," + y + "," + z;
+      let l = COL.celdas.get(key);
+      if (!l) COL.celdas.set(key, (l = []));
+      l.push(i);
+    }
+  }
+}
+const selloCol = new Uint32Array(COL.n);
+let generacionCol = 1;
+// Rayo contra la colisión: devuelve { t, n } (distancia y normal hacia el origen) o null.
+function rayoCol(o, d, max) {
+  if (!COL.n) return null;
+  generacionCol++;
+  const C = COL.C, T = COL.tri;
+  const x0 = Math.floor(Math.min(o.x, o.x + d.x * max) / C), x1 = Math.floor(Math.max(o.x, o.x + d.x * max) / C);
+  const y0 = Math.floor(Math.min(o.y, o.y + d.y * max) / C), y1 = Math.floor(Math.max(o.y, o.y + d.y * max) / C);
+  const z0 = Math.floor(Math.min(o.z, o.z + d.z * max) / C), z1 = Math.floor(Math.max(o.z, o.z + d.z * max) / C);
+  let mejor = max, n = null;
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
+    const l = COL.celdas.get(x + "," + y + "," + z);
+    if (!l) continue;
+    for (const i of l) {
+      if (selloCol[i] === generacionCol) continue;
+      selloCol[i] = generacionCol;
+      const k = i * 9;
+      const ax = T[k], ay = T[k + 1], az = T[k + 2];
+      const e1x = T[k + 3] - ax, e1y = T[k + 4] - ay, e1z = T[k + 5] - az;
+      const e2x = T[k + 6] - ax, e2y = T[k + 7] - ay, e2z = T[k + 8] - az;
+      const px = d.y * e2z - d.z * e2y, py = d.z * e2x - d.x * e2z, pz = d.x * e2y - d.y * e2x;
+      const det = e1x * px + e1y * py + e1z * pz;
+      if (Math.abs(det) < 1e-9) continue;
+      const inv = 1 / det, sx = o.x - ax, sy = o.y - ay, sz = o.z - az;
+      const u = (sx * px + sy * py + sz * pz) * inv;
+      if (u < 0 || u > 1) continue;
+      const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+      const v = (d.x * qx + d.y * qy + d.z * qz) * inv;
+      if (v < 0 || u + v > 1) continue;
+      const tt = (e2x * qx + e2y * qy + e2z * qz) * inv;
+      if (tt > 1e-4 && tt < mejor) {
+        mejor = tt;
+        n = [e1y * e2z - e1z * e2y, e1z * e2x - e1x * e2z, e1x * e2y - e1y * e2x];
+      }
+    }
+  }
+  if (!n) return null;
+  const nv = new THREE.Vector3(...n).normalize();
+  if (nv.dot(d) > 0) nv.negate();
+  return { t: mejor, n: nv };
+}
+
 document.getElementById("carga").hidden = true;
 window.__espacioAbierto = true;
 
@@ -609,28 +707,183 @@ let rapido = false;
 const btnOrbitar = document.getElementById("modoOrbitar");
 const btnCaminar = document.getElementById("modoCaminar");
 const palanca = document.getElementById("palanca");
-const perilla = document.getElementById("perilla");
+const mirarPalanca = document.getElementById("mirarPalanca");
 const vertical = document.getElementById("vertical");
 const ayuda = document.getElementById("ayuda");
+const mira = document.getElementById("mira");
+const lienzo = renderer.domElement;
 
+// Dos modos:
+//  · Orbitar es la cámara libre: gira alrededor de un punto, vuela en cualquier dirección y atraviesa paredes.
+//  · Recorrer es el cuerpo del lector: ojos a 1,60 m, pisa el piso de su gravedad, sube escaleras y no
+//    atraviesa paredes. Una palanca camina, la otra mira (en compu: WASD + mouse).
 function ponerModo(m) {
   modo = m;
   orbita.enabled = m === "orbitar";
   btnOrbitar.setAttribute("aria-pressed", m === "orbitar");
   btnCaminar.setAttribute("aria-pressed", m === "caminar");
-  palanca.hidden = vertical.hidden = m !== "caminar";
+  palanca.hidden = false;
+  mirarPalanca.hidden = m !== "caminar";
+  vertical.hidden = m !== "orbitar";
   ayuda.textContent = m === "orbitar"
-    ? "Arrastrá para girar · pellizcá para acercarte · dos dedos para desplazar."
-    : "Arrastrá para mirar · palanca para avanzar · ▲▼ para subir o bajar · X Y Z para girar de gravedad. Las H son portales: atravesalas. En compu: WASD, Q/E y el mouse.";
+    ? "Cámara libre: arrastrá para girar, pellizcá para acercarte. La palanca y ▲▼ vuelan y atraviesan todo. En compu: WASD, Q/E y Shift."
+    : "Palanca izquierda: caminar · derecha: mirar. X Y Z cambian la gravedad: caés sobre ese piso. Las H son portales. En compu: WASD para caminar, clic para mirar con el mouse (Esc suelta), Shift corre, Espacio salta.";
   if (m === "orbitar") {
+    if (document.pointerLockElement) document.exitPointerLock();
     camera.up.set(0, 1, 0);
     const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     orbita.target.copy(camera.position).addScaledVector(delante, 40);
     orbita.update();
   }
 }
-btnOrbitar.onclick = () => ponerModo("orbitar");
-btnCaminar.onclick = () => ponerModo("caminar");
+
+// ---------- El cuerpo del lector ----------
+// Pies, "arriba" (U: el eje de su gravedad, con signo), rumbo (H, perpendicular a U) y cabeceo.
+// Colisión: rayos contra la malla de colisión (rayoCol). Hacia los costados, tres rayos (rodillas, pecho y
+// cabeza) frenan y hacen deslizar contra las paredes; hacia abajo, un rayo desde la altura del escalón
+// apoya los pies: así sube escalones de hasta 55 cm y baja sin despegarse. Sin piso, cae.
+const OJOS = 1.6;
+const CUERPO = { radio: 0.3, escalon: 0.55, g: 9.8, paso: 3.2, corre: 9, salto: 4.2 };
+const cuerpo = { pies: new THREE.Vector3(), U: new THREE.Vector3(0, 1, 0), H: new THREE.Vector3(0, 0, -1), cab: 0,
+                 vu: 0, suelo: false, caida: 0, lag: 0, suave: 0, ultimo: null };
+const vMov = new THREE.Vector3(), vDir = new THREE.Vector3(), vDer = new THREE.Vector3(), vOri = new THREE.Vector3();
+const vAbajo = new THREE.Vector3(), vMira = new THREE.Vector3(), vNorm = new THREE.Vector3(), CERO = new THREE.Vector3();
+const mMira = new THREE.Matrix4(), qMira = new THREE.Quaternion();
+
+function ejePrincipal(v) {
+  const a = [Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)], k = a.indexOf(Math.max(...a));
+  const r = new THREE.Vector3();
+  r.setComponent(k, Math.sign(v.getComponent(k)) || 1);
+  return r;
+}
+function rumboDesde(U) {
+  const f = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  cuerpo.cab = THREE.MathUtils.clamp(Math.asin(THREE.MathUtils.clamp(f.dot(U), -1, 1)), -1.4, 1.4);
+  let h = f.clone().addScaledVector(U, -f.dot(U));
+  if (h.lengthSq() < 1e-4) {                        // mirando justo arriba o abajo: el rumbo sale del "arriba" de la cámara
+    h = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).multiplyScalar(-Math.sign(f.dot(U)) || 1);
+    h.addScaledVector(U, -h.dot(U));
+  }
+  cuerpo.U.copy(U);
+  cuerpo.H.copy(h.normalize());
+}
+// Pone el cuerpo donde está la cámara. Devuelve si hay algo para pisar debajo (hasta 120 m).
+function entrarCaminar(U) {
+  rumboDesde(U || ejePrincipal(new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion)));
+  cuerpo.pies.copy(camera.position).addScaledVector(cuerpo.U, -OJOS);
+  cuerpo.vu = 0; cuerpo.suelo = false; cuerpo.caida = 0; cuerpo.lag = 0; cuerpo.suave = 0;
+  return !!rayoCol(camera.position, vAbajo.copy(cuerpo.U).negate(), 120);
+}
+function guardarCuerpo() {
+  return { pies: cuerpo.pies.clone(), U: cuerpo.U.clone(), H: cuerpo.H.clone(), cab: cuerpo.cab,
+           p: camera.position.clone(), q: camera.quaternion.clone(), f: camera.fov };
+}
+function restaurarCuerpo(g) {
+  cuerpo.pies.copy(g.pies); cuerpo.U.copy(g.U); cuerpo.H.copy(g.H); cuerpo.cab = g.cab;
+  cuerpo.vu = 0; cuerpo.suelo = false; cuerpo.caida = 0; cuerpo.lag = 0;
+}
+function mirar(guinada, cabeceo) {
+  cuerpo.H.applyAxisAngle(cuerpo.U, guinada);
+  cuerpo.cab = THREE.MathUtils.clamp(cuerpo.cab + cabeceo, -1.45, 1.45);
+}
+function pisoBajo(desde, max) {
+  const r = rayoCol(desde, vAbajo.copy(cuerpo.U).negate(), max);
+  return r && r.n.dot(cuerpo.U) > 0.3 ? r : null;
+}
+function apoyar(desde, t) {
+  const antes = cuerpo.pies.dot(cuerpo.U);
+  const estaba = cuerpo.suelo;
+  cuerpo.pies.copy(desde).addScaledVector(cuerpo.U, -t);
+  if (estaba) cuerpo.lag -= cuerpo.pies.dot(cuerpo.U) - antes;    // el escalón se sube con la vista suave
+  cuerpo.lag = THREE.MathUtils.clamp(cuerpo.lag, -0.6, 0.6);
+  cuerpo.vu = 0; cuerpo.suelo = true; cuerpo.caida = 0;
+  if (!cuerpo.ultimo) cuerpo.ultimo = { pies: new THREE.Vector3(), U: new THREE.Vector3(), H: new THREE.Vector3(), cab: 0 };
+  cuerpo.ultimo.pies.copy(cuerpo.pies); cuerpo.ultimo.U.copy(cuerpo.U); cuerpo.ultimo.H.copy(cuerpo.H); cuerpo.ultimo.cab = cuerpo.cab;
+}
+function pasoCuerpo(dt, f, s, corre, salta) {
+  const U = cuerpo.U;
+  // Caminar: en el plano perpendicular a U, con deslizamiento contra las paredes.
+  vDer.crossVectors(cuerpo.H, U);
+  vMov.copy(cuerpo.H).multiplyScalar(f).addScaledVector(vDer, s);
+  const largo = vMov.length();
+  if (largo > 1) vMov.divideScalar(largo);
+  vMov.multiplyScalar((corre ? CUERPO.corre : CUERPO.paso) * dt * (cuerpo.suelo ? 1 : 0.7));
+  for (let it = 0; it < 3 && vMov.lengthSq() > 1e-10; it++) {
+    const L = vMov.length();
+    vDir.copy(vMov).divideScalar(L);
+    let choque = null;
+    for (const h of [0.6, 1.15, 1.75]) {
+      vOri.copy(cuerpo.pies).addScaledVector(U, h);
+      const r = rayoCol(vOri, vDir, L + CUERPO.radio);
+      if (r && Math.abs(r.n.dot(U)) < 0.75 && (!choque || r.t < choque.t)) choque = r;
+    }
+    if (!choque) { cuerpo.pies.add(vMov); break; }
+    const avance = Math.max(0, choque.t - CUERPO.radio);
+    cuerpo.pies.addScaledVector(vDir, avance);
+    vNorm.copy(choque.n).addScaledVector(U, -choque.n.dot(U)).normalize();
+    if (choque.t < CUERPO.radio) cuerpo.pies.addScaledVector(vNorm, (CUERPO.radio - choque.t) * 0.5);
+    vMov.copy(vDir).multiplyScalar(L - avance);
+    vMov.addScaledVector(vNorm, -vMov.dot(vNorm));
+  }
+  // Vertical: apoyarse, subir o bajar escalones, saltar, caer.
+  const arriba = vOri.copy(cuerpo.pies).addScaledVector(U, CUERPO.escalon);
+  if (salta && cuerpo.suelo) { cuerpo.vu = CUERPO.salto; cuerpo.suelo = false; }
+  if (cuerpo.suelo) {
+    const r = pisoBajo(arriba, CUERPO.escalon + 0.6);
+    if (r) { apoyar(arriba, r.t); return; }
+    cuerpo.suelo = false;
+  }
+  cuerpo.vu = Math.max(cuerpo.vu - CUERPO.g * dt, -40);
+  let dz = cuerpo.vu * dt;
+  if (dz <= 0) {
+    const r = pisoBajo(arriba, CUERPO.escalon - dz);
+    if (r) { apoyar(arriba, r.t); return; }
+  } else {
+    const techo = rayoCol(vMira.copy(cuerpo.pies).addScaledVector(U, OJOS + 0.1), U, dz + 0.15);
+    if (techo) { cuerpo.vu = 0; dz = 0; }
+  }
+  cuerpo.pies.addScaledVector(U, dz);
+  cuerpo.caida -= Math.min(0, dz);
+  if (cuerpo.caida > 150) {                         // cayó al vacío: vuelve al último lugar donde pisó
+    cuerpo.caida = 0;
+    if (cuerpo.ultimo) { restaurarCuerpo(cuerpo.ultimo); cuerpo.suave = 0; destellar(); }
+    else recorrer(true);
+  }
+}
+function colocarCamara(dt) {
+  cuerpo.lag *= Math.exp(-dt * 10);
+  camera.position.copy(cuerpo.pies).addScaledVector(cuerpo.U, OJOS + cuerpo.lag);
+  vMira.copy(cuerpo.H).multiplyScalar(Math.cos(cuerpo.cab)).addScaledVector(cuerpo.U, Math.sin(cuerpo.cab));
+  mMira.lookAt(CERO, vMira, cuerpo.U);
+  qMira.setFromRotationMatrix(mMira);
+  if (cuerpo.suave > 0) { cuerpo.suave -= dt; camera.quaternion.slerp(qMira, Math.min(1, dt * 3)); }
+  else camera.quaternion.copy(qMira);
+  camera.up.copy(cuerpo.U);
+}
+function destellar() {
+  destello.style.transition = "none";
+  destello.style.opacity = 0.85;
+  requestAnimationFrame(() => { destello.style.transition = ""; destello.style.opacity = 0; });
+}
+// Botón Recorrer: si hay piso debajo, el lector se apoya ahí; si está lejos (afuera del objeto), viaja a la
+// entrada de la habitación +++, frente a la H, sobre el piso z.
+const ENTRADA = { pies: [60, 10.2], mira: [-1, 0, 0] };
+function recorrer(forzarEntrada) {
+  if (vuelo) return;
+  if (!forzarEntrada && entrarCaminar()) { ponerModo("caminar"); return; }
+  const p = deBlender([ENTRADA.pies[0], ENTRADA.pies[1], MEDIO_PLANO + OJOS]);
+  const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(p, p.clone().add(deBlender(ENTRADA.mira)), new THREE.Vector3(0, 1, 0)));
+  const dist = camera.position.distanceTo(p);
+  const medio = camera.position.clone().add(p).multiplyScalar(0.5);
+  medio.y += Math.min(80, dist * 0.2);
+  vuelo = { t0: performance.now(), dur: Math.min(6000, 2200 + dist * 8), p0: camera.position.clone(), c: medio,
+            q0: camera.quaternion.clone(), f0: camera.fov, d: { p, q, f: fovVertical(18) },
+            alTerminar: () => { entrarCaminar(new THREE.Vector3(0, 1, 0)); ponerModo("caminar"); } };
+  orbita.enabled = false;
+  arrastre = null;
+}
+btnOrbitar.onclick = () => { if (!vuelo) ponerModo("orbitar"); };
+btnCaminar.onclick = () => recorrer();
 document.getElementById("rapido").onclick = (e) => { rapido = !rapido; e.currentTarget.setAttribute("aria-pressed", rapido); };
 
 function fovVertical(lente) {
@@ -669,6 +922,7 @@ const poses = instancias.map(poseDe);
 
 function llegar(i) {
   const ins = instancias[i];
+  if (ins.modo === "caminar") entrarCaminar();
   ponerModo(ins.modo);
   if (ins.modo === "orbitar") {
     const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -695,7 +949,7 @@ function irAInstancia(i, instantaneo) {
   const medio = camera.position.clone().add(d.p).multiplyScalar(0.5);
   medio.y += Math.min(80, dist * 0.2);
   vuelo = { t0: performance.now(), dur: Math.min(7500, 2800 + dist * 10), p0: camera.position.clone(), c: medio,
-            q0: camera.quaternion.clone(), f0: camera.fov, d, i };
+            q0: camera.quaternion.clone(), f0: camera.fov, d, alTerminar: () => llegar(i) };
   orbita.enabled = false;
   arrastre = null;
 }
@@ -709,33 +963,46 @@ function pasoVuelo(ahora) {
   camera.fov = vuelo.f0 + (vuelo.d.f - vuelo.f0) * e;
   camera.updateProjectionMatrix();
   if (u >= 1) {
-    const i = vuelo.i, lectura = vuelo.lectura;
+    const fin = vuelo.alTerminar;
     vuelo = null;
-    if (i === null) ponerModo("caminar"); else llegar(i);
-    if (lectura) iniciarVelo(lectura);
+    if (fin) fin();
   }
 }
 
 // ---------- Girar a otra gravedad dentro de la misma habitación (botones X, Y, Z) ----------
 // La cámara "cae" sobre el piso de esa gravedad: gira lo mínimo para que su arriba sea el nuevo y se apoya
 // a la altura de los ojos sobre ese plano, del lado de la habitación donde está.
-const MEDIO_PLANO = 1.755, OJOS = 1.6;
+const MEDIO_PLANO = 1.755;
 const aBlender = (v) => [v.x, -v.z, v.y];
 const deBlender = (b) => new THREE.Vector3(b[0], b[2], -b[1]);
+// Recorriendo, el cuerpo gira y cae (con la física) sobre lo primero que encuentre hacia ese piso. Desde la
+// cámara libre, viaja hasta el plano a la altura de los ojos y ahí empieza a caminar.
 function girarA(eje) {
-  if (vuelo || eje === ejeActivo) return;
+  if (vuelo || velo) return;
   const i = "xyz".indexOf(eje);
   const posB = aBlender(camera.position);
   const signo = Math.sign(posB[i]) || 1;
   const arribaB = [0, 0, 0];
   arribaB[i] = signo;
+  const U = deBlender(arribaB).normalize();
+  if (modo === "caminar") {
+    if (Math.abs(cuerpo.U.dot(U)) > 0.99) return;
+    const q = new THREE.Quaternion().setFromUnitVectors(cuerpo.U, U);
+    cuerpo.H.applyQuaternion(q).addScaledVector(U, -cuerpo.H.dot(U)).normalize();
+    cuerpo.U.copy(U);
+    cuerpo.suelo = false; cuerpo.vu = 0; cuerpo.caida = 0; cuerpo.lag = 0;
+    cuerpo.suave = 1.3;
+    return;
+  }
+  if (eje === ejeActivo) return;
   posB[i] = signo * (MEDIO_PLANO + OJOS);
   const destino = deBlender(posB);
   const actual = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-  const q = new THREE.Quaternion().setFromUnitVectors(actual, deBlender(arribaB).normalize()).multiply(camera.quaternion);
-  ponerModo("caminar");
+  const q = new THREE.Quaternion().setFromUnitVectors(actual, U).multiply(camera.quaternion);
   vuelo = { t0: performance.now(), dur: 1800, p0: camera.position.clone(), c: camera.position.clone().add(destino).multiplyScalar(0.5),
-            q0: camera.quaternion.clone(), f0: camera.fov, d: { p: destino, q, f: camera.fov }, i: null };
+            q0: camera.quaternion.clone(), f0: camera.fov, d: { p: destino, q, f: camera.fov },
+            alTerminar: () => { entrarCaminar(U); ponerModo("caminar"); } };
+  orbita.enabled = false;
 }
 for (const b of botonesGravedad) b.onclick = () => girarA(b.dataset.eje);
 
@@ -1035,11 +1302,14 @@ function cruzar(p) {
   camera.position.copy(espejo(camera.position));
   camera.up.copy(arriba);
   camera.lookAt(camera.position.clone().add(adelante));
+  // El cuerpo pasa al otro lado del mismo piso: pies, arriba y rumbo, reflejados.
+  cuerpo.pies.copy(espejo(cuerpo.pies));
+  cuerpo.U.copy(espejo(cuerpo.U));
+  cuerpo.H.copy(espejo(cuerpo.H));
+  cuerpo.vu = 0; cuerpo.suelo = false; cuerpo.lag = 0; cuerpo.ultimo = null;
   for (const q of pasos) q.prev = null;
   enfriar = performance.now() + 1200;
-  destello.style.transition = "none";
-  destello.style.opacity = 0.85;
-  requestAnimationFrame(() => { destello.style.transition = ""; destello.style.opacity = 0; });
+  destellar();
   const s = aBlender(camera.position).map((c) => (c >= 0 ? "+" : "−")).join("");
   actual = -1;
   botonesInst.forEach((b) => b.setAttribute("aria-pressed", false));
@@ -1090,10 +1360,14 @@ function irALectura(d) {
   notaTexto.textContent = d.L.nota;
   legibCaja.hidden = true;
   nota.hidden = false;
+  if (document.pointerLockElement) document.exitPointerLock();
+  // Si el lector estaba recorriendo, después del velo vuelve a donde estaba parado.
+  const regreso = modo === "caminar" ? guardarCuerpo() : null;
   const dist = camera.position.distanceTo(d.pose.p);
   vuelo = { t0: performance.now(), dur: Math.min(5000, 1800 + dist * 40), p0: camera.position.clone(),
             c: camera.position.clone().add(d.pose.p).multiplyScalar(0.5), q0: camera.quaternion.clone(), f0: camera.fov,
-            d: { p: d.pose.p, q: d.pose.q, f: fovVertical(24) }, i: null, lectura: d };
+            d: { p: d.pose.p, q: d.pose.q, f: fovVertical(24) }, alTerminar: () => iniciarVelo(d, regreso) };
+  orbita.enabled = false;
   arrastre = null;
 }
 // Tocar una esfera: un clic o tap corto (sin arrastrar) sobre ella. La tolerancia crece con la distancia.
@@ -1140,8 +1414,10 @@ renderer.domElement.addEventListener("pointerup", (e) => {
   const corto = Math.hypot(e.clientX - toque.x, e.clientY - toque.y) < 12 && performance.now() - toque.t < 700;
   toque = null;
   if (!corto || vuelo || velo) return;
-  const d = esferaBajo(e.clientX, e.clientY);
+  const enMira = document.pointerLockElement === renderer.domElement;
+  const d = enMira ? esferaBajo(innerWidth / 2, innerHeight / 2) : esferaBajo(e.clientX, e.clientY);
   if (d) irALectura(d);
+  else if (!enMira && modo === "caminar" && e.pointerType === "mouse") capturarMouse();
 });
 renderer.domElement.addEventListener("pointermove", (e) => {
   if (e.buttons || e.pointerType !== "mouse") return;
@@ -1152,7 +1428,7 @@ renderer.domElement.addEventListener("pointermove", (e) => {
 const capaVelo = document.getElementById("velo");
 let velo = null;
 const PAPEL = new THREE.Color(0xe9e3d6), NEGRO = new THREE.Color(0x0d0d0d);
-function iniciarVelo(d) {
+function iniciarVelo(d, regreso) {
   const mostrar = new Map();                      // malla → color plano del texto
   if (d.L.tipo === "escalera") mostrar.set(d.esc, new THREE.Color(0x1e6973));
   else d.mz.traverse((o) => { if (o.isMesh && (o.userData.mat || "").startsWith("Tinta_")) mostrar.set(o, colorDe(o.userData.mat)); });
@@ -1166,7 +1442,7 @@ function iniciarVelo(d) {
     if (mostrar.has(o)) { materiales.push([o, o.material]); o.material = new THREE.MeshBasicMaterial({ color: mostrar.get(o), side: THREE.DoubleSide }); }
     else { ocultos.push(o); o.visible = false; }
   });
-  velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + d.L.segundos * 1000 };
+  velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + d.L.segundos * 1000, regreso };
   scene.fog = null;
   scene.background = fondo;
   capaVelo.style.background = "#" + fondo.getHexString();
@@ -1186,6 +1462,12 @@ function terminarVelo() {
     scene.fog = v.niebla;
     scene.background = null;
     capaVelo.style.opacity = 0;                    // se levanta el velo y el lector queda suelto
+    const r = v.regreso;
+    if (!r) { ponerModo("orbitar"); return; }
+    const dist = camera.position.distanceTo(r.p);
+    vuelo = { t0: performance.now(), dur: Math.min(4500, 1600 + dist * 30), p0: camera.position.clone(),
+              c: camera.position.clone().add(r.p).multiplyScalar(0.5), q0: camera.quaternion.clone(), f0: camera.fov,
+              d: { p: r.p, q: r.q, f: r.f }, alTerminar: () => { restaurarCuerpo(r); ponerModo("caminar"); } };
   }, 380);
 }
 
@@ -1209,42 +1491,60 @@ document.getElementById("enderezar").onclick = () => {
   camera.lookAt(camera.position.clone().add(delante));
 };
 
-// Mirada libre en 3 ejes (conserva el giro de cada gravedad).
+// Mirar arrastrando sobre la pantalla (al recorrer): se "agarra" el espacio.
 let arrastre = null;
-renderer.domElement.addEventListener("pointerdown", (e) => {
-  if (modo !== "caminar") return;
+lienzo.addEventListener("pointerdown", (e) => {
+  if (modo !== "caminar" || document.pointerLockElement === lienzo) return;
   arrastre = { id: e.pointerId, x: e.clientX, y: e.clientY };
-  try { renderer.domElement.setPointerCapture(e.pointerId); } catch (err) { /* puntero sintético o ya liberado */ }
+  try { lienzo.setPointerCapture(e.pointerId); } catch (err) { /* puntero sintético o ya liberado */ }
 });
-renderer.domElement.addEventListener("pointermove", (e) => {
-  if (!arrastre || e.pointerId !== arrastre.id) return;
+lienzo.addEventListener("pointermove", (e) => {
+  if (!arrastre || e.pointerId !== arrastre.id || vuelo || velo) return;
   const dx = e.clientX - arrastre.x, dy = e.clientY - arrastre.y;
   arrastre.x = e.clientX; arrastre.y = e.clientY;
-  const k = 0.0035;
-  camera.rotateOnAxis(new THREE.Vector3(0, 1, 0), dx * k);
-  camera.rotateOnAxis(new THREE.Vector3(1, 0, 0), dy * k);
+  mirar(dx * 0.0035, dy * 0.0035);
 });
 const soltar = (e) => { if (arrastre && e.pointerId === arrastre.id) arrastre = null; };
-renderer.domElement.addEventListener("pointerup", soltar);
-renderer.domElement.addEventListener("pointercancel", soltar);
+lienzo.addEventListener("pointerup", soltar);
+lienzo.addEventListener("pointercancel", soltar);
 
-// Palanca táctil.
-const empuje = { x: 0, y: 0 };
-let dedoPalanca = null;
-function moverPalanca(e) {
-  const r = palanca.getBoundingClientRect();
-  let x = (e.clientX - r.left - r.width / 2) / (r.width / 2);
-  let y = (e.clientY - r.top - r.height / 2) / (r.height / 2);
-  const l = Math.hypot(x, y);
-  if (l > 1) { x /= l; y /= l; }
-  empuje.x = x; empuje.y = y;
-  perilla.style.transform = `translate(${x * 44}px, ${y * 44}px)`;
+// En compu, como en los juegos: un clic captura el mouse y moverlo mira; Esc lo suelta. La mira del centro
+// sirve para tocar las esferas.
+let capturado = false;
+document.addEventListener("pointerlockchange", () => {
+  capturado = document.pointerLockElement === lienzo;
+  mira.hidden = !capturado;
+});
+document.addEventListener("mousemove", (e) => {
+  if (!capturado || modo !== "caminar" || vuelo || velo) return;
+  mirar(-e.movementX * 0.0022, -e.movementY * 0.0022);
+});
+function capturarMouse() {
+  try { const r = lienzo.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) { /* sin captura: se mira arrastrando */ }
 }
-palanca.addEventListener("pointerdown", (e) => { dedoPalanca = e.pointerId; try { palanca.setPointerCapture(e.pointerId); } catch (err) { /* nada */ } moverPalanca(e); });
-palanca.addEventListener("pointermove", (e) => { if (e.pointerId === dedoPalanca) moverPalanca(e); });
-const soltarPalanca = (e) => { if (e.pointerId !== dedoPalanca) return; dedoPalanca = null; empuje.x = empuje.y = 0; perilla.style.transform = ""; };
-palanca.addEventListener("pointerup", soltarPalanca);
-palanca.addEventListener("pointercancel", soltarPalanca);
+
+// Palancas táctiles: la izquierda camina (o vuela, en Orbitar), la derecha mira.
+function hacerPalanca(el) {
+  const perilla = el.querySelector(".perilla"), v = { x: 0, y: 0 };
+  let dedo = null;
+  const mover = (e) => {
+    const r = el.getBoundingClientRect();
+    let x = (e.clientX - r.left - r.width / 2) / (r.width / 2);
+    let y = (e.clientY - r.top - r.height / 2) / (r.height / 2);
+    const l = Math.hypot(x, y);
+    if (l > 1) { x /= l; y /= l; }
+    v.x = x; v.y = y;
+    perilla.style.transform = `translate(${x * 44}px, ${y * 44}px)`;
+  };
+  el.addEventListener("pointerdown", (e) => { dedo = e.pointerId; try { el.setPointerCapture(e.pointerId); } catch (err) { /* nada */ } mover(e); });
+  el.addEventListener("pointermove", (e) => { if (e.pointerId === dedo) mover(e); });
+  const soltarla = (e) => { if (e.pointerId !== dedo) return; dedo = null; v.x = v.y = 0; perilla.style.transform = ""; };
+  el.addEventListener("pointerup", soltarla);
+  el.addEventListener("pointercancel", soltarla);
+  return v;
+}
+const empuje = hacerPalanca(palanca);
+const giro = hacerPalanca(mirarPalanca);
 
 let altura = 0;
 for (const [id, v] of [["subir", 1], ["bajar", -1]]) {
@@ -1256,10 +1556,15 @@ for (const [id, v] of [["subir", 1], ["bajar", -1]]) {
 const teclas = new Set();
 addEventListener("keydown", (e) => {
   teclas.add(e.code);
+  if (e.code === "Space" || e.code.startsWith("Arrow")) e.preventDefault();
   const m = /^(?:Digit|Numpad)(\d)$/.exec(e.code);          // 1…9 y 0 → instancias 1…10
   if (m) { const n = (Number(m[1]) + 9) % 10; if (instancias[n]) irAInstancia(n); }
+  if (e.code === "KeyX" || e.code === "KeyY" || e.code === "KeyZ") girarA(e.code.slice(3).toLowerCase());
 });
 addEventListener("keyup", (e) => teclas.delete(e.code));
+addEventListener("blur", () => teclas.clear());
+// Un botón tocado con el mouse no se queda con el foco (si no, Espacio lo volvería a apretar).
+document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("button"); if (b && e.detail) b.blur(); });
 
 // ---------- Bucle ----------
 const reloj = new THREE.Clock();
@@ -1279,20 +1584,28 @@ function cuadro() {
     pasoVuelo(performance.now());
   } else if (velo) {
     // durante el velo la cámara queda quieta
-  } else if (modo === "caminar") {
+  } else {
     let f = -empuje.y, s = empuje.x, u = altura;
     if (teclas.has("KeyW") || teclas.has("ArrowUp")) f += 1;
     if (teclas.has("KeyS") || teclas.has("ArrowDown")) f -= 1;
     if (teclas.has("KeyD") || teclas.has("ArrowRight")) s += 1;
     if (teclas.has("KeyA") || teclas.has("ArrowLeft")) s -= 1;
-    if (teclas.has("KeyE")) u += 1;
-    if (teclas.has("KeyQ")) u -= 1;
-    const v = (rapido || teclas.has("ShiftLeft") ? 18 : 4) * dt;
-    camera.translateZ(-f * v);
-    camera.translateX(s * v);
-    camera.translateY(u * v);
-  } else {
-    orbita.update();
+    const corre = rapido || teclas.has("ShiftLeft") || teclas.has("ShiftRight");
+    if (modo === "caminar") {
+      if (giro.x || giro.y) mirar(-giro.x * 2.4 * dt, -giro.y * 1.7 * dt);
+      pasoCuerpo(dt, f, s, corre, teclas.has("Space"));
+      colocarCamara(dt);
+    } else {
+      // Cámara libre: vuela en la dirección en que mira y lleva consigo el centro de giro.
+      if (teclas.has("KeyE")) u += 1;
+      if (teclas.has("KeyQ")) u -= 1;
+      if (f || s || u) {
+        vMov.set(s, u, -f).multiplyScalar((corre ? 70 : 16) * dt).applyQuaternion(camera.quaternion);
+        camera.position.add(vMov);
+        orbita.target.add(vMov);
+      }
+      orbita.update();
+    }
   }
   legibilidad();
   revisarPortales();
@@ -1305,7 +1618,8 @@ function bucle() { cuadro(); requestAnimationFrame(bucle); }
 irAInstancia(0, true);
 bucle();
 // Para depurar desde la consola (paso = un cuadro sin esperar a requestAnimationFrame).
-window.visor = { scene, camera, renderer, raiz, irAInstancia, instancias, datos, uTiempo, entorno, girarA, paso: cuadro, get audio() { return audio; }, disparadores, irALectura };
+window.visor = { scene, camera, renderer, raiz, irAInstancia, instancias, datos, uTiempo, entorno, girarA, paso: cuadro, get audio() { return audio; }, disparadores, irALectura,
+                 cuerpo, recorrer, teclas, rayoCol, deBlender, aBlender, get modo() { return modo; } };
 
 function ajustarTamano() {
   if (!innerWidth || !innerHeight) return;
