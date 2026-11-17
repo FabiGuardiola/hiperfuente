@@ -1101,19 +1101,43 @@ const rayo = new THREE.Raycaster(), vNdc = new THREE.Vector2();
 function esferaBajo(x, y) {
   vNdc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
   rayo.setFromCamera(vNdc, camera);
-  let mejor = null, mejorT = 160;
+  // Se elige la esfera más alineada con el toque (error angular), a cualquier distancia.
+  let mejor = null, mejorError = Infinity;
   for (const d of disparadores) {
     const t = rayo.ray.origin.distanceTo(d.centro);
-    if (t > mejorT || d.centro.clone().sub(rayo.ray.origin).dot(rayo.ray.direction) < 0) continue;
-    if (rayo.ray.distanceToPoint(d.centro) < 1.4 + t * 0.012) { mejor = d; mejorT = t; }
+    if (t < 0.5 || d.centro.clone().sub(rayo.ray.origin).dot(rayo.ray.direction) < 0) continue;
+    const error = rayo.ray.distanceToPoint(d.centro) / t;
+    if (error < Math.max(0.035, 1.6 / t) && error < mejorError) { mejor = d; mejorError = error; }
   }
   return mejor;
+}
+// Halo que late alrededor de cada esfera: indica que se puede tocar.
+const halos = [];
+{
+  const lienzo = document.createElement("canvas");
+  lienzo.width = lienzo.height = 128;
+  const c = lienzo.getContext("2d"), g = c.createRadialGradient(64, 64, 10, 64, 64, 62);
+  g.addColorStop(0, "rgba(255,238,200,0.0)"); g.addColorStop(0.45, "rgba(255,230,180,0.55)"); g.addColorStop(0.6, "rgba(255,220,160,0.25)"); g.addColorStop(1, "rgba(255,220,160,0)");
+  c.fillStyle = g; c.fillRect(0, 0, 128, 128);
+  const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(lienzo), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  for (const d of disparadores) {
+    const s = new THREE.Sprite(mat);
+    s.position.copy(d.centro);
+    s.scale.setScalar(2.6);
+    s.renderOrder = 15;
+    scene.add(s);
+    halos.push(s);
+  }
+}
+function latirHalos(t) {
+  const k = 2.4 + 0.8 * (0.5 + 0.5 * Math.sin(t * 2.2));
+  for (const s of halos) s.scale.setScalar(k);
 }
 let toque = null;
 renderer.domElement.addEventListener("pointerdown", (e) => { toque = { x: e.clientX, y: e.clientY, t: performance.now() }; });
 renderer.domElement.addEventListener("pointerup", (e) => {
   if (!toque) return;
-  const corto = Math.hypot(e.clientX - toque.x, e.clientY - toque.y) < 8 && performance.now() - toque.t < 500;
+  const corto = Math.hypot(e.clientX - toque.x, e.clientY - toque.y) < 12 && performance.now() - toque.t < 700;
   toque = null;
   if (!corto || vuelo || velo) return;
   const d = esferaBajo(e.clientX, e.clientY);
@@ -1272,6 +1296,7 @@ function cuadro() {
   }
   legibilidad();
   revisarPortales();
+  latirHalos(reloj.elapsedTime);
   if (velo && performance.now() > velo.fin) terminarVelo();
   cielo.position.copy(camera.position);
   renderer.render(scene, camera);
