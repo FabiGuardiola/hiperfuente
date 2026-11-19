@@ -249,7 +249,9 @@ function material(nombre, rgba) {
   const color = new THREE.Color().setRGB(rgba[0], rgba[1], rgba[2]);
   let m;
   if (nombre.startsWith("Lampara") || nombre === "Color_ffd159") {
-    m = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.8, 0.55).multiplyScalar(1.6), fog: true });
+    m = new THREE.MeshPhongMaterial({ color: 0xf4f1ea, specular: 0xffffff, shininess: 140, transparent: true,
+                                      opacity: 0.2, depthWrite: false, emissive: new THREE.Color(0, 0, 0) });
+    m.userData.vidrio = true;
     lamparas.push(m);
   } else if (nombre === "Horizonte") {
     // La frase del horizonte está a 1,8 km: la niebla normal la borraría. Se le da un velo fijo.
@@ -800,8 +802,13 @@ function apoyar(desde, t) {
   if (!cuerpo.ultimo) cuerpo.ultimo = { pies: new THREE.Vector3(), U: new THREE.Vector3(), H: new THREE.Vector3(), cab: 0 };
   cuerpo.ultimo.pies.copy(cuerpo.pies); cuerpo.ultimo.U.copy(cuerpo.U); cuerpo.ultimo.H.copy(cuerpo.H); cuerpo.ultimo.cab = cuerpo.cab;
 }
+const vAntes = new THREE.Vector3(), vPaso = new THREE.Vector3(), vEje = new THREE.Vector3(), vPrueba = new THREE.Vector3();
+function hayPiso(p) {
+  return !!pisoBajo(vPrueba.copy(p).addScaledVector(cuerpo.U, CUERPO.escalon), CUERPO.escalon + 0.6);
+}
 function pasoCuerpo(dt, f, s, corre, salta) {
   const U = cuerpo.U;
+  vAntes.copy(cuerpo.pies);
   // Caminar: en el plano perpendicular a U, con deslizamiento contra las paredes.
   vDer.crossVectors(cuerpo.H, U);
   vMov.copy(cuerpo.H).multiplyScalar(f).addScaledVector(vDer, s);
@@ -812,7 +819,7 @@ function pasoCuerpo(dt, f, s, corre, salta) {
     const L = vMov.length();
     vDir.copy(vMov).divideScalar(L);
     let choque = null;
-    for (const h of [0.6, 1.15, 1.75]) {
+    for (const h of [0.6, 1.15, 1.7]) {
       vOri.copy(cuerpo.pies).addScaledVector(U, h);
       const r = rayoCol(vOri, vDir, L + CUERPO.radio);
       if (r && Math.abs(r.n.dot(U)) < 0.75 && (!choque || r.t < choque.t)) choque = r;
@@ -824,6 +831,19 @@ function pasoCuerpo(dt, f, s, corre, salta) {
     if (choque.t < CUERPO.radio) cuerpo.pies.addScaledVector(vNorm, (CUERPO.radio - choque.t) * 0.5);
     vMov.copy(vDir).multiplyScalar(L - avance);
     vMov.addScaledVector(vNorm, -vMov.dot(vNorm));
+  }
+  // Bordes: caminando no se cae. Si el paso queda sin piso, se prueba deslizar por cada eje; si no, se queda.
+  if (cuerpo.suelo && !salta && !hayPiso(cuerpo.pies)) {
+    vPaso.copy(cuerpo.pies).sub(vAntes);
+    cuerpo.pies.copy(vAntes);
+    for (const eje of [[1, 0, 0], [0, 1, 0], [0, 0, 1]]) {
+      vEje.set(...eje);
+      if (Math.abs(vEje.dot(U)) > 0.5) continue;
+      const c = vPaso.dot(vEje);
+      if (Math.abs(c) < 1e-5) continue;
+      cuerpo.pies.addScaledVector(vEje, c);
+      if (!hayPiso(cuerpo.pies)) cuerpo.pies.addScaledVector(vEje, -c);
+    }
   }
   // Vertical: apoyarse, subir o bajar escalones, saltar, caer.
   const arriba = vOri.copy(cuerpo.pies).addScaledVector(U, CUERPO.escalon);
@@ -1391,20 +1411,20 @@ const halos = [];
   const lienzo = document.createElement("canvas");
   lienzo.width = lienzo.height = 128;
   const c = lienzo.getContext("2d"), g = c.createRadialGradient(64, 64, 10, 64, 64, 62);
-  g.addColorStop(0, "rgba(255,238,200,0.0)"); g.addColorStop(0.45, "rgba(255,230,180,0.55)"); g.addColorStop(0.6, "rgba(255,220,160,0.25)"); g.addColorStop(1, "rgba(255,220,160,0)");
+  g.addColorStop(0, "rgba(255,238,200,0.0)"); g.addColorStop(0.42, "rgba(255,232,190,0.0)"); g.addColorStop(0.5, "rgba(255,230,180,0.22)"); g.addColorStop(0.62, "rgba(255,220,160,0.06)"); g.addColorStop(1, "rgba(255,220,160,0)");
   c.fillStyle = g; c.fillRect(0, 0, 128, 128);
   const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(lienzo), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
   for (const d of disparadores) {
     const s = new THREE.Sprite(mat);
     s.position.copy(d.centro);
-    s.scale.setScalar(2.6);
+    s.scale.setScalar(1.2);
     s.renderOrder = 15;
     scene.add(s);
     halos.push(s);
   }
 }
 function latirHalos(t) {
-  const k = 2.4 + 0.8 * (0.5 + 0.5 * Math.sin(t * 2.2));
+  const k = 1.1 + 0.25 * (0.5 + 0.5 * Math.sin(t * 2.2));
   for (const s of halos) s.scale.setScalar(k);
 }
 let toque = null;
@@ -1578,7 +1598,7 @@ function cuadro() {
   // Si la página se abrió en una pestaña oculta, el lienzo quedó en 0 × 0: se corrige apenas hay tamaño.
   if (innerWidth > 0 && (renderer.domElement.clientWidth !== innerWidth || renderer.domElement.width === 0)) ajustarTamano();
   const tt = reloj.elapsedTime, parpadeo = 0.55 + 0.25 * Math.sin(tt * 2.3) + 0.2 * Math.sin(tt * 7.1 + 1.3) * Math.sin(tt * 0.9);
-  for (const m of lamparas) m.color.copy(LUZ_LAMPARA).multiplyScalar(1.6 * parpadeo);
+  for (const m of lamparas) m.emissive.copy(LUZ_LAMPARA).multiplyScalar(0.16 * parpadeo);
   animarEntorno(reloj.elapsedTime);
   if (vuelo) {
     pasoVuelo(performance.now());
@@ -1619,7 +1639,7 @@ irAInstancia(0, true);
 bucle();
 // Para depurar desde la consola (paso = un cuadro sin esperar a requestAnimationFrame).
 window.visor = { scene, camera, renderer, raiz, irAInstancia, instancias, datos, uTiempo, entorno, girarA, paso: cuadro, get audio() { return audio; }, disparadores, irALectura,
-                 cuerpo, recorrer, teclas, rayoCol, deBlender, aBlender, get modo() { return modo; } };
+                 cuerpo, recorrer, teclas, rayoCol, deBlender, aBlender, orbita, get modo() { return modo; } };
 
 function ajustarTamano() {
   if (!innerWidth || !innerHeight) return;
