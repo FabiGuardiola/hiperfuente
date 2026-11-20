@@ -1,0 +1,1652 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hiperfuente navegable</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Pantalla completa: el espacio ocupa todo; la interfaz son tiras finas en los bordes, como marginalia. */
+@font-face { font-family: "FabiBlock"; src: url(data:font/otf;base64,T1RUTwAKAIAAAwAgQ0ZGIJZt8QkAAACsAAAeBU9TLzJpH4XgAAAetAAAAGBjbWFwTJrvDQAAHxQAAAD8Z2FzcAAAAAsAACAQAAAACGhlYWRjOEOOAAAgGAAAADZoaGVhCAEDzgAAIFAAAAAkaG10eCuNHUgAACB0AAABsG1heHAAbFAAAAAiJAAAAAZuYW1ln/BRSAAAIiwAAALZcG9zdP+fADIAACUIAAAAIAEABAQAAQEBEkZhYmlCbG9jay1SZWd1bGFyAAEBAS/4hgL4hwP4iASL+5j6fPpABR0AAAQ4ER0AAB0sDx0AAB4DEB0AAAAAHQAAHgUSAG4CAAEACAAPABYAHQAkACsAMgA5AEAARwBOAFUAXABjAGoAcQB4AH8AhgCNAJQAmwCiAKkAsAC3AL4AxQDMANMA2gDhAOgA7wD2AP0BBAELARIBGQEgAScBLgE1ATwBQwFKAVEBWAFfAWYBbQF0AXsBggGJAZABlwGeAaUBrAGzAboBwQHIAc8B1gHdAeQB6wHyAfkCAAIHAg4CFQIcAiMCKgIxAjgCPwJGAk0CVAJbAmICaQJwAncCfgKFAowCkwKaAqECqAKvArYCvQLEAssC0gLZAuAC5wLuAvgDAgMJdW5pMDAyMHVuaTAwMjF1bmkwMDIydW5pMDAyM3VuaTAwMjR1bmkwMDI1dW5pMDAyNnVuaTAwMjd1bmkwMDI4dW5pMDAyOXVuaTAwMkF1bmkwMDJCdW5pMDAyQ3VuaTAwMkR1bmkwMDJFdW5pMDAyRnVuaTAwMzB1bmkwMDMxdW5pMDAzMnVuaTAwMzN1bmkwMDM0dW5pMDAzNXVuaTAwMzZ1bmkwMDM3dW5pMDAzOHVuaTAwMzl1bmkwMDNBdW5pMDAzQnVuaTAwM0R1bmkwMDNGdW5pMDA0MHVuaTAwNDF1bmkwMDQydW5pMDA0M3VuaTAwNDR1bmkwMDQ1dW5pMDA0NnVuaTAwNDd1bmkwMDQ4dW5pMDA0OXVuaTAwNEF1bmkwMDRCdW5pMDA0Q3VuaTAwNER1bmkwMDRFdW5pMDA0RnVuaTAwNTB1bmkwMDUxdW5pMDA1MnVuaTAwNTN1bmkwMDU0dW5pMDA1NXVuaTAwNTZ1bmkwMDU3dW5pMDA1OHVuaTAwNTl1bmkwMDVBdW5pMDA1QnVuaTAwNUN1bmkwMDVEdW5pMDA1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) format("opentype"); font-display: swap; }
+:root {
+  --noche: #16191C;        /* fondo mientras carga */
+  --papel: #E9E3D6;
+  --piedra: #A8A398;
+  --lacre: #9B3D2E;
+  --tinta: #2F4858;
+  --velo: rgba(22, 25, 28, .62);
+  --hyper: "FabiBlock", "Arial Black", sans-serif;
+  --mono: "DM Mono", ui-monospace, "Courier New", monospace;
+  color-scheme: dark;
+}
+/* Reglas base: dentro de Claude las pone la plataforma, en GitHub Pages no. */
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--noche); color: var(--papel); font-family: var(--mono); font-size: 13px; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; }
+canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; }
+.barra {
+  position: fixed; left: 0; right: 0; top: 0; z-index: 2;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: linear-gradient(var(--velo), transparent);
+  pointer-events: none;
+}
+.barra > * { pointer-events: auto; }
+h1 { margin: 0; font-family: var(--hyper); font-weight: 400; font-size: 22px; letter-spacing: .02em; color: var(--papel); }
+.grupo { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rotulo { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--piedra); margin-right: 2px; }
+button {
+  font: inherit; font-size: 12px; color: var(--papel); background: var(--velo);
+  border: 1px solid rgba(233, 227, 214, .28); border-radius: 2px; padding: 7px 10px; cursor: pointer; min-height: 34px;
+}
+button[aria-pressed="true"] { background: var(--lacre); border-color: var(--lacre); }
+button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
+.ayuda {
+  position: fixed; z-index: 2; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(176px + env(safe-area-inset-bottom, 0px));
+  max-width: 300px; font-size: 11px; margin: 0; line-height: 1.5; color: var(--piedra); text-align: right; pointer-events: none;
+}
+.palanca {
+  position: fixed; z-index: 2; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 128px; height: 128px; border-radius: 50%; border: 1px solid rgba(233, 227, 214, .35); background: var(--velo); touch-action: none;
+}
+#palanca { left: max(24px, env(safe-area-inset-left, 0px)); }
+#mirarPalanca { right: max(24px, env(safe-area-inset-right, 0px)); }
+.palanca span { position: absolute; left: 0; right: 0; top: -18px; text-align: center; font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--piedra); pointer-events: none; }
+.perilla { position: absolute; left: 44px; top: 44px; width: 40px; height: 40px; border-radius: 50%; background: var(--papel); opacity: .8; pointer-events: none; }
+#mira { position: fixed; z-index: 2; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; pointer-events: none; }
+#mira::before, #mira::after { content: ""; position: absolute; background: var(--papel); opacity: .85; }
+#mira::before { left: 6px; top: 0; width: 2px; height: 14px; }
+#mira::after { top: 6px; left: 0; height: 2px; width: 14px; }
+.vertical { position: fixed; z-index: 2; left: calc(168px + env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; }
+.vertical button { width: 46px; }
+#carga { position: fixed; inset: 0; z-index: 3; display: grid; place-content: center; gap: 10px; text-align: center; background: var(--noche); }
+#carga strong { font-family: var(--hyper); font-weight: 400; font-size: 34px; color: var(--lacre); }
+#barraCarga { width: 220px; height: 2px; background: rgba(233, 227, 214, .2); }
+#barraCarga i { display: block; height: 100%; width: 0; background: var(--papel); }
+.grav { min-width: 34px; font-weight: 500; }
+/* Mapa lateral: el icosaedro en miniatura, con el piso de la gravedad activa siempre abajo, y la ficha del lugar. */
+#mapa {
+  position: fixed; z-index: 2; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(112px + env(safe-area-inset-top, 0px));
+  width: 190px; padding: 8px 10px 10px; background: rgba(22, 25, 28, .5); border-left: 1px solid rgba(233, 227, 214, .25);
+  color: #fff; font-family: var(--mono); font-size: 9.5px; line-height: 1.4; pointer-events: none;
+}
+#mapaLienzo { display: block; position: static; inset: auto; width: 170px; height: 170px; }
+#sonido { pointer-events: auto; display: block; width: 100%; margin-bottom: 6px; font-size: 12px; font-weight: 500; letter-spacing: .06em; padding: 9px 8px; text-align: left; }
+#sonido[aria-pressed="true"] { background: var(--lacre); border-color: var(--lacre); }
+#aviso { min-height: 0; font-size: 10.5px; line-height: 1.35; color: #fff; background: rgba(155, 61, 46, .85); padding: 0 6px; max-height: 0; overflow: hidden; transition: max-height .4s, padding .4s; }
+#aviso.visible { max-height: 60px; padding: 5px 6px; }
+#ficha { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 6px 0 0; }
+#ficha dt { color: #bdb8ad; text-transform: uppercase; font-size: 8px; letter-spacing: .1em; padding-top: 2px; }
+#ficha dd { margin: 0; color: #fff; }
+@media (max-width: 900px) { #mapa { width: 112px; padding: 5px; } #mapaLienzo { width: 102px; height: 102px; } #ficha { display: none; } #sonido { font-size: 10.5px; padding: 8px 5px; } }
+#velo { position: fixed; inset: 0; z-index: 1; opacity: 0; pointer-events: none; }
+#destello { position: fixed; inset: 0; z-index: 1; background: var(--papel); opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
+.chip { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 8px 10px; border: 1px solid var(--lacre); color: var(--papel); background: rgba(155, 61, 46, .35); border-radius: 2px; }
+/* Las 10 instancias en una sola fila, a todo el ancho. */
+.tira { order: 9; flex-basis: 100%; display: grid; grid-template-columns: auto repeat(10, minmax(0, 1fr)); gap: 6px; align-items: center; }
+.tira button { padding: 7px 6px; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+@media (max-width: 1200px) { .tira { grid-template-columns: repeat(10, minmax(0, 1fr)); } .tira .rotulo { display: none; } }
+.tira button b { font-weight: 500; color: var(--piedra); margin-right: 5px; }
+.tira button[aria-pressed="true"] b { color: var(--papel); }
+@media (max-width: 820px) {
+  .tira { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+  .tira .rotulo, .tira .nombre { display: none; }
+  .tira button { text-align: center; padding: 7px 0; }
+  .tira button b { margin: 0; color: var(--papel); }
+}
+#nota {
+  position: fixed; z-index: 2; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  width: min(460px, calc(100vw - 360px)); padding: 10px 14px 12px; background: var(--velo);
+  border-left: 3px solid var(--lacre); font-size: 12px; line-height: 1.5; pointer-events: none;
+}
+#nota strong { display: block; font-family: var(--hyper); font-weight: 400; font-size: 18px; letter-spacing: .02em; color: var(--papel); margin-bottom: 2px; }
+#nota span { color: #cfc9bb; }
+#legibCaja { margin-top: 9px; display: grid; gap: 4px; }
+#legibCaja b { font-weight: 400; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--piedra); }
+#legibCaja div { height: 3px; background: rgba(233, 227, 214, .2); }
+#legibCaja i { display: block; height: 100%; width: 0; background: var(--papel); }
+@media (max-width: 1100px) { .ayuda { display: none; } }
+@media (max-width: 900px) { #nota { left: 16px; right: 16px; transform: none; width: auto; bottom: calc(168px + env(safe-area-inset-bottom, 0px)); } }
+@media (max-width: 560px) { h1 { font-size: 17px; } }
+</style>
+
+<div id="carga" role="status">
+  <strong>HIPERFUENTE</strong>
+  <span id="textoCarga">Cargando el espacio…</span>
+  <div id="barraCarga"><i></i></div>
+</div>
+
+<header class="barra">
+  <h1>HIPERFUENTE</h1>
+  <div class="grupo" role="group" aria-label="Modo de navegación">
+    <span class="rotulo">Modo</span>
+    <button id="modoOrbitar" aria-pressed="true">Orbitar</button>
+    <button id="modoCaminar" aria-pressed="false">Recorrer</button>
+  </div>
+  <nav class="tira" id="instancias" aria-label="Instancias">
+    <span class="rotulo">Instancias</span>
+  </nav>
+  <div class="grupo">
+  </div>
+  <div class="grupo" role="group" aria-label="Gravedad" title="La gravedad activa: su piso se ilumina y sus textos se ven más. Tocá otra para girar hacia ese piso.">
+    <span class="rotulo">Gravedad</span>
+    <button class="grav" data-eje="x" aria-pressed="false">X</button>
+    <button class="grav" data-eje="y" aria-pressed="false">Y</button>
+    <button class="grav" data-eje="z" aria-pressed="true">Z</button>
+  </div>
+  <div class="grupo">
+    <button id="enderezar" title="Vuelve a poner el horizonte derecho">Enderezar</button>
+    <button id="rapido" aria-pressed="false">Rápido</button>
+  </div>
+</header>
+
+<div id="palanca" class="palanca" hidden aria-hidden="true"><span>Caminar</span><div class="perilla"></div></div>
+<div id="mirarPalanca" class="palanca" hidden aria-hidden="true"><span>Mirar</span><div class="perilla"></div></div>
+<div id="mira" hidden></div>
+<div class="vertical" id="vertical" hidden>
+  <button id="subir" aria-label="Subir">▲</button>
+  <button id="bajar" aria-label="Bajar">▼</button>
+</div>
+<p class="ayuda" id="ayuda">Arrastrá para girar · pellizcá para acercarte · dos dedos para desplazar.</p>
+<div id="destello"></div>
+<div id="velo"></div>
+<aside id="mapa" aria-label="Mapa: dónde estás en el icosaedro">
+  <button id="sonido" aria-pressed="false" title="Prende o apaga el sonido: suena el espacio donde estás">♪ Sonido · OFF</button>
+  <div id="aviso" aria-live="polite"></div>
+  <canvas id="mapaLienzo" width="340" height="340"></canvas>
+  <dl id="ficha"></dl>
+</aside>
+<div id="nota" hidden>
+  <strong id="notaTitulo"></strong>
+  <span id="notaTexto"></span>
+  <div id="legibCaja" hidden><b>Legibilidad</b><div><i></i></div></div>
+</div>
+
+<script>
+// Si algo falla, que se vea en la pantalla de carga en vez de quedar colgado.
+function mostrarError(texto) {
+  // Una vez abierto el espacio, un error suelto no tapa la pantalla: queda en la consola.
+  if (window.__espacioAbierto) { console.warn("Hiperfuente:", texto); return; }
+  const t = document.getElementById("textoCarga");
+  if (t) t.textContent = "No se pudo abrir el espacio: " + texto;
+  const c = document.getElementById("carga");
+  if (c) c.hidden = false;
+}
+addEventListener("error", (e) => {
+  if (e.target && e.target.tagName === "SCRIPT") mostrarError("no cargó " + e.target.src);
+  else if (e.message) mostrarError(e.message);
+}, true);
+addEventListener("unhandledrejection", (e) => mostrarError(String(e.reason && e.reason.message || e.reason)));
+document.getElementById("textoCarga").textContent = "Cargando librerías…";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<!-- Sistema sonoro de los 24 espacios (audio/engine.js del proyecto): notas, tríadas, modos y timbres. -->
+<script src="audio24.js"></script>
+<script>
+(async function () {
+if (!window.THREE || !THREE.GLTFLoader || !THREE.OrbitControls) { mostrarError("no cargaron las librerías de Three.js."); return; }
+const testGL = document.createElement("canvas");
+if (!(testGL.getContext("webgl2") || testGL.getContext("webgl"))) { mostrarError("este navegador no tiene WebGL activado."); return; }
+THREE.ColorManagement.legacyMode = false;
+
+// ---------- Escena ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+const NIEBLA = new THREE.Color(0xd9d6cc);
+scene.fog = new THREE.FogExp2(NIEBLA, 0.0007);
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.05, 4000);
+camera.position.set(260, 150, 260);
+
+// Blender es Z arriba; Three es Y arriba. Todo el modelo cuelga de esta raíz girada.
+const raiz = new THREE.Group();
+raiz.rotation.x = -Math.PI / 2;
+scene.add(raiz);
+const Q_RAIZ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+const blenderAThree = (v) => new THREE.Vector3(v[0], v[2], -v[1]);
+
+// Cielo claro y nublado (luz de día pareja): un domo con degradé según la altura.
+const cielo = new THREE.Mesh(
+  new THREE.SphereGeometry(3000, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      cenit: { value: new THREE.Color(0x8fa3b3) }, medio: { value: new THREE.Color(0xc4ccd0) },
+      horizonte: { value: new THREE.Color(0xe6e1d6) }, suelo: { value: new THREE.Color(0xb3ada1) },
+    },
+    vertexShader: "varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position.z = gl_Position.w; }",
+    fragmentShader: `uniform vec3 cenit, medio, horizonte, suelo; varying vec3 d;
+      void main(){ float h = d.y;
+        vec3 c = h > 0.0 ? mix(mix(horizonte, medio, smoothstep(0.0, 0.18, h)), cenit, smoothstep(0.18, 0.8, h))
+                         : mix(horizonte * 0.6, suelo, smoothstep(0.0, 0.12, -h));
+        gl_FragColor = vec4(c, 1.0); }`,
+  })
+);
+cielo.renderOrder = -1;
+scene.add(cielo);
+
+// Luz de día pareja: cielo claro de relleno y un sol alto (42°) que marca las caras sin oscurecer los textos.
+scene.add(new THREE.HemisphereLight(0xf2f0ea, 0x8a8478, 1.6));
+const sol = new THREE.DirectionalLight(0xfff3e0, 1.8);
+const el = THREE.MathUtils.degToRad(42), az = THREE.MathUtils.degToRad(30);
+sol.position.copy(blenderAThree([Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)])).multiplyScalar(500);
+scene.add(sol);
+
+// ---------- Materiales (color plano de la paleta) ----------
+const materiales = {};
+const lamparas = [];             // "lámparas esféricas de luz intermitente" (Babel): titilan
+const LUZ_LAMPARA = new THREE.Color(1.0, 0.8, 0.55);
+function material(nombre, rgba) {
+  if (materiales[nombre]) return materiales[nombre];
+  const color = new THREE.Color().setRGB(rgba[0], rgba[1], rgba[2]);
+  let m;
+  if (nombre.startsWith("Lampara") || nombre === "Color_ffd159") {
+    m = new THREE.MeshPhongMaterial({ color: 0xf4f1ea, specular: 0xffffff, shininess: 140, transparent: true,
+                                      opacity: 0.2, depthWrite: false, emissive: new THREE.Color(0, 0, 0) });
+    m.userData.vidrio = true;
+    lamparas.push(m);
+  } else if (nombre === "Horizonte") {
+    // La frase del horizonte está a 1,8 km: la niebla normal la borraría. Se le da un velo fijo.
+    m = new THREE.MeshBasicMaterial({ color: color.clone().lerp(NIEBLA, 0.22), fog: false });
+  } else {
+    m = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
+    if (rgba[3] < 0.99) { m.transparent = true; m.opacity = 0.35; m.depthWrite = false; }
+  }
+  return (materiales[nombre] = m);
+}
+
+// ---------- Carga ----------
+const textoCarga = document.getElementById("textoCarga");
+const relleno = document.querySelector("#barraCarga i");
+const matriz = (f) => new THREE.Matrix4().set(...f);
+
+textoCarga.textContent = "Cargando el espacio…";
+// "no-cache": el navegador revalida siempre con el servidor, así la página no mezcla datos de versiones distintas.
+const datos = await fetch("escena.json", { cache: "no-cache" }).then((r) => { if (!r.ok) throw new Error("escena.json respondió " + r.status); return r.json(); });
+// El glTF trae la geometría embebida como data URI, y el Artifact no deja pedir data: con fetch.
+// Así que se descarga el .json, se decodifica el buffer acá y se arma un GLB en memoria.
+async function cargarModelo(url) {
+  const r = await fetch(url, { cache: "no-cache" });
+  if (!r.ok) throw new Error(url + " respondió " + r.status);
+  const total = Number(r.headers.get("content-length")) || 12.9e6;
+  const lector = r.body.getReader();
+  const partes = [];
+  let leido = 0;
+  for (;;) {
+    const { done, value } = await lector.read();
+    if (done) break;
+    partes.push(value);
+    leido += value.length;
+    relleno.style.width = Math.min(100, 100 * leido / total).toFixed(0) + "%";
+    textoCarga.textContent = "Cargando el espacio… " + (leido / 1e6).toFixed(1) + " MB";
+  }
+  textoCarga.textContent = "Armando el espacio…";
+  const crudo = new Uint8Array(leido);
+  let p = 0;
+  for (const parte of partes) { crudo.set(parte, p); p += parte.length; }
+  const gl = JSON.parse(new TextDecoder().decode(crudo));
+  if (gl.buffers.length !== 1) throw new Error("el modelo trae " + gl.buffers.length + " buffers");
+  const b64 = atob(gl.buffers[0].uri.slice(gl.buffers[0].uri.indexOf(",") + 1));
+  const bin = new Uint8Array(b64.length);
+  for (let i = 0; i < b64.length; i++) bin[i] = b64.charCodeAt(i);
+  delete gl.buffers[0].uri;
+  gl.buffers[0].byteLength = bin.length;
+  const json = new TextEncoder().encode(JSON.stringify(gl));
+  const largoJson = Math.ceil(json.length / 4) * 4, largoBin = Math.ceil(bin.length / 4) * 4;
+  const glb = new Uint8Array(12 + 8 + largoJson + 8 + largoBin);
+  const dv = new DataView(glb.buffer);
+  dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, glb.length, true);
+  dv.setUint32(12, largoJson, true); dv.setUint32(16, 0x4E4F534A, true);
+  glb.fill(0x20, 20, 20 + largoJson); glb.set(json, 20);
+  const b = 20 + largoJson;
+  dv.setUint32(b, largoBin, true); dv.setUint32(b + 4, 0x004E4942, true);
+  glb.set(bin, b + 8);
+  return new Promise((ok, mal) => new THREE.GLTFLoader().parse(glb.buffer, "", ok, mal));
+}
+const gltf = await cargarModelo("modelo.gltf.json");
+
+const pieza = {};
+const nodosEntorno = [];
+const nodosTitular = [];
+const colNodos = {};
+gltf.scene.traverse((o) => {
+  if (o.isMesh) {
+    o.userData.mat = o.material.name;
+    o.material = material(o.material.name, datos.materiales[o.material.name] || [0.5, 0.5, 0.5, 1]);
+  }
+  if (["MODULO_Z", "ESTRUCTURA", "ESCALERAS", "UNICO"].includes(o.name)) pieza[o.name] = o;
+  else if (o.isMesh && o.name.startsWith("E_")) nodosEntorno.push(o);
+  else if (o.isMesh && o.name.startsWith("T_")) nodosTitular.push(o);
+  else if (["COL_MODULO", "COL_ESTRUCTURA", "COL_UNICO"].includes(o.name)) colNodos[o.name] = o;
+});
+
+// ---------- Escaleras: cartel de aeropuerto ----------
+// Cada letra se da vuelta como una chapa del cartel (oscila hasta 180° alrededor del eje del renglón) mientras uno no está de frente; al pararse
+// delante (dentro de un cono de ~60° y a menos de ~15 m), o muy cerca, se detiene y se lee. Lejos (más de ~100 m)
+// quedan quietas, para el panorama. El centro de
+// cada letra viene en COLOR_0 (ver 10_exportar_web.py); el signo de R dice hacia qué lado mira el renglón.
+const uTiempo = { value: 0 };
+const uCamara = { value: new THREE.Vector3() };   // MeshLambertMaterial no recibe cameraPosition: se pasa a mano
+const matEscaleras = new THREE.MeshLambertMaterial({
+  color: new THREE.Color(0x1e6973),        // cian oscuro: más claro que el negro, para que se lean como caracteres
+  side: THREE.DoubleSide, vertexColors: true,
+});
+matEscaleras.onBeforeCompile = (sh) => {
+  sh.uniforms.uTiempo = uTiempo;
+  sh.uniforms.uCam = uCamara;
+  sh.uniforms.uCod = { value: new THREE.Vector2(datos.codigo.min, datos.codigo.rango) };
+  sh.vertexShader = sh.vertexShader
+    .replace("#include <common>", `#include <common>
+      uniform float uTiempo; uniform vec2 uCod; uniform vec3 uCam;
+      mat3 giroY(float a){ float c = cos(a), s = sin(a); return mat3(c, 0., -s, 0., 1., 0., s, 0., c); }`)
+    .replace("#include <beginnormal_vertex>", `#include <beginnormal_vertex>
+      float aeMira = color.r >= 0.5 ? 1.0 : -1.0;
+      vec3 aeCtr = vec3((color.r - (color.r >= 0.5 ? 0.5 : 0.0)) * 2.0, color.g, color.b) * uCod.y + uCod.x;
+      vec3 aeVista = transpose(mat3(modelMatrix)) * (uCam - modelMatrix[3].xyz);
+      vec3 aeD = aeVista - aeCtr;
+      float aeDist = length(aeD);
+      float aeFrente = normalize(aeD.xy + vec2(1e-4)).x * aeMira;
+      float aeCerca = smoothstep(0.45, 0.75, aeFrente) * (1.0 - smoothstep(12.0, 22.0, aeDist));
+      float aeMuyCerca = 1.0 - smoothstep(2.0, 4.0, aeDist);
+      float aeLejos = smoothstep(80.0, 120.0, aeDist);
+      float aeAzar = fract(sin(dot(aeCtr.yz, vec2(12.9898, 78.233))) * 43758.5453);
+      // Cada letra da una vuelta completa cada ~4 s (una ola que sube por la escalera) y vuelve a su lugar:
+      // los peldaños siguen armados por las letras. De frente, muy cerca o muy lejos, no se mueven.
+      float aeQuieta = max(max(aeCerca, aeMuyCerca), aeLejos);
+      float aeFase = fract(uTiempo * 0.25 - aeCtr.z * 0.11 + aeAzar * 0.35);
+      float aeAng = aeQuieta > 0.5 ? 0.0 : 6.28318 * smoothstep(0.0, 0.22, aeFase);
+      mat3 aeR = giroY(aeAng);
+      objectNormal = aeR * objectNormal;`)
+    .replace("#include <begin_vertex>", `#include <begin_vertex>
+      transformed = aeCtr + aeR * (transformed - aeCtr);`);
+  sh.fragmentShader = sh.fragmentShader.replace("#include <color_fragment>", "");
+};
+pieza.ESCALERAS.material = matEscaleras;
+
+function fijar(obj, m) { obj.matrixAutoUpdate = false; obj.matrix.copy(m); return obj; }
+
+// Una estructura = módulo z + sus copias giradas (gravedades x e y) + el núcleo.
+const estructura = new THREE.Group();
+for (const f of [null, ...datos.modulo]) {
+  const m = f ? matriz(f) : new THREE.Matrix4();
+  estructura.add(fijar(pieza.MODULO_Z.clone(), m));
+  estructura.add(fijar(pieza.ESCALERAS.clone(), m));
+}
+if (pieza.ESTRUCTURA) estructura.add(fijar(pieza.ESTRUCTURA.clone(), new THREE.Matrix4()));
+raiz.add(estructura);
+// Las otras 7 habitaciones: la misma estructura reflejada en los planos.
+const salasObj = [estructura];          // las 8 estructuras-habitación, en el mismo orden que datos.habitaciones
+for (const f of Object.values(datos.habitaciones)) { const c = fijar(estructura.clone(), matriz(f)); salasObj.push(c); raiz.add(c); }
+raiz.add(fijar(pieza.UNICO, new THREE.Matrix4()));
+
+// ---------- Entorno: letras y palabras sueltas, translúcidas y en movimiento ----------
+// Anamorfosis: cada letra respira a lo largo de su rayo desde el punto de vista (se escala alrededor de ese
+// punto), así sigue alineada y se lee desde ahí aunque se mueva. Palabras del relato: flotan despacio.
+const colorDe = (n) => { const c = datos.materiales[n] || [0.5, 0.5, 0.5]; return new THREE.Color().setRGB(c[0], c[1], c[2]); };
+const matsEntorno = {};
+const matsPorEje = { x: [], y: [], z: [] };     // los textos de cada gravedad: se ven más cuando esa gravedad está activa
+function materialEntorno(tipo, nombre, eje) {
+  const k = tipo + nombre + (eje || "");
+  if (matsEntorno[k]) return matsEntorno[k];
+  const base = colorDe(nombre);
+  const Clase = tipo === "pie" ? THREE.MeshLambertMaterial : THREE.MeshBasicMaterial;
+  const m = new Clase({
+    color: tipo === "hor" ? base.lerp(NIEBLA, 0.04) : base,
+    transparent: true, opacity: { ana: 0.82, pal: 0.55, hor: 0.95, pie: 1 }[tipo],
+    depthWrite: tipo === "pie", side: THREE.DoubleSide, fog: tipo !== "hor",
+  });
+  if (eje) {
+    m.userData.op = tipo === "ana" ? [0.22, 0.95] : [0.3, 1.0];
+    matsPorEje[eje].push(m);
+  }
+  return (matsEntorno[k] = m);
+}
+const entorno = [];
+nodosEntorno.forEach((nodo, i) => {
+  const n = nodo.name;
+  const tipo = n.startsWith("E_Anamorfosis_") ? "ana" : n.startsWith("E_Palabra_") ? "pal" : n.startsWith("E_Pie_") ? "pie" : "hor";
+  const eje = tipo === "ana" || tipo === "pie" ? n.split("_")[2] : null;
+  nodo.material = materialEntorno(tipo, nodo.userData.mat, eje);
+  nodo.geometry.computeBoundingBox();
+  nodo.userData.centro = nodo.geometry.boundingBox.getCenter(new THREE.Vector3());
+  nodo.updateMatrix();
+  nodo.matrixAutoUpdate = false;
+  nodo.renderOrder = 10;
+  entorno.push({ nodo, tipo, eje, base: nodo.matrix.clone(), fase: (i * 2.399) % 6.283,
+                 P: eje && datos.puntos[eje] ? new THREE.Vector3(...datos.puntos[eje]) : null });
+  raiz.add(nodo);
+});
+const mA = new THREE.Matrix4(), mB = new THREE.Matrix4();
+const mC = new THREE.Matrix4();
+function animarEntorno(t) {
+  for (const e of entorno) {
+    if (e.tipo === "ana" && e.P) {
+      // Las letras quedan quietas en su desorden: solo desde el punto se alinean. Pero nunca del todo
+      // estáticas: van y vienen un poco sobre su rayo (eso no se ve desde el punto) y tiemblan apenas
+      // alrededor de su centro (eso sí se ve, incluso cuando la frase se lee).
+      const s = 1 + 0.08 * Math.sin(t * 0.45 + e.fase);
+      const c = e.nodo.userData.centro;
+      mA.makeTranslation(e.P.x, e.P.y, e.P.z);
+      mA.multiply(mB.makeScale(s, s, s));
+      mA.multiply(mB.makeTranslation(-e.P.x, -e.P.y, -e.P.z));
+      mA.multiply(e.base);
+      mA.multiply(mB.makeTranslation(c.x, c.y + 0.025 * Math.sin(t * 1.3 + e.fase * 2), c.z));
+      mA.multiply(mB.makeRotationZ(0.045 * Math.sin(t * 0.9 + e.fase * 3)));
+      mA.multiply(mC.makeTranslation(-c.x, -c.y, -c.z));
+      e.nodo.matrix.copy(mA);
+    } else if (e.tipo === "pie") {
+      // Las palabras de pie respiran apenas (se estiran hacia arriba y vuelven), siempre apoyadas en el piso.
+      e.nodo.matrix.multiplyMatrices(e.base, mB.makeScale(1, 1 + 0.03 * Math.sin(t * 0.8 + e.fase), 1));
+    } else if (e.tipo === "pal") {
+      // Las cuatro partes del relato flotan y giran despacio sobre su eje, siempre.
+      mA.makeTranslation(6 * Math.sin(t * 0.17 + e.fase * 2), 6 * Math.cos(t * 0.13 + e.fase), 10 * Math.sin(t * 0.25 + e.fase));
+      e.nodo.matrix.multiplyMatrices(mA, e.base);
+      e.nodo.matrix.multiply(mB.makeRotationY(0.9 * Math.sin(t * 0.2 + e.fase)));
+    } else {
+      mA.makeTranslation(0, 0, 6 * Math.sin(t * 0.1 + e.fase));
+      e.nodo.matrix.multiplyMatrices(mA, e.base);
+    }
+    e.nodo.matrixWorldNeedsUpdate = true;
+  }
+}
+// ---------- El icosaedro de cristal: encierra todo el objeto ----------
+// Sus 12 vértices son las 12 esquinas de los rectángulos áureos y las puntas de las 12 columnas
+// (cada columna va por la arista larga de un rectángulo, del pie, donde cruza otro plano, hasta el vértice).
+// En cada vértice está la nota de su columna (sistema sonoro de los 24 espacios).
+const CORTO = 69.6, LARGO = 112.6;            // medio lado corto y medio lado largo de los rectángulos
+const VERTICES = [];                           // [x, y, z] en Blender, plano y nota
+for (const a of [1, -1]) for (const b of [1, -1]) {
+  VERTICES.push({ p: [0, a * CORTO, b * LARGO], plano: 0, clave: [a, b] });   // x = 0: corto en y, largo en z
+  VERTICES.push({ p: [b * LARGO, 0, a * CORTO], plano: 1, clave: [a, b] });   // y = 0: corto en z, largo en x
+  VERTICES.push({ p: [a * CORTO, b * LARGO, 0], plano: 2, clave: [a, b] });   // z = 0: corto en x, largo en y
+}
+const NOTAS_POR_PLANO = [   // igual que BY_PLANE de audio/engine.js (clave = signos de los ejes corto y largo)
+  { "++": 0, "+-": 3, "-+": 9, "--": 6 }, { "++": 4, "+-": 5, "-+": 10, "--": 11 }, { "++": 7, "+-": 1, "-+": 8, "--": 2 },
+];
+const sg = (n) => (n > 0 ? "+" : "-");
+for (const v of VERTICES) {
+  const [s, l] = v.clave;                        // signo en el eje corto, signo en el eje largo
+  // engine.js: x=0 por (y,z); y=0 por (z,x); z=0 por (x,y) → siempre (corto, largo)
+  v.nota = NOTAS_POR_PLANO[v.plano][sg(s) + sg(l)];
+}
+const ARISTAS = [];
+for (let i = 0; i < 12; i++) for (let j = i + 1; j < 12; j++) {
+  const d = Math.hypot(...VERTICES[i].p.map((c, k) => c - VERTICES[j].p[k]));
+  if (Math.abs(d - 2 * CORTO) < 1) ARISTAS.push([i, j]);
+}
+const vecinos = (i, j) => ARISTAS.some(([a, b]) => (a === i && b === j) || (a === j && b === i));
+const CARAS = [];
+for (const [i, j] of ARISTAS) for (let k = j + 1; k < 12; k++) if (vecinos(i, k) && vecinos(j, k)) CARAS.push([i, j, k]);
+
+const cristal = new THREE.Group();
+cristal.name = "cristal";
+{
+  const pos = [];
+  for (const c of CARAS) for (const i of c) pos.push(...VERTICES[i].p);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  const vidrio = new THREE.Mesh(g, new THREE.MeshPhongMaterial({
+    color: 0xf4f6f6, specular: 0xffffff, shininess: 90, transparent: true, opacity: 0.09,
+    side: THREE.DoubleSide, depthWrite: false, fog: false,
+  }));
+  vidrio.renderOrder = 20;
+  cristal.add(vidrio);
+  const barra = (a, b, radio, mat) => {
+    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b);
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(radio, radio, A.distanceTo(B), 6, 1, true), mat);
+    m.position.copy(A).add(B).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize());
+    cristal.add(m);
+  };
+  const matArista = new THREE.MeshLambertMaterial({ color: 0xe4e2dc, transparent: true, opacity: 0.55 });
+  for (const [i, j] of ARISTAS) barra(VERTICES[i].p, VERTICES[j].p, 0.35, matArista);
+  // Las 12 columnas: del pie (donde la arista larga cruza el otro plano) al vértice.
+  const matColumna = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+  for (const v of VERTICES) {
+    const pie = v.p.map((c) => (Math.abs(c) > LARGO - 1 ? 0 : c));
+    barra(pie, v.p, 0.9, matColumna);
+  }
+  const esfera = new THREE.SphereGeometry(2.4, 20, 12);
+  const matPunta = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x777777 });
+  for (const v of VERTICES) {
+    const s = new THREE.Mesh(esfera, matPunta);
+    s.position.set(...v.p);
+    cristal.add(s);
+  }
+}
+raiz.add(cristal);
+
+// Las notas, junto a cada vértice (texto en la subsidiaria de la web, en blanco).
+async function etiquetasDeNotas() {
+  try { await document.fonts.load("600 72px 'DM Mono'"); } catch (e) { /* sigue con la de respaldo */ }
+  for (const v of VERTICES) {
+    const lienzo = document.createElement("canvas");
+    lienzo.width = 256; lienzo.height = 128;
+    const c = lienzo.getContext("2d");
+    c.font = "500 72px 'DM Mono', monospace";
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 8;
+    c.fillStyle = "#ffffff";
+    c.fillText(window.Audio24 ? Audio24.NOTE[v.nota] : "", 128, 64);
+    const tex = new THREE.CanvasTexture(lienzo);
+    tex.encoding = THREE.sRGBEncoding;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
+    sp.scale.set(18, 9, 1);
+    sp.position.set(...v.p.map((c) => c * 1.09));
+    sp.renderOrder = 21;
+    cristal.add(sp);
+  }
+}
+etiquetasDeNotas();
+
+// ---------- Titular: escritura ploteada, la más efímera. Se imprime, se lee y el bombardeo lo borra ----------
+const titulares = nodosTitular.map((nodo, i) => {
+  const m = new THREE.MeshLambertMaterial({ color: colorDe(nodo.userData.mat), side: THREE.DoubleSide });
+  const u = { uDesde: { value: -1e4 }, uHasta: { value: 1e4 } };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying float vLX;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLX = position.x;");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying float vLX;\nuniform float uDesde, uHasta;")
+      .replace("void main() {", "void main() {\nif (vLX < uDesde || vLX > uHasta) discard;");
+  };
+  m.customProgramCacheKey = () => "titular";
+  nodo.material = m;
+  nodo.geometry.computeBoundingBox();
+  const bb = nodo.geometry.boundingBox;
+  raiz.add(nodo);
+  const orden = nodo.name.includes("bajada") ? 2 : nodo.name.endsWith("_2") ? 1 : 0;
+  return { u, min: bb.min.x - 0.5, max: bb.max.x + 0.5, retraso: orden * 1.4 };
+});
+const CICLO = 24;       // s: 7 imprimiéndose, 10 para leer, 3 borrándose, 4 en blanco
+function animarTitular(t) {
+  for (const e of titulares) {
+    const c = (((t - e.retraso) % CICLO) + CICLO) % CICLO;
+    const ancho = e.max - e.min;
+    let desde = e.min - 1, hasta = e.max + 1;
+    if (c < 7) hasta = e.min + ancho * Math.floor((c / 7) * 60) / 60;      // de a golpes, como una máquina
+    else if (c < 17) { /* se lee */ }
+    else if (c < 20) desde = e.min + ancho * ((c - 17) / 3);                // el bombardeo lo borra
+    else hasta = e.min - 1;
+    e.u.uDesde.value = desde;
+    e.u.uHasta.value = hasta;
+  }
+}
+
+// ---------- Gravedad activa: la que tiene el "arriba" de la mirada. Su piso se ilumina y sus textos se ven más ----------
+const botonesGravedad = [...document.querySelectorAll(".grav")];
+const vArriba = new THREE.Vector3();
+const brillo = { x: 0, y: 0, z: 1 };
+let ejeActivo = "";
+function gravedadActiva(dt) {
+  vArriba.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  const b = [Math.abs(vArriba.x), Math.abs(vArriba.z), Math.abs(vArriba.y)];      // en ejes de Blender
+  let eje = "xyz"[b.indexOf(Math.max(...b))];
+  // Histéresis: mirar hacia abajo (para leer un piso) inclina el "arriba" de la cámara; la gravedad no
+  // cambia mientras el eje actual siga teniendo un peso razonable.
+  if (ejeActivo && eje !== ejeActivo && b["xyz".indexOf(ejeActivo)] > 0.42) eje = ejeActivo;
+  if (eje !== ejeActivo) {
+    ejeActivo = eje;
+    for (const b of botonesGravedad) b.setAttribute("aria-pressed", b.dataset.eje === eje);
+  }
+  for (const e of "xyz") {
+    brillo[e] += ((e === eje ? 1 : 0) - brillo[e]) * Math.min(1, dt * 3);
+    const piso = materiales["Fotocopia_Plano_" + e + "0"];
+    if (piso && piso.emissive) piso.emissive.setRGB(0.42, 0.27, 0.12).multiplyScalar(brillo[e]);
+    for (const m of matsPorEje[e]) m.opacity = m.userData.op[0] + (m.userData.op[1] - m.userData.op[0]) * brillo[e];
+  }
+}
+
+raiz.updateMatrixWorld(true);
+
+// ---------- Colisión para caminar ----------
+// Una sopa de triángulos en coordenadas del mundo (las 24 estructuras, los 8 núcleos y los planos), repartida
+// en una grilla de celdas de 4 m. Los rayos de la física son cortos, así que cada uno revisa pocas celdas.
+const COL = { C: 4, tri: null, n: 0, celdas: new Map() };
+{
+  const tris = [];
+  const agregar = (nodo, W) => {
+    if (!nodo) return;
+    nodo.updateMatrixWorld(true);
+    const v = new THREE.Vector3();
+    nodo.traverse((o) => {
+      if (!o.isMesh) return;
+      const M = W.clone().multiply(o.matrixWorld), pos = o.geometry.attributes.position, idx = o.geometry.index;
+      const n = idx ? idx.count : pos.count;
+      for (let k = 0; k < n; k++) {
+        v.fromBufferAttribute(pos, idx ? idx.getX(k) : k).applyMatrix4(M);
+        tris.push(v.x, v.y, v.z);
+      }
+    });
+  };
+  const R = raiz.matrixWorld;
+  const salasM = [new THREE.Matrix4(), ...Object.values(datos.habitaciones).map(matriz)];
+  const modsM = [new THREE.Matrix4(), ...datos.modulo.map(matriz)];
+  for (const S of salasM) {
+    for (const M of modsM) agregar(colNodos.COL_MODULO, R.clone().multiply(S).multiply(M));
+    agregar(colNodos.COL_ESTRUCTURA, R.clone().multiply(S));
+  }
+  agregar(colNodos.COL_UNICO, R.clone());
+  COL.tri = new Float32Array(tris);
+  COL.n = COL.tri.length / 9;
+  const t = COL.tri, C = COL.C;
+  for (let i = 0; i < COL.n; i++) {
+    const o = i * 9;
+    const lo = [0, 1, 2].map((k) => Math.floor(Math.min(t[o + k], t[o + 3 + k], t[o + 6 + k]) / C));
+    const hi = [0, 1, 2].map((k) => Math.floor(Math.max(t[o + k], t[o + 3 + k], t[o + 6 + k]) / C));
+    for (let x = lo[0]; x <= hi[0]; x++) for (let y = lo[1]; y <= hi[1]; y++) for (let z = lo[2]; z <= hi[2]; z++) {
+      const key = x + "," + y + "," + z;
+      let l = COL.celdas.get(key);
+      if (!l) COL.celdas.set(key, (l = []));
+      l.push(i);
+    }
+  }
+}
+const selloCol = new Uint32Array(COL.n);
+let generacionCol = 1;
+// Rayo contra la colisión: devuelve { t, n } (distancia y normal hacia el origen) o null.
+function rayoCol(o, d, max) {
+  if (!COL.n) return null;
+  generacionCol++;
+  const C = COL.C, T = COL.tri;
+  const x0 = Math.floor(Math.min(o.x, o.x + d.x * max) / C), x1 = Math.floor(Math.max(o.x, o.x + d.x * max) / C);
+  const y0 = Math.floor(Math.min(o.y, o.y + d.y * max) / C), y1 = Math.floor(Math.max(o.y, o.y + d.y * max) / C);
+  const z0 = Math.floor(Math.min(o.z, o.z + d.z * max) / C), z1 = Math.floor(Math.max(o.z, o.z + d.z * max) / C);
+  let mejor = max, n = null;
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
+    const l = COL.celdas.get(x + "," + y + "," + z);
+    if (!l) continue;
+    for (const i of l) {
+      if (selloCol[i] === generacionCol) continue;
+      selloCol[i] = generacionCol;
+      const k = i * 9;
+      const ax = T[k], ay = T[k + 1], az = T[k + 2];
+      const e1x = T[k + 3] - ax, e1y = T[k + 4] - ay, e1z = T[k + 5] - az;
+      const e2x = T[k + 6] - ax, e2y = T[k + 7] - ay, e2z = T[k + 8] - az;
+      const px = d.y * e2z - d.z * e2y, py = d.z * e2x - d.x * e2z, pz = d.x * e2y - d.y * e2x;
+      const det = e1x * px + e1y * py + e1z * pz;
+      if (Math.abs(det) < 1e-9) continue;
+      const inv = 1 / det, sx = o.x - ax, sy = o.y - ay, sz = o.z - az;
+      const u = (sx * px + sy * py + sz * pz) * inv;
+      if (u < 0 || u > 1) continue;
+      const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+      const v = (d.x * qx + d.y * qy + d.z * qz) * inv;
+      if (v < 0 || u + v > 1) continue;
+      const tt = (e2x * qx + e2y * qy + e2z * qz) * inv;
+      if (tt > 1e-4 && tt < mejor) {
+        mejor = tt;
+        n = [e1y * e2z - e1z * e2y, e1z * e2x - e1x * e2z, e1x * e2y - e1y * e2x];
+      }
+    }
+  }
+  if (!n) return null;
+  const nv = new THREE.Vector3(...n).normalize();
+  if (nv.dot(d) > 0) nv.negate();
+  return { t: mejor, n: nv };
+}
+
+document.getElementById("carga").hidden = true;
+window.__espacioAbierto = true;
+
+// ---------- Navegación ----------
+const orbita = new THREE.OrbitControls(camera, renderer.domElement);
+orbita.target.set(0, 0, 0);
+orbita.enableDamping = true;
+orbita.maxDistance = 900;
+orbita.update();
+
+let modo = "orbitar";
+let rapido = false;
+const btnOrbitar = document.getElementById("modoOrbitar");
+const btnCaminar = document.getElementById("modoCaminar");
+const palanca = document.getElementById("palanca");
+const mirarPalanca = document.getElementById("mirarPalanca");
+const vertical = document.getElementById("vertical");
+const ayuda = document.getElementById("ayuda");
+const mira = document.getElementById("mira");
+const lienzo = renderer.domElement;
+
+// Dos modos:
+//  · Orbitar es la cámara libre: gira alrededor de un punto, vuela en cualquier dirección y atraviesa paredes.
+//  · Recorrer es el cuerpo del lector: ojos a 1,60 m, pisa el piso de su gravedad, sube escaleras y no
+//    atraviesa paredes. Una palanca camina, la otra mira (en compu: WASD + mouse).
+function ponerModo(m) {
+  modo = m;
+  orbita.enabled = m === "orbitar";
+  btnOrbitar.setAttribute("aria-pressed", m === "orbitar");
+  btnCaminar.setAttribute("aria-pressed", m === "caminar");
+  palanca.hidden = false;
+  mirarPalanca.hidden = m !== "caminar";
+  vertical.hidden = m !== "orbitar";
+  ayuda.textContent = m === "orbitar"
+    ? "Cámara libre: arrastrá para girar, pellizcá para acercarte. La palanca y ▲▼ vuelan y atraviesan todo. En compu: WASD, Q/E y Shift."
+    : "Palanca izquierda: caminar · derecha: mirar. X Y Z cambian la gravedad: caés sobre ese piso. Las H son portales. En compu: WASD para caminar, clic para mirar con el mouse (Esc suelta), Shift corre, Espacio salta.";
+  if (m === "orbitar") {
+    if (document.pointerLockElement) document.exitPointerLock();
+    camera.up.set(0, 1, 0);
+    const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    orbita.target.copy(camera.position).addScaledVector(delante, 40);
+    orbita.update();
+  }
+}
+
+// ---------- El cuerpo del lector ----------
+// Pies, "arriba" (U: el eje de su gravedad, con signo), rumbo (H, perpendicular a U) y cabeceo.
+// Colisión: rayos contra la malla de colisión (rayoCol). Hacia los costados, tres rayos (rodillas, pecho y
+// cabeza) frenan y hacen deslizar contra las paredes; hacia abajo, un rayo desde la altura del escalón
+// apoya los pies: así sube escalones de hasta 55 cm y baja sin despegarse. Sin piso, cae.
+const OJOS = 1.6;
+const CUERPO = { radio: 0.3, escalon: 0.55, g: 9.8, paso: 3.2, corre: 9, salto: 4.2 };
+const cuerpo = { pies: new THREE.Vector3(), U: new THREE.Vector3(0, 1, 0), H: new THREE.Vector3(0, 0, -1), cab: 0,
+                 vu: 0, suelo: false, caida: 0, lag: 0, suave: 0, ultimo: null };
+const vMov = new THREE.Vector3(), vDir = new THREE.Vector3(), vDer = new THREE.Vector3(), vOri = new THREE.Vector3();
+const vAbajo = new THREE.Vector3(), vMira = new THREE.Vector3(), vNorm = new THREE.Vector3(), CERO = new THREE.Vector3();
+const mMira = new THREE.Matrix4(), qMira = new THREE.Quaternion();
+
+function ejePrincipal(v) {
+  const a = [Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)], k = a.indexOf(Math.max(...a));
+  const r = new THREE.Vector3();
+  r.setComponent(k, Math.sign(v.getComponent(k)) || 1);
+  return r;
+}
+function rumboDesde(U) {
+  const f = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  cuerpo.cab = THREE.MathUtils.clamp(Math.asin(THREE.MathUtils.clamp(f.dot(U), -1, 1)), -1.4, 1.4);
+  let h = f.clone().addScaledVector(U, -f.dot(U));
+  if (h.lengthSq() < 1e-4) {                        // mirando justo arriba o abajo: el rumbo sale del "arriba" de la cámara
+    h = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).multiplyScalar(-Math.sign(f.dot(U)) || 1);
+    h.addScaledVector(U, -h.dot(U));
+  }
+  cuerpo.U.copy(U);
+  cuerpo.H.copy(h.normalize());
+}
+// Pone el cuerpo donde está la cámara. Devuelve si hay algo para pisar debajo (hasta 120 m).
+function entrarCaminar(U) {
+  rumboDesde(U || ejePrincipal(new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion)));
+  cuerpo.pies.copy(camera.position).addScaledVector(cuerpo.U, -OJOS);
+  cuerpo.vu = 0; cuerpo.suelo = false; cuerpo.caida = 0; cuerpo.lag = 0; cuerpo.suave = 0;
+  return !!rayoCol(camera.position, vAbajo.copy(cuerpo.U).negate(), 120);
+}
+function guardarCuerpo() {
+  return { pies: cuerpo.pies.clone(), U: cuerpo.U.clone(), H: cuerpo.H.clone(), cab: cuerpo.cab,
+           p: camera.position.clone(), q: camera.quaternion.clone(), f: camera.fov };
+}
+function restaurarCuerpo(g) {
+  cuerpo.pies.copy(g.pies); cuerpo.U.copy(g.U); cuerpo.H.copy(g.H); cuerpo.cab = g.cab;
+  cuerpo.vu = 0; cuerpo.suelo = false; cuerpo.caida = 0; cuerpo.lag = 0;
+}
+function mirar(guinada, cabeceo) {
+  cuerpo.H.applyAxisAngle(cuerpo.U, guinada);
+  cuerpo.cab = THREE.MathUtils.clamp(cuerpo.cab + cabeceo, -1.45, 1.45);
+}
+function pisoBajo(desde, max) {
+  const r = rayoCol(desde, vAbajo.copy(cuerpo.U).negate(), max);
+  return r && r.n.dot(cuerpo.U) > 0.3 ? r : null;
+}
+function apoyar(desde, t) {
+  const antes = cuerpo.pies.dot(cuerpo.U);
+  const estaba = cuerpo.suelo;
+  cuerpo.pies.copy(desde).addScaledVector(cuerpo.U, -t);
+  if (estaba) cuerpo.lag -= cuerpo.pies.dot(cuerpo.U) - antes;    // el escalón se sube con la vista suave
+  cuerpo.lag = THREE.MathUtils.clamp(cuerpo.lag, -0.6, 0.6);
+  cuerpo.vu = 0; cuerpo.suelo = true; cuerpo.caida = 0;
+  if (!cuerpo.ultimo) cuerpo.ultimo = { pies: new THREE.Vector3(), U: new THREE.Vector3(), H: new THREE.Vector3(), cab: 0 };
+  cuerpo.ultimo.pies.copy(cuerpo.pies); cuerpo.ultimo.U.copy(cuerpo.U); cuerpo.ultimo.H.copy(cuerpo.H); cuerpo.ultimo.cab = cuerpo.cab;
+}
+const vAntes = new THREE.Vector3(), vPaso = new THREE.Vector3(), vEje = new THREE.Vector3(), vPrueba = new THREE.Vector3();
+function hayPiso(p) {
+  return !!pisoBajo(vPrueba.copy(p).addScaledVector(cuerpo.U, CUERPO.escalon), CUERPO.escalon + 0.6);
+}
+function pasoCuerpo(dt, f, s, corre, salta) {
+  const U = cuerpo.U;
+  vAntes.copy(cuerpo.pies);
+  // Caminar: en el plano perpendicular a U, con deslizamiento contra las paredes.
+  vDer.crossVectors(cuerpo.H, U);
+  vMov.copy(cuerpo.H).multiplyScalar(f).addScaledVector(vDer, s);
+  const largo = vMov.length();
+  if (largo > 1) vMov.divideScalar(largo);
+  vMov.multiplyScalar((corre ? CUERPO.corre : CUERPO.paso) * dt * (cuerpo.suelo ? 1 : 0.7));
+  for (let it = 0; it < 3 && vMov.lengthSq() > 1e-10; it++) {
+    const L = vMov.length();
+    vDir.copy(vMov).divideScalar(L);
+    let choque = null;
+    for (const h of [0.6, 1.15, 1.7]) {
+      vOri.copy(cuerpo.pies).addScaledVector(U, h);
+      const r = rayoCol(vOri, vDir, L + CUERPO.radio);
+      if (r && Math.abs(r.n.dot(U)) < 0.75 && (!choque || r.t < choque.t)) choque = r;
+    }
+    if (!choque) { cuerpo.pies.add(vMov); break; }
+    const avance = Math.max(0, choque.t - CUERPO.radio);
+    cuerpo.pies.addScaledVector(vDir, avance);
+    vNorm.copy(choque.n).addScaledVector(U, -choque.n.dot(U)).normalize();
+    if (choque.t < CUERPO.radio) cuerpo.pies.addScaledVector(vNorm, (CUERPO.radio - choque.t) * 0.5);
+    vMov.copy(vDir).multiplyScalar(L - avance);
+    vMov.addScaledVector(vNorm, -vMov.dot(vNorm));
+  }
+  // Bordes: caminando no se cae. Si el paso queda sin piso, se prueba deslizar por cada eje; si no, se queda.
+  if (cuerpo.suelo && !salta && !hayPiso(cuerpo.pies)) {
+    vPaso.copy(cuerpo.pies).sub(vAntes);
+    cuerpo.pies.copy(vAntes);
+    for (const eje of [[1, 0, 0], [0, 1, 0], [0, 0, 1]]) {
+      vEje.set(...eje);
+      if (Math.abs(vEje.dot(U)) > 0.5) continue;
+      const c = vPaso.dot(vEje);
+      if (Math.abs(c) < 1e-5) continue;
+      cuerpo.pies.addScaledVector(vEje, c);
+      if (!hayPiso(cuerpo.pies)) cuerpo.pies.addScaledVector(vEje, -c);
+    }
+  }
+  // Vertical: apoyarse, subir o bajar escalones, saltar, caer.
+  const arriba = vOri.copy(cuerpo.pies).addScaledVector(U, CUERPO.escalon);
+  if (salta && cuerpo.suelo) { cuerpo.vu = CUERPO.salto; cuerpo.suelo = false; }
+  if (cuerpo.suelo) {
+    const r = pisoBajo(arriba, CUERPO.escalon + 0.6);
+    if (r) { apoyar(arriba, r.t); return; }
+    cuerpo.suelo = false;
+  }
+  cuerpo.vu = Math.max(cuerpo.vu - CUERPO.g * dt, -40);
+  let dz = cuerpo.vu * dt;
+  if (dz <= 0) {
+    const r = pisoBajo(arriba, CUERPO.escalon - dz);
+    if (r) { apoyar(arriba, r.t); return; }
+  } else {
+    const techo = rayoCol(vMira.copy(cuerpo.pies).addScaledVector(U, OJOS + 0.1), U, dz + 0.15);
+    if (techo) { cuerpo.vu = 0; dz = 0; }
+  }
+  cuerpo.pies.addScaledVector(U, dz);
+  cuerpo.caida -= Math.min(0, dz);
+  if (cuerpo.caida > 150) {                         // cayó al vacío: vuelve al último lugar donde pisó
+    cuerpo.caida = 0;
+    if (cuerpo.ultimo) { restaurarCuerpo(cuerpo.ultimo); cuerpo.suave = 0; destellar(); }
+    else recorrer(true);
+  }
+}
+function colocarCamara(dt) {
+  cuerpo.lag *= Math.exp(-dt * 10);
+  camera.position.copy(cuerpo.pies).addScaledVector(cuerpo.U, OJOS + cuerpo.lag);
+  vMira.copy(cuerpo.H).multiplyScalar(Math.cos(cuerpo.cab)).addScaledVector(cuerpo.U, Math.sin(cuerpo.cab));
+  mMira.lookAt(CERO, vMira, cuerpo.U);
+  qMira.setFromRotationMatrix(mMira);
+  if (cuerpo.suave > 0) { cuerpo.suave -= dt; camera.quaternion.slerp(qMira, Math.min(1, dt * 3)); }
+  else camera.quaternion.copy(qMira);
+  camera.up.copy(cuerpo.U);
+}
+function destellar() {
+  destello.style.transition = "none";
+  destello.style.opacity = 0.85;
+  requestAnimationFrame(() => { destello.style.transition = ""; destello.style.opacity = 0; });
+}
+// Botón Recorrer: si hay piso debajo, el lector se apoya ahí; si está lejos (afuera del objeto), viaja a la
+// entrada de la habitación +++, frente a la H, sobre el piso z.
+const ENTRADA = { pies: [60, 10.2], mira: [-1, 0, 0] };
+function recorrer(forzarEntrada) {
+  if (vuelo) return;
+  if (!forzarEntrada && entrarCaminar()) { ponerModo("caminar"); return; }
+  const p = deBlender([ENTRADA.pies[0], ENTRADA.pies[1], MEDIO_PLANO + OJOS]);
+  const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(p, p.clone().add(deBlender(ENTRADA.mira)), new THREE.Vector3(0, 1, 0)));
+  const dist = camera.position.distanceTo(p);
+  const medio = camera.position.clone().add(p).multiplyScalar(0.5);
+  medio.y += Math.min(80, dist * 0.2);
+  vuelo = { t0: performance.now(), dur: Math.min(6000, 2200 + dist * 8), p0: camera.position.clone(), c: medio,
+            q0: camera.quaternion.clone(), f0: camera.fov, d: { p, q, f: fovVertical(18) },
+            alTerminar: () => { entrarCaminar(new THREE.Vector3(0, 1, 0)); ponerModo("caminar"); } };
+  orbita.enabled = false;
+  arrastre = null;
+}
+btnOrbitar.onclick = () => { if (!vuelo) ponerModo("orbitar"); };
+btnCaminar.onclick = () => recorrer();
+document.getElementById("rapido").onclick = (e) => { rapido = !rapido; e.currentTarget.setAttribute("aria-pressed", rapido); };
+
+function fovVertical(lente) {
+  const horizontal = 2 * Math.atan(18 / lente);
+  return THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(horizontal / 2) / Math.max(camera.aspect, 1)));
+}
+
+// ---------- Instancias: 10 puntos de vista. Al elegir una, la cámara viaja hasta ahí ----------
+// Lo que depende del punto de vista (anamorfosis) se ve ilegible durante el viaje y se ordena al llegar;
+// desde ahí se puede caminar y, al moverse, la lectura se pierde otra vez.
+const instancias = datos.instancias;
+const cajaInst = document.getElementById("instancias");
+const botonesInst = instancias.map((ins, i) => {
+  const b = document.createElement("button");
+  const num = document.createElement("b");
+  num.textContent = i + 1;
+  const nombre = document.createElement("span");
+  nombre.className = "nombre";
+  nombre.textContent = ins.titulo;
+  b.append(num, nombre);
+  b.title = (i + 1) + " · " + ins.titulo;
+  b.onclick = () => irAInstancia(i);
+  cajaInst.append(b);
+  return b;
+});
+const nota = document.getElementById("nota");
+const notaTitulo = document.getElementById("notaTitulo");
+const notaTexto = document.getElementById("notaTexto");
+const legibCaja = document.getElementById("legibCaja");
+const legibBarra = document.querySelector("#legibCaja i");
+let actual = -1;
+let vuelo = null;
+
+const poseDe = (ins) => ({ p: blenderAThree(ins.pos), q: Q_RAIZ.clone().multiply(new THREE.Quaternion(...ins.quat)), f: fovVertical(ins.lente) });
+const poses = instancias.map(poseDe);
+
+function llegar(i) {
+  const ins = instancias[i];
+  if (ins.modo === "caminar") entrarCaminar();
+  ponerModo(ins.modo);
+  if (ins.modo === "orbitar") {
+    const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    orbita.target.copy(camera.position).addScaledVector(delante, Math.max(60, camera.position.length() * 0.9));
+    orbita.update();
+  }
+}
+
+function irAInstancia(i, instantaneo) {
+  const ins = instancias[i], d = poseDe(ins);
+  actual = i;
+  botonesInst.forEach((b, k) => b.setAttribute("aria-pressed", k === i));
+  notaTitulo.textContent = String(i + 1).padStart(2, "0") + " · " + ins.titulo;
+  notaTexto.textContent = ins.nota;
+  legibCaja.hidden = !ins.anamorfosis;
+  nota.hidden = false;
+  if (instantaneo) {
+    camera.position.copy(d.p); camera.quaternion.copy(d.q); camera.fov = d.f; camera.updateProjectionMatrix();
+    vuelo = null;
+    llegar(i);
+    return;
+  }
+  const dist = camera.position.distanceTo(d.p);
+  const medio = camera.position.clone().add(d.p).multiplyScalar(0.5);
+  medio.y += Math.min(80, dist * 0.2);
+  vuelo = { t0: performance.now(), dur: Math.min(7500, 2800 + dist * 10), p0: camera.position.clone(), c: medio,
+            q0: camera.quaternion.clone(), f0: camera.fov, d, alTerminar: () => llegar(i) };
+  orbita.enabled = false;
+  arrastre = null;
+}
+
+function pasoVuelo(ahora) {
+  const u = Math.min(1, (ahora - vuelo.t0) / vuelo.dur);
+  const e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+  const a = 1 - e;
+  camera.position.copy(vuelo.p0).multiplyScalar(a * a).addScaledVector(vuelo.c, 2 * a * e).addScaledVector(vuelo.d.p, e * e);
+  camera.quaternion.slerpQuaternions(vuelo.q0, vuelo.d.q, e);
+  camera.fov = vuelo.f0 + (vuelo.d.f - vuelo.f0) * e;
+  camera.updateProjectionMatrix();
+  if (u >= 1) {
+    const fin = vuelo.alTerminar;
+    vuelo = null;
+    if (fin) fin();
+  }
+}
+
+// ---------- Girar a otra gravedad dentro de la misma habitación (botones X, Y, Z) ----------
+// La cámara "cae" sobre el piso de esa gravedad: gira lo mínimo para que su arriba sea el nuevo y se apoya
+// a la altura de los ojos sobre ese plano, del lado de la habitación donde está.
+const MEDIO_PLANO = 1.755;
+const aBlender = (v) => [v.x, -v.z, v.y];
+const deBlender = (b) => new THREE.Vector3(b[0], b[2], -b[1]);
+// Recorriendo, el cuerpo gira y cae (con la física) sobre lo primero que encuentre hacia ese piso. Desde la
+// cámara libre, viaja hasta el plano a la altura de los ojos y ahí empieza a caminar.
+function girarA(eje) {
+  if (vuelo || velo) return;
+  const i = "xyz".indexOf(eje);
+  const posB = aBlender(camera.position);
+  const signo = Math.sign(posB[i]) || 1;
+  const arribaB = [0, 0, 0];
+  arribaB[i] = signo;
+  const U = deBlender(arribaB).normalize();
+  if (modo === "caminar") {
+    if (Math.abs(cuerpo.U.dot(U)) > 0.99) return;
+    const q = new THREE.Quaternion().setFromUnitVectors(cuerpo.U, U);
+    cuerpo.H.applyQuaternion(q).addScaledVector(U, -cuerpo.H.dot(U)).normalize();
+    cuerpo.U.copy(U);
+    cuerpo.suelo = false; cuerpo.vu = 0; cuerpo.caida = 0; cuerpo.lag = 0;
+    cuerpo.suave = 1.3;
+    return;
+  }
+  if (eje === ejeActivo) return;
+  posB[i] = signo * (MEDIO_PLANO + OJOS);
+  const destino = deBlender(posB);
+  const actual = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+  const q = new THREE.Quaternion().setFromUnitVectors(actual, U).multiply(camera.quaternion);
+  vuelo = { t0: performance.now(), dur: 1800, p0: camera.position.clone(), c: camera.position.clone().add(destino).multiplyScalar(0.5),
+            q0: camera.quaternion.clone(), f0: camera.fov, d: { p: destino, q, f: camera.fov },
+            alTerminar: () => { entrarCaminar(U); ponerModo("caminar"); } };
+  orbita.enabled = false;
+}
+for (const b of botonesGravedad) b.onclick = () => girarA(b.dataset.eje);
+
+// ---------- Mapa lateral: el icosaedro en miniatura y la ficha del lugar ----------
+const mapaRender = new THREE.WebGLRenderer({ canvas: document.getElementById("mapaLienzo"), antialias: true, alpha: true });
+mapaRender.setPixelRatio(1);
+mapaRender.setSize(340, 340, false);
+mapaRender.outputEncoding = THREE.sRGBEncoding;
+const mapa = new THREE.Scene();
+const mapaCam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
+const enMapa = (b) => deBlender(b.map((c) => c / CORTO));
+{
+  const lineas = [];
+  for (const [i, j] of ARISTAS) lineas.push(enMapa(VERTICES[i].p), enMapa(VERTICES[j].p));
+  mapa.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(lineas),
+    new THREE.LineBasicMaterial({ color: 0xd8d6d0, transparent: true, opacity: 0.7 })));
+  const columnas = [];
+  for (const v of VERTICES) columnas.push(enMapa(v.p.map((c) => (Math.abs(c) > LARGO - 1 ? 0 : c))), enMapa(v.p));
+  mapa.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(columnas), new THREE.LineBasicMaterial({ color: 0xffffff })));
+  // Pisos y paredes de las habitaciones: el cuadrado central de cada rectángulo y las tres líneas donde se cruzan.
+  const C = CORTO, pisos = [];
+  const cuadrado = (esq) => { for (let k = 0; k < 4; k++) pisos.push(enMapa(esq[k]), enMapa(esq[(k + 1) % 4])); };
+  cuadrado([[0, -C, -C], [0, C, -C], [0, C, C], [0, -C, C]]);
+  cuadrado([[-C, 0, -C], [C, 0, -C], [C, 0, C], [-C, 0, C]]);
+  cuadrado([[-C, -C, 0], [C, -C, 0], [C, C, 0], [-C, C, 0]]);
+  for (const [a, b] of [[[-C, 0, 0], [C, 0, 0]], [[0, -C, 0], [0, C, 0]], [[0, 0, -C], [0, 0, C]]]) pisos.push(enMapa(a), enMapa(b));
+  mapa.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pisos), new THREE.LineBasicMaterial({ color: 0xffffff })));
+  const punto = new THREE.SphereGeometry(0.045, 10, 6);
+  for (const v of VERTICES) { const s = new THREE.Mesh(punto, new THREE.MeshBasicMaterial({ color: 0xffffff })); s.position.copy(enMapa(v.p)); mapa.add(s); }
+}
+// Los tres rectángulos áureos, en grises sutiles; el de la gravedad activa, más claro.
+const PHI = LARGO / CORTO;
+const rectMapa = {};
+for (const [eje, esquinas] of Object.entries({
+  x: [[0, -1, -PHI], [0, 1, -PHI], [0, 1, PHI], [0, -1, PHI]],
+  y: [[-PHI, 0, -1], [PHI, 0, -1], [PHI, 0, 1], [-PHI, 0, 1]],
+  z: [[-1, -PHI, 0], [1, -PHI, 0], [1, PHI, 0], [-1, PHI, 0]],
+})) {
+  const [a, b, c, d] = esquinas.map((e) => deBlender(e));
+  const g = new THREE.BufferGeometry().setFromPoints([a, b, c, a, c, d]);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false }));
+  rectMapa[eje] = m;
+  mapa.add(m);
+}
+// El piso de la habitación actual (el cuadrado del plano activo en ese octante), en rojizo.
+const pisoActual = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({
+  color: 0xc0533f, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false }));
+pisoActual.geometry.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(18), 3));
+mapa.add(pisoActual);
+let pisoClave = "";
+function marcarPiso(eje, signos) {
+  const clave = eje + signos.join("");
+  if (clave === pisoClave) return;
+  pisoClave = clave;
+  const i = "xyz".indexOf(eje), j = (i + 1) % 3, k = (i + 2) % 3;
+  const esquina = (a, b) => { const p = [0, 0, 0]; p[j] = a * signos[j]; p[k] = b * signos[k]; return deBlender(p); };
+  const [A, B, C, D] = [esquina(0, 0), esquina(1, 0), esquina(1, 1), esquina(0, 1)];
+  const arr = pisoActual.geometry.attributes.position;
+  [A, B, C, A, C, D].forEach((v, n) => arr.setXYZ(n, v.x, v.y, v.z));
+  arr.needsUpdate = true;
+  pisoActual.geometry.computeBoundingSphere();
+}
+const marca = new THREE.Mesh(new THREE.SphereGeometry(0.09, 14, 10), new THREE.MeshBasicMaterial({ color: 0x9b3d2e }));
+const rumbo = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -0.45)]),
+  new THREE.LineBasicMaterial({ color: 0x9b3d2e }));
+marca.add(rumbo);
+mapa.add(marca);
+
+const ficha = document.getElementById("ficha");
+const CUENTO = { x: "El jardín de senderos que se bifurcan", y: "El Aleph", z: "La biblioteca de Babel" };
+let fichaClave = "", fichaReloj = 0;
+const vM = new THREE.Vector3(), vMu = new THREE.Vector3(), vMf = new THREE.Vector3();
+function actualizarMapa(dt) {
+  // Cámara del mapa: el piso de la gravedad activa abajo y el lector de espaldas, como en su vista.
+  vMu.set(0, 1, 0).applyQuaternion(camera.quaternion);
+  const ub = aBlender(vMu), i = "xyz".indexOf(ejeActivo);
+  const arribaB = [0, 0, 0];
+  arribaB[i] = Math.sign(ub[i]) || 1;
+  const arriba = deBlender(arribaB);
+  vMf.set(0, 0, -1).applyQuaternion(camera.quaternion).addScaledVector(arriba, -vMf.dot(arriba));
+  if (vMf.lengthSq() < 1e-4) vMf.set(1, 0, 0).addScaledVector(arriba, -arriba.x);
+  vMf.normalize();
+  mapaCam.position.copy(vMf).multiplyScalar(-6.2).addScaledVector(arriba, 3.4);
+  mapaCam.up.copy(arriba);
+  mapaCam.lookAt(0, 0, 0);
+  marca.position.copy(camera.position).multiplyScalar(1 / CORTO).clampLength(0, 2.2);   // fuera del icosaedro, en el borde
+  marca.quaternion.copy(camera.quaternion);
+  for (const e of "xyz") rectMapa[e].material.opacity = e === ejeActivo ? 0.22 : 0.1;
+  marcarPiso(ejeActivo, aBlender(camera.position).map((c) => (c >= 0 ? 1 : -1)));   // solo el piso de esta habitación
+  mapaRender.render(mapa, mapaCam);
+
+  // Ficha: habitación (octante), gravedad, y lo que dice el sistema sonoro de ese espacio.
+  fichaReloj -= dt;
+  const b = aBlender(camera.position);
+  const sala = b.map((c) => (c >= 0 ? "+" : "-")).join(" ");
+  const clave = sala + ejeActivo;
+  if (clave === fichaClave && fichaReloj > 0) return;
+  fichaClave = clave;
+  fichaReloj = 0.25;
+  const A = window.Audio24;
+  const sp = A && A.SPACES.find((s) => s.roomSign === sala && s.p === i);
+  espacioActual = sp || null;
+  plagalActual = sala.split(" ")[i] === "-";            // del lado negativo del plano del piso: plagal
+  const filas = [["Habitación", "( " + sala.split(" ").join(" , ") + " )"],
+                 ["Gravedad", ejeActivo + " · piso " + ejeActivo + " = 0"],
+                 ["Cuento", CUENTO[ejeActivo]]];
+  if (sp) {
+    const md = A.MODES[sp.mode], N = A.NOTE;
+    const triada = [0, sp.q === "M" ? 4 : 3, 7].map((d) => N[(sp.root + d) % 12]);
+    filas.push(["Tónica", N[sp.tonic] + " (el piso)"],
+               ["Tríada", N[sp.root] + (sp.q === "M" ? " mayor" : " menor") + " · " + triada.join(" ")],
+               ["Modo", nombreModo(sp.mode, plagalActual) + " · " + (plagalActual ? "plagal" : "auténtico") + " · tónica en la " + sp.role],
+               ["Característica", N[(sp.tonic + md.semi[md.c]) % 12] + " · " + md.cname],
+               ["Timbre", A.TIMBRES[sp.p].name.toLowerCase()],
+               ["Espacio", (sp.i + 1) + " de 24"]);
+  }
+  filas.push(["Posición", b.map((c, k) => "xyz"[k] + " " + Math.round(c)).join("  ") + " m"]);
+  ficha.replaceChildren(...filas.flatMap(([k, v]) => {
+    const dt_ = document.createElement("dt"), dd = document.createElement("dd");
+    dt_.textContent = k; dd.textContent = v;
+    return [dt_, dd];
+  }));
+}
+
+// ---------- Sonido: una sola pieza que modula según dónde estás (sistema de audio/engine.js) ----------
+// Un consort de tres voces, una por plano y con su timbre (x órgano de flautas, y cuerda frotada, z voz):
+//   · cada pared suena su nota (las tres paredes de la habitación son su tríada, en afinación justa) y
+//     suena más fuerte cuanto más cerca está el lector de esa pared: al moverse, cambia la mezcla;
+//   · el piso es la tónica: bajo una octava abajo y la melodía, en el timbre del piso;
+//   · la melodía tiene 4 frases de 12 unidades (ascenso, arco, descenso y cláusula sobre la final), con el
+//     ritmo del modo (tono = 2, semitono = 1) y la nota característica acentuada en cada frase.
+// Modos de Glarean (Dodecachordon, 1547): 6 especies, auténtico o plagal. Del lado positivo del plano del piso
+// el modo es auténtico (de la final a la octava); del lado negativo, plagal (una cuarta abajo de la final a la
+// quinta arriba). Cruzar una H cambia de auténtico a plagal sobre el mismo piso.
+// Hay un solo reloj: un cambio de espacio espera al comienzo de la frase siguiente y entra deslizando las
+// notas (modula dentro de la misma pieza, sin cortar el pulso). En las anamorfosis, el acorde se desafina
+// cuando la frase se desarma: leer es afinar.
+let espacioActual = null, plagalActual = false, desafino = 0;
+const botonSonido = document.getElementById("sonido");
+const CONTORNOS = [[0, 2, 4, "C", 4, 5, 4], [4, 5, 7, "C", 6, 5, 4], [7, 6, 4, "C", 3, 2, 1], [2, 4, 3, "C", 2, 1, 0]];
+const nombreModo = (modo, plagal) => (plagal ? "Hipo" + modo.toLowerCase() : modo);
+function melodia(sp, plagal, k) {
+  const A = window.Audio24, md = A.MODES[sp.mode];
+  const [lo, hi] = plagal ? [-4, 5] : [0, 8];
+  let prev = k === 0 ? 0 : (plagal ? 1 : 4), inicio = 0;
+  return CONTORNOS[k].map((d0, i) => {
+    const d = d0 === "C" ? md.c : d0;
+    let mejor = null;
+    for (let o = -2; o <= 2; o++) {
+      const pos = (d % 7) + 7 * o;
+      if (pos < lo || pos > hi) continue;
+      if (mejor === null || Math.abs(pos - prev) < Math.abs(mejor - prev)) mejor = pos;
+    }
+    if (mejor === null) mejor = d % 7;
+    prev = mejor;
+    const grado = ((mejor % 7) + 7) % 7, octava = Math.floor(mejor / 7);
+    const nota = { inicio, dur: md.cells[i], f: sp.f0 * md.ratio[grado] * Math.pow(2, octava), acento: i === 3 };
+    inicio += md.cells[i];
+    return nota;
+  });
+}
+// Razón justa de la nota de cada pared respecto de la tónica (la del piso es 1).
+function razonesDeParedes(sp) {
+  return [0, 1, 2].map((q) => {
+    if (q === sp.p) return 1;
+    const semi = (sp.pcs[q] - sp.tonic + 12) % 12;
+    return sp.padR.find((r) => Math.round(12 * Math.log2(r)) % 12 === semi) || Math.pow(2, semi / 12);
+  });
+}
+let audio = null;
+function afinar(eng, T, v, t, f, tc) {
+  v.c.frequency.setTargetAtTime(f, t, tc);
+  v.m.frequency.setTargetAtTime(f * T.ratio, t, tc);
+  v.mg.gain.setTargetAtTime(f * T.index, t, tc);
+}
+const avisoSonido = document.getElementById("aviso");
+let avisoReloj = null;
+function aplicarEspacio(sp, plagal, t, primera) {
+  const A = window.Audio24, tc = primera ? 0.02 : 0.22;        // al modular, las notas se deslizan
+  const md = A.MODES[sp.mode], N = A.NOTE;
+  const r = razonesDeParedes(sp);
+  // Cuarta voz: la nota característica del modo, sostenida (lo que distingue a un modo de otro con el mismo acorde).
+  const fCaract = sp.f0 * md.ratio[md.c] * (plagal ? 0.5 : 1);
+  audio.motores.forEach((eng, q) => {
+    afinar(eng, A.TIMBRES[q], eng.padA, t, sp.f0 * r[q], tc);
+    const esPiso = q === sp.p;
+    if (esPiso) {
+      afinar(eng, A.TIMBRES[q], eng.bass, t, sp.f0 / 2, tc);
+      afinar(eng, A.TIMBRES[q], eng.padB, t, fCaract, tc);
+    }
+    eng.bass.vca.gain.setTargetAtTime(esPiso ? 0.15 : 0, t, 0.5);
+    eng.padB.vca.gain.setTargetAtTime(esPiso ? 0.11 : 0, t, 0.6);
+  });
+  if (!primera) {
+    // Señal de la modulación, en el tiempo fuerte: un arpegio agudo de las cuatro notas (tónica, las otras dos
+    // de la tríada y la característica) en los timbres de las paredes, y el bajo que se hincha.
+    const otros = audio.motores.filter((e, q) => q !== sp.p);
+    const arpegio = [1, r[(sp.p + 1) % 3], r[(sp.p + 2) % 3], md.ratio[md.c]].map((x) => sp.f0 * 2 * (x < 1 ? x * 2 : x));
+    arpegio.forEach((f, k) => {
+      const e = otros[k % 2];
+      e.note(e.lead, t + k * A.UNIT, 2.2 * A.UNIT, f, 0.3, 1.6);
+    });
+    const piso = audio.motores[sp.p];
+    piso.bass.vca.gain.setTargetAtTime(0.26, t, 0.05);
+    piso.bass.vca.gain.setTargetAtTime(0.15, t + 3 * A.UNIT, 0.4);
+  }
+  // Aviso visible en el mapa, en el momento en que suena el cambio.
+  const texto = (primera ? "Suena: " : "Modula a: ") + N[sp.tonic] + " " + nombreModo(sp.mode, plagal).toLowerCase() +
+    " · característica " + N[(sp.tonic + md.semi[md.c]) % 12] + " (" + md.cname + ")";
+  clearTimeout(avisoReloj);
+  setTimeout(() => {
+    avisoSonido.textContent = texto;
+    avisoSonido.classList.add("visible");
+    avisoReloj = setTimeout(() => avisoSonido.classList.remove("visible"), 4500);
+  }, Math.max(0, (t - audio.ctx.currentTime) * 1000));
+  audio.sp = sp;
+  audio.plagal = plagal;
+  audio.frase = 0;
+}
+function programarFrase(t) {
+  const A = window.Audio24, sp = audio.sp, eng = audio.motores[sp.p];
+  for (const n of melodia(sp, audio.plagal, audio.frase % 4))
+    eng.note(eng.lead, t + n.inicio * A.UNIT, n.dur * A.UNIT, n.f, n.acento ? 0.36 : 0.22, n.acento ? 1.8 : 1);
+  audio.frase++;
+}
+function sonidoPaso() {
+  if (!audio || !espacioActual || audio.ctx.state !== "running") return;
+  const A = window.Audio24, ahora = audio.ctx.currentTime;
+  if (!audio.sp) { aplicarEspacio(espacioActual, plagalActual, ahora + 0.05, true); audio.prox = ahora + 0.1; }
+  while (audio.prox < ahora + 0.6) {
+    if (audio.sp.i !== espacioActual.i || audio.plagal !== plagalActual) aplicarEspacio(espacioActual, plagalActual, audio.prox, false);
+    programarFrase(audio.prox);
+    audio.prox += A.PHRASE;
+  }
+  // Mezcla continua: cada pared suena más cuanto más cerca está el lector.
+  const b = aBlender(camera.position), cents = 30 * desafino;
+  audio.motores.forEach((eng, q) => {
+    const cerca = 1 - THREE.MathUtils.smoothstep(Math.abs(b[q]) - MEDIO_PLANO, 3, 45);
+    eng.padA.vca.gain.setTargetAtTime(0.025 + 0.11 * cerca + (q === audio.sp.p ? 0.04 : 0), ahora, 0.4);
+    eng.padA.c.detune.setTargetAtTime(q % 2 ? cents : -cents, ahora, 0.2);
+  });
+}
+setInterval(sonidoPaso, 100);
+function pintarBotonSonido(encendido) {
+  botonSonido.setAttribute("aria-pressed", encendido);
+  botonSonido.textContent = encendido ? "♪ Sonido · ON" : "♪ Sonido · OFF";
+}
+botonSonido.onclick = async () => {
+  try {
+    const encendido = botonSonido.getAttribute("aria-pressed") === "true";
+    if (!audio) {
+      const Contexto = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Contexto();
+      const bus = window.Audio24.makeBus(ctx, ctx.destination);
+      const motores = [0, 1, 2].map((q) => window.Audio24.makeEngine(ctx, bus.in, window.Audio24.TIMBRES[q]));
+      motores.forEach((m) => m.fadeIn(ctx.currentTime));
+      audio = { ctx, bus, motores, sp: null, plagal: false, frase: 0, prox: 0 };
+    }
+    if (encendido) await audio.ctx.suspend(); else await audio.ctx.resume();
+    pintarBotonSonido(!encendido);
+    sonidoPaso();
+  } catch (e) {
+    botonSonido.textContent = "Sin sonido";
+  }
+};
+pintarBotonSonido(false);
+
+// ---------- Portales: la contraforma de cada H ----------
+// Al atravesar la H caminando se pasa al otro lado del mismo piso: la habitación espejada a través de ese plano,
+// con la gravedad invertida. Es el mismo piso visto desde abajo (y, en el sistema sonoro, la misma tónica en otro acorde).
+const portal = datos.portal;
+const pasos = [];
+{
+  const salas = [new THREE.Matrix4(), ...Object.values(datos.habitaciones).map(matriz)];
+  const mods = [new THREE.Matrix4(), ...datos.modulo.map(matriz)];
+  for (const S of salas) mods.forEach((M, g) => pasos.push({ inv: S.clone().multiply(M).invert(), eje: "zxy"[g], prev: null }));
+}
+const destello = document.getElementById("destello");
+let enfriar = 0;
+const vB = new THREE.Vector3();
+function revisarPortales() {
+  if (!portal || vuelo || modo !== "caminar" || performance.now() < enfriar) return;
+  const camB = aBlender(camera.position);
+  for (const p of pasos) {
+    const L = vB.set(camB[0], camB[1], camB[2]).applyMatrix4(p.inv);
+    const dentro = L.y > portal.y[0] && L.y < portal.y[1] && L.z > portal.z[0] - 1 && L.z < portal.z[1];
+    const lado = Math.sign(L.x - portal.x);
+    if (dentro && p.prev && p.prev.dentro && p.prev.lado !== lado) { cruzar(p); return; }
+    p.prev = { dentro, lado };
+  }
+}
+function cruzar(p) {
+  const i = "xyz".indexOf(p.eje);
+  const espejo = (v) => { const b = aBlender(v); b[i] = -b[i]; return deBlender(b); };
+  const adelante = espejo(new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion));
+  const arriba = espejo(new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion));
+  camera.position.copy(espejo(camera.position));
+  camera.up.copy(arriba);
+  camera.lookAt(camera.position.clone().add(adelante));
+  // El cuerpo pasa al otro lado del mismo piso: pies, arriba y rumbo, reflejados.
+  cuerpo.pies.copy(espejo(cuerpo.pies));
+  cuerpo.U.copy(espejo(cuerpo.U));
+  cuerpo.H.copy(espejo(cuerpo.H));
+  cuerpo.vu = 0; cuerpo.suelo = false; cuerpo.lag = 0; cuerpo.ultimo = null;
+  for (const q of pasos) q.prev = null;
+  enfriar = performance.now() + 1200;
+  destellar();
+  const s = aBlender(camera.position).map((c) => (c >= 0 ? "+" : "−")).join("");
+  actual = -1;
+  botonesInst.forEach((b) => b.setAttribute("aria-pressed", false));
+  notaTitulo.textContent = "Portal · gravedad " + p.eje + " invertida";
+  notaTexto.textContent = "Atravesaste la H: estás del otro lado del mismo piso, en la habitación " + s +
+    ", que es su espejo. El piso es el mismo; ahora lo pisás desde abajo.";
+  legibCaja.hidden = true;
+  nota.hidden = false;
+}
+
+// ---------- Puntos de lectura: las esferas ----------
+// Cada esfera (lámpara) de cada estructura se toca (clic o tap) y la cámara viaja hasta el punto exacto desde
+// donde se lee la pieza que le corresponde. Al llegar, por un instante todo lo que no es ese texto se vuelve un
+// plano de color: desaparece lo tridimensional y el texto queda como una página. Después el velo se levanta y
+// el lector sigue navegando. Las poses están en coordenadas del módulo z y se llevan a las 24 estructuras.
+// tipo: "escalera" muestra en el velo los renglones de las escaleras; "texto", los textos del módulo.
+// segundos: cuánto dura el velo, según el largo del texto.
+const LECTURAS = [
+  { tipo: "escalera", segundos: 5, esfera: [42.3, 10.2, 22.3], titulo: "Escalera 1", nota: "Los bolsillos de Yu Tsun, un renglón por escalón.", pos: [57.5, 10.16, 21.2], mira: [41, 10.16, 21.6] },
+  { tipo: "texto", segundos: 8, esfera: [40.3, 16.8, 26.8], titulo: "El muro de Babel", nota: "El muro es texto. De frente, a esta distancia, se lee.", pos: [58, 10.2, 34.5], mira: [34.5, 10.2, 34.5] },
+  { tipo: "escalera", segundos: 5, esfera: [32.4, 10.2, 46.4], titulo: "Escalera 2", nota: "El hexágono: anaqueles, libros, páginas, renglones.", pos: [37, 10.16, 46.3], mira: [26, 10.16, 46.6] },
+  { tipo: "escalera", segundos: 4, esfera: [22.3, 10.2, 49.3], titulo: "Escalera 3", nota: "Lo que se vio en el Aleph.", pos: [31, 16.15, 49.6], mira: [20, 16.15, 51.6] },
+  { tipo: "texto", segundos: 6, esfera: [32.8, 9.0, 5.3], titulo: "El índice", nota: "En el piso, al pasar la H.", pos: [50.8, 7.75, 8.7], mira: [45.7, 7.75, 1.8] },
+  { tipo: "texto", segundos: 5, esfera: [25.2, 9.8, 11.8], titulo: "La cita del descanso", nota: "Una cita en bloque, en el piso del descanso.", pos: [42.6, 9.5, 31.2], mira: [36.1, 9.5, 25.0] },
+  { tipo: "texto", segundos: 7, esfera: [57.3, 54.8, 4.8], titulo: "El glosario", nota: "Entradas de diccionario sobre la pared.", pos: [46.6, 12, 13.2], mira: [46.6, 1.8, 13.2] },
+  { tipo: "texto", segundos: 3.5, esfera: [49.8, 62.8, 14.8], titulo: "La cita del friso", nota: "«La Biblioteca es ilimitada y periódica.»", pos: [46, 56.5, 18.4], mira: [46, 62.4, 18.4] },
+];
+const disparadores = [];
+{
+  const salas = [new THREE.Matrix4(), ...Object.values(datos.habitaciones).map(matriz)];
+  const mods = [new THREE.Matrix4(), ...datos.modulo.map(matriz)];
+  const aMundo = (W, p) => deBlender(new THREE.Vector3(...p).applyMatrix4(W).toArray());
+  salas.forEach((S, r) => mods.forEach((M, g) => {
+    const W = S.clone().multiply(M);
+    const mz = salasObj[r].children[2 * g], esc = salasObj[r].children[2 * g + 1];   // el módulo y sus escaleras
+    for (const L of LECTURAS) {
+      const ojo = aMundo(W, L.pos), blanco = aMundo(W, L.mira);
+      const arriba = aMundo(W, [L.pos[0], L.pos[1], L.pos[2] + 1]).sub(ojo).normalize();
+      const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(ojo, blanco, arriba));
+      disparadores.push({ L, mz, esc, centro: aMundo(W, L.esfera), pose: { p: ojo, q, f: fovVertical(24) } });
+    }
+  }));
+}
+function irALectura(d) {
+  actual = -1;
+  botonesInst.forEach((b) => b.setAttribute("aria-pressed", false));
+  notaTitulo.textContent = "Lectura · " + d.L.titulo;
+  notaTexto.textContent = d.L.nota;
+  legibCaja.hidden = true;
+  nota.hidden = false;
+  if (document.pointerLockElement) document.exitPointerLock();
+  // Si el lector estaba recorriendo, después del velo vuelve a donde estaba parado.
+  const regreso = modo === "caminar" ? guardarCuerpo() : null;
+  const dist = camera.position.distanceTo(d.pose.p);
+  vuelo = { t0: performance.now(), dur: Math.min(5000, 1800 + dist * 40), p0: camera.position.clone(),
+            c: camera.position.clone().add(d.pose.p).multiplyScalar(0.5), q0: camera.quaternion.clone(), f0: camera.fov,
+            d: { p: d.pose.p, q: d.pose.q, f: fovVertical(24) }, alTerminar: () => iniciarVelo(d, regreso) };
+  orbita.enabled = false;
+  arrastre = null;
+}
+// Tocar una esfera: un clic o tap corto (sin arrastrar) sobre ella. La tolerancia crece con la distancia.
+const rayo = new THREE.Raycaster(), vNdc = new THREE.Vector2();
+function esferaBajo(x, y) {
+  vNdc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
+  rayo.setFromCamera(vNdc, camera);
+  // Se elige la esfera más alineada con el toque (error angular), a cualquier distancia.
+  let mejor = null, mejorError = Infinity;
+  for (const d of disparadores) {
+    const t = rayo.ray.origin.distanceTo(d.centro);
+    if (t < 0.5 || d.centro.clone().sub(rayo.ray.origin).dot(rayo.ray.direction) < 0) continue;
+    const error = rayo.ray.distanceToPoint(d.centro) / t;
+    if (error < Math.max(0.035, 1.6 / t) && error < mejorError) { mejor = d; mejorError = error; }
+  }
+  return mejor;
+}
+// Halo que late alrededor de cada esfera: indica que se puede tocar.
+const halos = [];
+{
+  const lienzo = document.createElement("canvas");
+  lienzo.width = lienzo.height = 128;
+  const c = lienzo.getContext("2d"), g = c.createRadialGradient(64, 64, 10, 64, 64, 62);
+  g.addColorStop(0, "rgba(255,238,200,0.0)"); g.addColorStop(0.42, "rgba(255,232,190,0.0)"); g.addColorStop(0.5, "rgba(255,230,180,0.22)"); g.addColorStop(0.62, "rgba(255,220,160,0.06)"); g.addColorStop(1, "rgba(255,220,160,0)");
+  c.fillStyle = g; c.fillRect(0, 0, 128, 128);
+  const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(lienzo), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  for (const d of disparadores) {
+    const s = new THREE.Sprite(mat);
+    s.position.copy(d.centro);
+    s.scale.setScalar(1.2);
+    s.renderOrder = 15;
+    scene.add(s);
+    halos.push(s);
+  }
+}
+function latirHalos(t) {
+  const k = 1.1 + 0.25 * (0.5 + 0.5 * Math.sin(t * 2.2));
+  for (const s of halos) s.scale.setScalar(k);
+}
+let toque = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { toque = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+renderer.domElement.addEventListener("pointerup", (e) => {
+  if (!toque) return;
+  const corto = Math.hypot(e.clientX - toque.x, e.clientY - toque.y) < 12 && performance.now() - toque.t < 700;
+  toque = null;
+  if (!corto || vuelo || velo) return;
+  const enMira = document.pointerLockElement === renderer.domElement;
+  const d = enMira ? esferaBajo(innerWidth / 2, innerHeight / 2) : esferaBajo(e.clientX, e.clientY);
+  if (d) irALectura(d);
+  else if (!enMira && modo === "caminar" && e.pointerType === "mouse") capturarMouse();
+});
+renderer.domElement.addEventListener("pointermove", (e) => {
+  if (e.buttons || e.pointerType !== "mouse") return;
+  renderer.domElement.style.cursor = esferaBajo(e.clientX, e.clientY) ? "pointer" : "";
+});
+
+// El velo: por un instante, todo lo que no es el texto se vuelve un plano de color y el texto queda plano.
+const capaVelo = document.getElementById("velo");
+let velo = null;
+const PAPEL = new THREE.Color(0xe9e3d6), NEGRO = new THREE.Color(0x0d0d0d);
+function iniciarVelo(d, regreso) {
+  const mostrar = new Map();                      // malla → color plano del texto
+  if (d.L.tipo === "escalera") mostrar.set(d.esc, new THREE.Color(0x1e6973));
+  else d.mz.traverse((o) => { if (o.isMesh && (o.userData.mat || "").startsWith("Tinta_")) mostrar.set(o, colorDe(o.userData.mat)); });
+  // Fondo que contraste: si la mayoría del texto es oscuro → papel; si es claro o rojo → negro.
+  const colores = [...mostrar.values()];
+  const claro = colores.filter((c) => c.r + c.g + c.b > 0.9 || (c.r > 0.25 && c.g < 0.1)).length > colores.length / 2;
+  const fondo = claro ? NEGRO : PAPEL;
+  const ocultos = [], materiales = [];
+  scene.traverse((o) => {
+    if (!(o.isMesh || o.isLine || o.isSprite || o.isPoints) || !o.visible) return;
+    if (mostrar.has(o)) { materiales.push([o, o.material]); o.material = new THREE.MeshBasicMaterial({ color: mostrar.get(o), side: THREE.DoubleSide }); }
+    else { ocultos.push(o); o.visible = false; }
+  });
+  velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + d.L.segundos * 1000, regreso };
+  scene.fog = null;
+  scene.background = fondo;
+  capaVelo.style.background = "#" + fondo.getHexString();
+  capaVelo.style.transition = "none";
+  capaVelo.style.opacity = 1;                      // se entra desde el plano de color…
+  requestAnimationFrame(() => { capaVelo.style.transition = "opacity .5s"; capaVelo.style.opacity = 0; });   // …y aparece el texto
+}
+function terminarVelo() {
+  if (!velo) return;
+  const v = velo;
+  velo = null;
+  capaVelo.style.transition = "opacity .35s";
+  capaVelo.style.opacity = 1;
+  setTimeout(() => {
+    for (const o of v.ocultos) o.visible = true;
+    for (const [o, m] of v.materiales) { o.material.dispose(); o.material = m; }
+    scene.fog = v.niebla;
+    scene.background = null;
+    capaVelo.style.opacity = 0;                    // se levanta el velo y el lector queda suelto
+    const r = v.regreso;
+    if (!r) { ponerModo("orbitar"); return; }
+    const dist = camera.position.distanceTo(r.p);
+    vuelo = { t0: performance.now(), dur: Math.min(4500, 1600 + dist * 30), p0: camera.position.clone(),
+              c: camera.position.clone().add(r.p).multiplyScalar(0.5), q0: camera.quaternion.clone(), f0: camera.fov,
+              d: { p: r.p, q: r.q, f: r.f }, alTerminar: () => { restaurarCuerpo(r); ponerModo("caminar"); } };
+  }, 380);
+}
+
+// Legibilidad de la anamorfosis: máxima parado en el punto y mirando hacia donde mira la frase.
+const vF = new THREE.Vector3(), vT = new THREE.Vector3();
+function legibilidad() {
+  if (actual < 0 || !instancias[actual].anamorfosis) { desafino = 0; return; }
+  const p = poses[actual];
+  vF.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  vT.set(0, 0, -1).applyQuaternion(p.q);
+  const ang = Math.acos(Math.min(1, Math.max(-1, vF.dot(vT))));
+  const l = Math.max(0, 1 - camera.position.distanceTo(p.p) / 6) * Math.max(0, 1 - ang / 0.6);
+  legibBarra.style.width = (l * 100).toFixed(0) + "%";
+  desafino = 1 - l;
+}
+
+// Enderezar: deja la mirada y pone "arriba" en la vertical del mundo.
+document.getElementById("enderezar").onclick = () => {
+  const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(camera.position.clone().add(delante));
+};
+
+// Mirar arrastrando sobre la pantalla (al recorrer): se "agarra" el espacio.
+let arrastre = null;
+lienzo.addEventListener("pointerdown", (e) => {
+  if (modo !== "caminar" || document.pointerLockElement === lienzo) return;
+  arrastre = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  try { lienzo.setPointerCapture(e.pointerId); } catch (err) { /* puntero sintético o ya liberado */ }
+});
+lienzo.addEventListener("pointermove", (e) => {
+  if (!arrastre || e.pointerId !== arrastre.id || vuelo || velo) return;
+  const dx = e.clientX - arrastre.x, dy = e.clientY - arrastre.y;
+  arrastre.x = e.clientX; arrastre.y = e.clientY;
+  mirar(dx * 0.0035, dy * 0.0035);
+});
+const soltar = (e) => { if (arrastre && e.pointerId === arrastre.id) arrastre = null; };
+lienzo.addEventListener("pointerup", soltar);
+lienzo.addEventListener("pointercancel", soltar);
+
+// En compu, como en los juegos: un clic captura el mouse y moverlo mira; Esc lo suelta. La mira del centro
+// sirve para tocar las esferas.
+let capturado = false;
+document.addEventListener("pointerlockchange", () => {
+  capturado = document.pointerLockElement === lienzo;
+  mira.hidden = !capturado;
+});
+document.addEventListener("mousemove", (e) => {
+  if (!capturado || modo !== "caminar" || vuelo || velo) return;
+  mirar(-e.movementX * 0.0022, -e.movementY * 0.0022);
+});
+function capturarMouse() {
+  try { const r = lienzo.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) { /* sin captura: se mira arrastrando */ }
+}
+
+// Palancas táctiles: la izquierda camina (o vuela, en Orbitar), la derecha mira.
+function hacerPalanca(el) {
+  const perilla = el.querySelector(".perilla"), v = { x: 0, y: 0 };
+  let dedo = null;
+  const mover = (e) => {
+    const r = el.getBoundingClientRect();
+    let x = (e.clientX - r.left - r.width / 2) / (r.width / 2);
+    let y = (e.clientY - r.top - r.height / 2) / (r.height / 2);
+    const l = Math.hypot(x, y);
+    if (l > 1) { x /= l; y /= l; }
+    v.x = x; v.y = y;
+    perilla.style.transform = `translate(${x * 44}px, ${y * 44}px)`;
+  };
+  el.addEventListener("pointerdown", (e) => { dedo = e.pointerId; try { el.setPointerCapture(e.pointerId); } catch (err) { /* nada */ } mover(e); });
+  el.addEventListener("pointermove", (e) => { if (e.pointerId === dedo) mover(e); });
+  const soltarla = (e) => { if (e.pointerId !== dedo) return; dedo = null; v.x = v.y = 0; perilla.style.transform = ""; };
+  el.addEventListener("pointerup", soltarla);
+  el.addEventListener("pointercancel", soltarla);
+  return v;
+}
+const empuje = hacerPalanca(palanca);
+const giro = hacerPalanca(mirarPalanca);
+
+let altura = 0;
+for (const [id, v] of [["subir", 1], ["bajar", -1]]) {
+  const b = document.getElementById(id);
+  b.addEventListener("pointerdown", () => (altura = v));
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) b.addEventListener(ev, () => (altura = 0));
+}
+
+const teclas = new Set();
+addEventListener("keydown", (e) => {
+  teclas.add(e.code);
+  if (e.code === "Space" || e.code.startsWith("Arrow")) e.preventDefault();
+  const m = /^(?:Digit|Numpad)(\d)$/.exec(e.code);          // 1…9 y 0 → instancias 1…10
+  if (m) { const n = (Number(m[1]) + 9) % 10; if (instancias[n]) irAInstancia(n); }
+  if (e.code === "KeyX" || e.code === "KeyY" || e.code === "KeyZ") girarA(e.code.slice(3).toLowerCase());
+});
+addEventListener("keyup", (e) => teclas.delete(e.code));
+addEventListener("blur", () => teclas.clear());
+// Un botón tocado con el mouse no se queda con el foco (si no, Espacio lo volvería a apretar).
+document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("button"); if (b && e.detail) b.blur(); });
+
+// ---------- Bucle ----------
+const reloj = new THREE.Clock();
+function cuadro() {
+  const dt = Math.min(reloj.getDelta(), 0.1);
+  uTiempo.value = reloj.elapsedTime;
+  uCamara.value.copy(camera.position);
+  animarTitular(reloj.elapsedTime);
+  gravedadActiva(dt);
+  actualizarMapa(dt);
+  // Si la página se abrió en una pestaña oculta, el lienzo quedó en 0 × 0: se corrige apenas hay tamaño.
+  if (innerWidth > 0 && (renderer.domElement.clientWidth !== innerWidth || renderer.domElement.width === 0)) ajustarTamano();
+  const tt = reloj.elapsedTime, parpadeo = 0.55 + 0.25 * Math.sin(tt * 2.3) + 0.2 * Math.sin(tt * 7.1 + 1.3) * Math.sin(tt * 0.9);
+  for (const m of lamparas) m.emissive.copy(LUZ_LAMPARA).multiplyScalar(0.16 * parpadeo);
+  animarEntorno(reloj.elapsedTime);
+  if (vuelo) {
+    pasoVuelo(performance.now());
+  } else if (velo) {
+    // durante el velo la cámara queda quieta
+  } else {
+    let f = -empuje.y, s = empuje.x, u = altura;
+    if (teclas.has("KeyW") || teclas.has("ArrowUp")) f += 1;
+    if (teclas.has("KeyS") || teclas.has("ArrowDown")) f -= 1;
+    if (teclas.has("KeyD") || teclas.has("ArrowRight")) s += 1;
+    if (teclas.has("KeyA") || teclas.has("ArrowLeft")) s -= 1;
+    const corre = rapido || teclas.has("ShiftLeft") || teclas.has("ShiftRight");
+    if (modo === "caminar") {
+      if (giro.x || giro.y) mirar(-giro.x * 2.4 * dt, -giro.y * 1.7 * dt);
+      pasoCuerpo(dt, f, s, corre, teclas.has("Space"));
+      colocarCamara(dt);
+    } else {
+      // Cámara libre: vuela en la dirección en que mira y lleva consigo el centro de giro.
+      if (teclas.has("KeyE")) u += 1;
+      if (teclas.has("KeyQ")) u -= 1;
+      if (f || s || u) {
+        vMov.set(s, u, -f).multiplyScalar((corre ? 70 : 16) * dt).applyQuaternion(camera.quaternion);
+        camera.position.add(vMov);
+        orbita.target.add(vMov);
+      }
+      orbita.update();
+    }
+  }
+  legibilidad();
+  revisarPortales();
+  latirHalos(reloj.elapsedTime);
+  if (velo && performance.now() > velo.fin) terminarVelo();
+  cielo.position.copy(camera.position);
+  renderer.render(scene, camera);
+}
+function bucle() { cuadro(); requestAnimationFrame(bucle); }
+irAInstancia(0, true);
+bucle();
+// Para depurar desde la consola (paso = un cuadro sin esperar a requestAnimationFrame).
+window.visor = { scene, camera, renderer, raiz, irAInstancia, instancias, datos, uTiempo, entorno, girarA, paso: cuadro, get audio() { return audio; }, disparadores, irALectura,
+                 cuerpo, recorrer, teclas, rayoCol, deBlender, aBlender, orbita, get modo() { return modo; } };
+
+function ajustarTamano() {
+  if (!innerWidth || !innerHeight) return;
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+}
+addEventListener("resize", ajustarTamano);
+})().catch((err) => mostrarError(err && err.message || String(err)));
+</script>

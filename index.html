@@ -63,7 +63,11 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 #carga strong { font-family: var(--hyper); font-weight: 400; font-size: 34px; color: var(--lacre); }
 #barraCarga { width: 220px; height: 2px; background: rgba(233, 227, 214, .2); }
 #barraCarga i { display: block; height: 100%; width: 0; background: var(--papel); }
-.grav { min-width: 34px; font-weight: 500; }
+.grav { min-width: 46px; font-weight: 500; line-height: 1.05; padding-top: 4px; padding-bottom: 4px; }
+.grav small { display: block; font-size: 9px; font-weight: 400; letter-spacing: .03em; opacity: .85; white-space: nowrap; }
+#capitulo { display: grid; line-height: 1.15; padding: 2px 12px; border-left: 3px solid var(--lacre); }
+#capitulo b { font-family: var(--hyper); font-weight: 400; font-size: 17px; color: var(--papel); letter-spacing: .02em; }
+#capitulo span { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #e6e0d2; }
 /* Mapa lateral: el icosaedro en miniatura, con el piso de la gravedad activa siempre abajo, y la ficha del lugar. */
 #mapa {
   position: fixed; z-index: 2; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(112px + env(safe-area-inset-top, 0px));
@@ -78,7 +82,7 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 #ficha { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; margin: 6px 0 0; }
 #ficha dt { color: #bdb8ad; text-transform: uppercase; font-size: 8px; letter-spacing: .1em; padding-top: 2px; }
 #ficha dd { margin: 0; color: #fff; }
-@media (max-width: 900px) { #mapa { width: 112px; padding: 5px; } #mapaLienzo { width: 102px; height: 102px; } #ficha { display: none; } #sonido { font-size: 10.5px; padding: 8px 5px; } }
+@media (max-width: 900px) { #mapa { width: 150px; padding: 6px; } #mapaLienzo { width: 112px; height: 112px; margin: 0 auto; } #ficha { font-size: 9.5px; gap: 1px 6px; } #ficha dt { font-size: 7px; } #sonido { font-size: 10.5px; padding: 8px 5px; } }
 #velo { position: fixed; inset: 0; z-index: 1; opacity: 0; pointer-events: none; }
 #destello { position: fixed; inset: 0; z-index: 1; background: var(--papel); opacity: 0; pointer-events: none; transition: opacity .6s ease-out; }
 .chip { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 8px 10px; border: 1px solid var(--lacre); color: var(--papel); background: rgba(155, 61, 46, .35); border-radius: 2px; }
@@ -118,6 +122,7 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 
 <header class="barra">
   <h1>HIPERFUENTE</h1>
+  <div id="capitulo" aria-live="polite" title="El capítulo es la habitación donde estás"><b>Capítulo 1</b><span>El llamado</span></div>
   <div class="grupo" role="group" aria-label="Modo de navegación">
     <span class="rotulo">Modo</span>
     <button id="modoOrbitar" aria-pressed="true">Orbitar</button>
@@ -130,9 +135,9 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
   </div>
   <div class="grupo" role="group" aria-label="Gravedad" title="La gravedad activa: su piso se ilumina y sus textos se ven más. Tocá otra para girar hacia ese piso.">
     <span class="rotulo">Gravedad</span>
-    <button class="grav" data-eje="x" aria-pressed="false">X</button>
-    <button class="grav" data-eje="y" aria-pressed="false">Y</button>
-    <button class="grav" data-eje="z" aria-pressed="true">Z</button>
+    <button class="grav" data-eje="x" aria-pressed="false">X<small>Yu Tsun</small></button>
+    <button class="grav" data-eje="y" aria-pressed="false">Y<small>Roberto</small></button>
+    <button class="grav" data-eje="z" aria-pressed="true">Z<small>Madden</small></button>
   </div>
   <div class="grupo">
     <button id="enderezar" title="Vuelve a poner el horizonte derecho">Enderezar</button>
@@ -196,7 +201,7 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "hi
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputEncoding = THREE.sRGBEncoding;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMapping = THREE.NoToneMapping;
 renderer.toneMappingExposure = 1.0;
 document.body.prepend(renderer.domElement);
 
@@ -234,11 +239,64 @@ cielo.renderOrder = -1;
 scene.add(cielo);
 
 // Luz de día pareja: cielo claro de relleno y un sol alto (42°) que marca las caras sin oscurecer los textos.
-scene.add(new THREE.HemisphereLight(0xf2f0ea, 0x8a8478, 1.6));
-const sol = new THREE.DirectionalLight(0xfff3e0, 1.8);
-const el = THREE.MathUtils.degToRad(42), az = THREE.MathUtils.degToRad(30);
-sol.position.copy(blenderAThree([Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)])).multiplyScalar(500);
+scene.add(new THREE.HemisphereLight(0xf2f0ea, 0x6f6a60, 1.35));
+const sol = new THREE.DirectionalLight(0xfff3e0, 1.05);
+sol.position.set(0.55, 0.8, 0.35).multiplyScalar(300);
 scene.add(sol);
+const sol2 = new THREE.DirectionalLight(0xdfe6ff, 0.45);
+sol2.position.set(-0.4, 0.3, 0.9).multiplyScalar(300);
+scene.add(sol2);
+
+// ---------- Texturas del grupo (herramientas/texturas_espacio.py) ----------
+// Por familia: las imágenes (1 y 2 se reparten por pieza y gravedad) y cuántos metros cubre una repetición.
+// Blender proyecta una repetición cada 2,4 m. Los textos quedan en color plano: tienen que leerse.
+const cargadorT = new THREE.TextureLoader();
+const TEX_FAMILIAS = {
+  Tex_suelo: { imagenes: ["suelo"], metros: 6 },
+  Tex_baldosas: { imagenes: ["baldosas1", "baldosas2"], metros: 4 },
+  Tex_piedra: { imagenes: ["piedra"], metros: 3 },
+  Tex_pared: { imagenes: ["pared1", "pared2"], metros: 3.5 },
+  Tex_muro: { imagenes: ["muro1", "muro2"], metros: 3 },
+};
+const juegos = {}, vestidos = {};
+function juegoDeTexturas(n, metros) {
+  if (juegos[n]) return juegos[n];
+  const t = {};
+  for (const k of ["color", "normal", "ao"]) {
+    const url = "texturas/" + n + "_" + k + ".jpg";
+    // si la descarga se corta, se vuelve a pedir (hasta 3 veces); sin imagen, la superficie se ve negra
+    const reintentar = (vez) => () => { if (vez < 3) setTimeout(() => cargadorT.load(url, (img) => { x.image = img.image; x.needsUpdate = true; }, undefined, reintentar(vez + 1)), 600 * vez); };
+    const x = cargadorT.load(url, undefined, undefined, reintentar(1));
+    x.wrapS = x.wrapT = THREE.RepeatWrapping;
+    x.repeat.setScalar(2.4 / metros);
+    x.anisotropy = 4;
+    if (k === "color") x.encoding = THREE.sRGBEncoding;
+    t[k] = x;
+  }
+  return (juegos[n] = t);
+}
+function elegir(lista, clave) {                       // reparte la versión 1 o 2 según la pieza
+  let h = 0;
+  for (const ch of clave) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return lista[h % lista.length];
+}
+const colorDeMat = (n) => { const c = datos.materiales[n] || [0.5, 0.5, 0.5]; return new THREE.Color().setRGB(c[0], c[1], c[2]); };
+function vestir(nombre, clave) {
+  const fam = TEX_FAMILIAS[nombre];
+  const img = elegir(fam.imagenes, clave || nombre);
+  if (vestidos[nombre + img]) return vestidos[nombre + img];
+  const t = juegoDeTexturas(img, fam.metros);
+  const base = new THREE.Color(1, 1, 1).lerp(colorDeMat(nombre), 0.15);
+  if (nombre === "Tex_suelo") base.multiplyScalar(0.68);    // el suelo es muy claro: al sol directo se quemaba
+  return (vestidos[nombre + img] = new THREE.MeshPhongMaterial({
+    color: base, map: t.color, normalMap: t.normal, normalScale: new THREE.Vector2(1.2, 1.2), aoMap: t.ao,
+    aoMapIntensity: 1.0, shininess: 3, specular: new THREE.Color(0x0b0b0b), side: THREE.DoubleSide,
+  }));
+}
+function vestirCopia(nodo, clave) {
+  nodo.traverse((o) => { if (o.isMesh && TEX_FAMILIAS[o.userData.mat]) o.material = vestir(o.userData.mat, clave + o.userData.mat + o.name); });
+  return nodo;
+}
 
 // ---------- Materiales (color plano de la paleta) ----------
 const materiales = {};
@@ -253,6 +311,10 @@ function material(nombre, rgba) {
                                       opacity: 0.2, depthWrite: false, emissive: new THREE.Color(0, 0, 0) });
     m.userData.vidrio = true;
     lamparas.push(m);
+  } else if (TEX_FAMILIAS[nombre]) {
+    m = vestir(nombre, nombre);
+  } else if (nombre === "Aleph") {
+    m = new THREE.MeshBasicMaterial({ color: 0xfff1cc });
   } else if (nombre === "Horizonte") {
     // La frase del horizonte está a 1,8 km: la niebla normal la borraría. Se le da un velo fijo.
     m = new THREE.MeshBasicMaterial({ color: color.clone().lerp(NIEBLA, 0.22), fog: false });
@@ -312,6 +374,28 @@ async function cargarModelo(url) {
   return new Promise((ok, mal) => new THREE.GLTFLoader().parse(glb.buffer, "", ok, mal));
 }
 const gltf = await cargarModelo("modelo.gltf.json");
+const gltfEspejo = await cargarModelo("espejo.gltf.json");
+// 2026-11-20: lo que dice cada personaje (x e y aparte, para que cada archivo pese menos de 16 MB) y las columnatas
+for (const [archivo, destino] of [["personajes.gltf.json", gltf], ["columnatas.gltf.json", gltf], ["espejo_personajes.gltf.json", gltfEspejo]]) {
+  const extra = await cargarModelo(archivo);
+  for (const c of [...extra.scene.children]) destino.scene.add(c);
+}
+for (const g of [gltf, gltfEspejo]) g.scene.traverse((o) => {
+  if (!o.isMesh) return;
+  if (!o.geometry.attributes.normal) {
+    const geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+    geo.computeVertexNormals();
+    o.geometry = geo;
+  }
+  if (o.geometry.attributes.uv) o.geometry.setAttribute("uv2", o.geometry.attributes.uv);
+});
+// Las piezas espejo: solo se usa su geometría, en el mismo orden que la pieza original.
+const espejoMallas = {};
+for (const n of gltfEspejo.scene.children) {
+  const l = [];
+  n.traverse((o) => { if (o.isMesh) l.push(o); });
+  espejoMallas[n.name.replace("_ESPEJO", "")] = l;
+}
 
 const pieza = {};
 const nodosEntorno = [];
@@ -322,7 +406,7 @@ gltf.scene.traverse((o) => {
     o.userData.mat = o.material.name;
     o.material = material(o.material.name, datos.materiales[o.material.name] || [0.5, 0.5, 0.5, 1]);
   }
-  if (["MODULO_Z", "ESTRUCTURA", "ESCALERAS", "UNICO"].includes(o.name)) pieza[o.name] = o;
+  if (/^(MODULO_Z|ESTRUCTURA|UNICO|PLACAS|COLUMNATAS|TEXTOS(_[ZXY])?|ESCALERAS_[ZXY]|ANAMORFOSIS_[ZXY])$/.test(o.name)) pieza[o.name] = o;
   else if (o.isMesh && o.name.startsWith("E_")) nodosEntorno.push(o);
   else if (o.isMesh && o.name.startsWith("T_")) nodosTitular.push(o);
   else if (["COL_MODULO", "COL_ESTRUCTURA", "COL_UNICO"].includes(o.name)) colNodos[o.name] = o;
@@ -335,57 +419,246 @@ gltf.scene.traverse((o) => {
 // cada letra viene en COLOR_0 (ver 10_exportar_web.py); el signo de R dice hacia qué lado mira el renglón.
 const uTiempo = { value: 0 };
 const uCamara = { value: new THREE.Vector3() };   // MeshLambertMaterial no recibe cameraPosition: se pasa a mano
-const matEscaleras = new THREE.MeshLambertMaterial({
-  color: new THREE.Color(0x1e6973),        // cian oscuro: más claro que el negro, para que se lean como caracteres
-  side: THREE.DoubleSide, vertexColors: true,
-});
-matEscaleras.onBeforeCompile = (sh) => {
+// R: x del centro (+0,5 si el renglón mira a +x o +y); G: y del centro (+0,5 si mira por el eje y); B: z.
+function materialEscalera(hex) {
+  const m = new THREE.MeshLambertMaterial({ color: new THREE.Color(hex), side: THREE.DoubleSide, vertexColors: true });
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uTiempo = uTiempo;
+    sh.uniforms.uCam = uCamara;
+    sh.uniforms.uCod = { value: new THREE.Vector2(datos.codigo.min, datos.codigo.rango) };
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", `#include <common>
+        uniform float uTiempo; uniform vec2 uCod; uniform vec3 uCam;
+        mat3 giroY(float a){ float c = cos(a), s = sin(a); return mat3(c, 0., -s, 0., 1., 0., s, 0., c); }
+        mat3 giroX(float a){ float c = cos(a), s = sin(a); return mat3(1., 0., 0., 0., c, s, 0., -s, c); }`)
+      .replace("#include <beginnormal_vertex>", `#include <beginnormal_vertex>
+        float aeMira = color.r >= 0.5 ? 1.0 : -1.0;
+        float aeEjeY = color.g >= 0.5 ? 1.0 : 0.0;
+        vec3 aeCtr = vec3((color.r - (color.r >= 0.5 ? 0.5 : 0.0)) * 2.0, (color.g - aeEjeY * 0.5) * 2.0, color.b) * uCod.y + uCod.x;
+        vec3 aeVista = transpose(mat3(modelMatrix)) * (uCam - modelMatrix[3].xyz);
+        vec3 aeD = aeVista - aeCtr;
+        float aeDist = length(aeD);
+        vec2 aeH = normalize(aeD.xy + vec2(1e-4));
+        float aeFrente = (aeEjeY > 0.5 ? aeH.y : aeH.x) * aeMira;
+        float aeCerca = smoothstep(0.45, 0.75, aeFrente) * (1.0 - smoothstep(12.0, 22.0, aeDist));
+        float aeMuyCerca = 1.0 - smoothstep(2.0, 4.0, aeDist);
+        float aeLejos = smoothstep(80.0, 120.0, aeDist);
+        float aeAzar = fract(sin(dot(aeCtr, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+        // Cada letra da una vuelta completa cada ~4 s (una ola que sube por la escalera) y vuelve a su lugar.
+        // De frente y cerca, muy cerca o muy lejos, no se mueven.
+        float aeQuieta = max(max(aeCerca, aeMuyCerca), aeLejos);
+        float aeFase = fract(uTiempo * 0.25 - aeCtr.z * 0.11 + aeAzar * 0.35);
+        float aeAng = aeQuieta > 0.5 ? 0.0 : 6.28318 * smoothstep(0.0, 0.22, aeFase);
+        mat3 aeR = aeEjeY > 0.5 ? giroX(aeAng) : giroY(aeAng);
+        objectNormal = aeR * objectNormal;`)
+      .replace("#include <begin_vertex>", `#include <begin_vertex>
+        transformed = aeCtr + aeR * (transformed - aeCtr);`);
+    sh.fragmentShader = sh.fragmentShader.replace("#include <color_fragment>", "");
+  };
+  m.customProgramCacheKey = () => "escalera-v3";
+  return m;
+}
+const matsEscalera = { Color_5cc6d2: materialEscalera(0x5cc6d2), Color_1e6973: materialEscalera(0x1e6973) };
+for (const V of "ZXY") pieza["ESCALERAS_" + V].traverse((o) => { if (o.isMesh) o.material = matsEscalera[o.userData.mat] || matsEscalera.Color_1e6973; });
+
+// ---------- Anamorfosis: cada letra respira sobre su rayo desde el mirador y tiembla apenas ----------
+// El centro de cada letra viene en COLOR_0. Desde el mirador la frase se sigue leyendo aunque se mueva.
+const matAnamorfosis = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x9b3d2e), vertexColors: true, side: THREE.DoubleSide });
+matAnamorfosis.onBeforeCompile = (sh) => {
   sh.uniforms.uTiempo = uTiempo;
-  sh.uniforms.uCam = uCamara;
+  sh.uniforms.uOjo = { value: new THREE.Vector3(...datos.mirador.ojo) };
   sh.uniforms.uCod = { value: new THREE.Vector2(datos.codigo.min, datos.codigo.rango) };
   sh.vertexShader = sh.vertexShader
     .replace("#include <common>", `#include <common>
-      uniform float uTiempo; uniform vec2 uCod; uniform vec3 uCam;
-      mat3 giroY(float a){ float c = cos(a), s = sin(a); return mat3(c, 0., -s, 0., 1., 0., s, 0., c); }`)
-    .replace("#include <beginnormal_vertex>", `#include <beginnormal_vertex>
-      float aeMira = color.r >= 0.5 ? 1.0 : -1.0;
-      vec3 aeCtr = vec3((color.r - (color.r >= 0.5 ? 0.5 : 0.0)) * 2.0, color.g, color.b) * uCod.y + uCod.x;
-      vec3 aeVista = transpose(mat3(modelMatrix)) * (uCam - modelMatrix[3].xyz);
-      vec3 aeD = aeVista - aeCtr;
-      float aeDist = length(aeD);
-      float aeFrente = normalize(aeD.xy + vec2(1e-4)).x * aeMira;
-      float aeCerca = smoothstep(0.45, 0.75, aeFrente) * (1.0 - smoothstep(12.0, 22.0, aeDist));
-      float aeMuyCerca = 1.0 - smoothstep(2.0, 4.0, aeDist);
-      float aeLejos = smoothstep(80.0, 120.0, aeDist);
-      float aeAzar = fract(sin(dot(aeCtr.yz, vec2(12.9898, 78.233))) * 43758.5453);
-      // Cada letra da una vuelta completa cada ~4 s (una ola que sube por la escalera) y vuelve a su lugar:
-      // los peldaños siguen armados por las letras. De frente, muy cerca o muy lejos, no se mueven.
-      float aeQuieta = max(max(aeCerca, aeMuyCerca), aeLejos);
-      float aeFase = fract(uTiempo * 0.25 - aeCtr.z * 0.11 + aeAzar * 0.35);
-      float aeAng = aeQuieta > 0.5 ? 0.0 : 6.28318 * smoothstep(0.0, 0.22, aeFase);
-      mat3 aeR = giroY(aeAng);
-      objectNormal = aeR * objectNormal;`)
+      uniform float uTiempo; uniform vec3 uOjo; uniform vec2 uCod;`)
     .replace("#include <begin_vertex>", `#include <begin_vertex>
-      transformed = aeCtr + aeR * (transformed - aeCtr);`);
+      vec3 anC = vec3(color.r * 2.0, color.g * 2.0, color.b) * uCod.y + uCod.x;
+      float anF = fract(sin(dot(anC, vec3(12.9898, 78.233, 37.719))) * 43758.5453) * 6.2832;
+      float anS = 1.0 + 0.08 * sin(uTiempo * 0.45 + anF);
+      vec3 anE = normalize(uOjo - anC);
+      float anA = 0.045 * sin(uTiempo * 0.9 + anF * 3.0);
+      vec3 anP = transformed - anC;
+      anP = anP * cos(anA) + cross(anE, anP) * sin(anA) + anE * dot(anE, anP) * (1.0 - cos(anA));
+      transformed = uOjo + anS * (anC - uOjo) + anP * anS + vec3(0.0, 0.0, 0.025 * sin(uTiempo * 1.3 + anF * 2.0));`);
   sh.fragmentShader = sh.fragmentShader.replace("#include <color_fragment>", "");
 };
-pieza.ESCALERAS.material = matEscaleras;
+for (const V of "ZXY") pieza["ANAMORFOSIS_" + V].traverse((o) => { if (o.isMesh) o.material = matAnamorfosis; });
 
 function fijar(obj, m) { obj.matrixAutoUpdate = false; obj.matrix.copy(m); return obj; }
 
-// Una estructura = módulo z + sus copias giradas (gravedades x e y) + el núcleo.
-const estructura = new THREE.Group();
-for (const f of [null, ...datos.modulo]) {
-  const m = f ? matriz(f) : new THREE.Matrix4();
-  estructura.add(fijar(pieza.MODULO_Z.clone(), m));
-  estructura.add(fijar(pieza.ESCALERAS.clone(), m));
+// Una estructura = módulo z + sus copias giradas (gravedades x e y) + el núcleo, los textos y las placas.
+// Cada copia lleva userData.pieza y userData.g (0 z, 1 x, 2 y) para encontrarla después.
+const GIROS = [new THREE.Matrix4(), ...datos.modulo.map(matriz)];      // z, x, y
+const EJE_G = ["z", "x", "y"];
+function copia(nombre, m, g, clave) {
+  const c = fijar(pieza[nombre].clone(), m);
+  c.userData.pieza = nombre; c.userData.g = g;
+  if (clave) vestirCopia(c, clave);
+  return c;
 }
-if (pieza.ESTRUCTURA) estructura.add(fijar(pieza.ESTRUCTURA.clone(), new THREE.Matrix4()));
+const estructura = new THREE.Group();
+const VOZ_G = ["Z", "X", "Y"];                 // la gravedad g habla con la voz VOZ_G[g]
+GIROS.forEach((m, g) => {
+  estructura.add(copia("MODULO_Z", m, g, EJE_G[g]));
+  estructura.add(copia("ESCALERAS_" + VOZ_G[g], m, g));
+});
+estructura.add(copia("ESTRUCTURA", new THREE.Matrix4(), -1, "n"));
+GIROS.forEach((m, g) => {
+  estructura.add(copia("TEXTOS", m, g));
+  estructura.add(copia("TEXTOS_" + VOZ_G[g], m, g));
+  estructura.add(copia("ANAMORFOSIS_" + VOZ_G[g], m, g));
+});
+estructura.add(copia("PLACAS", new THREE.Matrix4(), -1));
 raiz.add(estructura);
-// Las otras 7 habitaciones: la misma estructura reflejada en los planos.
+// Las otras 7 habitaciones: la misma estructura reflejada en los planos. En las que son un reflejo (un número
+// impar de signos −), los textos se cambian por su versión dada vuelta en su lugar: así se leen derecho.
+function darVuelta(sala) {
+  for (const hijo of sala.children) {
+    const lista = espejoMallas[hijo.userData.pieza];
+    if (!lista) continue;
+    let i = 0;
+    hijo.traverse((o) => { if (o.isMesh && lista[i]) o.geometry = lista[i++].geometry; });
+  }
+}
 const salasObj = [estructura];          // las 8 estructuras-habitación, en el mismo orden que datos.habitaciones
-for (const f of Object.values(datos.habitaciones)) { const c = fijar(estructura.clone(), matriz(f)); salasObj.push(c); raiz.add(c); }
-raiz.add(fijar(pieza.UNICO, new THREE.Matrix4()));
+const salasM = [new THREE.Matrix4(), ...Object.values(datos.habitaciones).map(matriz)];
+for (let r = 1; r < salasM.length; r++) {
+  const c = fijar(estructura.clone(), salasM[r]);
+  if (salasM[r].determinant() < 0) darVuelta(c);
+  salasObj.push(c);
+  raiz.add(c);
+}
+raiz.add(fijar(vestirCopia(pieza.UNICO, "u"), new THREE.Matrix4()));
+if (pieza.COLUMNATAS) raiz.add(fijar(pieza.COLUMNATAS, new THREE.Matrix4()));   // el glosario de cada cuento, afuera
+
+// ---------- Núcleo: cartel de aeropuerto (letras que giran hasta que el lector se acerca) ----------
+// Uno por gravedad y habitación (24), en la pared del frente de quien entra por su puerta, a la altura de la vista.
+// Lejos, las letras dan vueltas; a menos de 9 m se asientan una por una. Ya asentado, cada 1,5 a 4 s una letra
+// al azar da unas vueltas y vuelve. Solo los 3 carteles más cercanos se dibujan en vivo.
+const ALFABETO = " ABCDEFGHIJKLMNÑOPQRSTUVWXYZÁÉÍÓÚÜ0123456789.,:;¿?¡!«»-";
+const COLS = 34, FILAS = 10, CW = 40, CH = 70;
+// el folio de cada capítulo, partido en renglones del cartel (sin cortar palabras)
+function filasDelFolio(texto) {
+  const filas = [];
+  let f = "";
+  for (const w of texto.toUpperCase().split(/\s+/)) {
+    if (f && f.length + 1 + w.length > COLS) { filas.push(f); f = w; } else f = f ? f + " " + w : w;
+  }
+  if (f) filas.push(f);
+  while (filas.length < FILAS) filas.push("");
+  return filas.slice(0, FILAS).map((l) => l.padEnd(COLS).slice(0, COLS).split(""));
+}
+const SALA_CLAVE = ["+++", ...Object.keys(datos.habitaciones).map((k) => k.replace("Habitacion_", ""))];
+const carteles = [], lienzosVivos = [];
+function lienzoCartel() {
+  const l = document.createElement("canvas");
+  l.width = COLS * CW; l.height = FILAS * CH;
+  const t = new THREE.CanvasTexture(l);
+  t.encoding = THREE.sRGBEncoding;
+  return { l, g: l.getContext("2d"), t };
+}
+for (let k = 0; k < 3; k++) lienzosVivos.push(lienzoCartel());
+const cartelQuieto = lienzoCartel();      // los lejanos: un cartel revuelto, dibujado una vez
+{
+  const cd = datos.cartel;
+  const L = new THREE.Matrix4().makeBasis(new THREE.Vector3(...cd.der), new THREE.Vector3(0, 0, 1), new THREE.Vector3(...cd.n))
+    .setPosition(...cd.centro);
+  const geo = new THREE.PlaneGeometry(7.0, 7.0 * FILAS * CH / (COLS * CW));     // a la altura de los ojos, frente a la puerta
+  salasM.forEach((S, r) => GIROS.forEach((G, g) => {
+    const objetivo = filasDelFolio((datos.folios || [])[datos.ciclo.indexOf(SALA_CLAVE[r])] || "");
+    const M = S.clone().multiply(G).multiply(L);
+    if (S.determinant() < 0) M.multiply(new THREE.Matrix4().makeScale(-1, 1, 1));   // en los reflejos, se lee derecho
+    const m = fijar(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: cartelQuieto.t })), M);
+    raiz.add(m);
+    const centro = blenderAThree(new THREE.Vector3(...cd.centro).applyMatrix4(S.clone().multiply(G)).toArray());
+    carteles.push({ m, centro, objetivo, actual: objetivo.map((f) => f.map(() => ALFABETO[Math.floor(Math.random() * ALFABETO.length)])),
+                    t: 0, vivo: null });
+  }));
+}
+function dibujarCartel(c, lz) {
+  const g = lz.g, w = CW, h = CH;
+  g.fillStyle = "#16191c"; g.fillRect(0, 0, lz.l.width, lz.l.height);
+  g.font = "500 40px 'DM Mono', monospace"; g.textAlign = "center"; g.textBaseline = "middle";
+  for (let f = 0; f < FILAS; f++) for (let k = 0; k < COLS; k++) {
+    g.fillStyle = "#24282c"; g.fillRect(k * w + 2, f * h + 4, w - 4, h - 8);
+    g.fillStyle = "#16191c"; g.fillRect(k * w + 2, f * h + h / 2 - 1, w - 4, 2);     // la ranura de la paleta
+    const ch = c.actual[f][k];
+    g.fillStyle = ch === c.objetivo[f][k] ? "#f3efe4" : "#a8a398";
+    g.fillText(ch, k * w + w / 2, f * h + h / 2 + 2);
+  }
+  lz.t.needsUpdate = true;
+}
+dibujarCartel(carteles[0], cartelQuieto);
+function animarCarteles(dt) {
+  for (const c of carteles) c.d = camera.position.distanceTo(c.centro);
+  const cerca = carteles.filter((c) => c.d < 45).sort((a, b) => a.d - b.d).slice(0, 3);
+  for (const c of carteles) if (c.vivo && !cerca.includes(c)) { lienzosVivos.push(c.vivo); c.vivo = null; c.m.material.map = cartelQuieto.t; }
+  for (const c of cerca) if (!c.vivo && lienzosVivos.length) { c.vivo = lienzosVivos.pop(); c.m.material.map = c.vivo.t; }
+  for (const c of cerca) {
+    if (!c.vivo) continue;
+    c.t += dt;
+    if (c.t < 0.05) continue;
+    c.t = 0;
+    const junto = c.d < 15;                 // el cartel está alto (arriba del anillo): se asienta desde más lejos
+    for (let f = 0; f < FILAS; f++) for (let k = 0; k < COLS; k++) {
+      const obj = c.objetivo[f][k], cur = c.actual[f][k];
+      if (junto) {
+        const giro = c.giros && c.giros.find((g) => g.f === f && g.k === k);
+        if (giro) {                                   // una letra suelta que gira y vuelve a la suya
+          giro.n--;
+          c.actual[f][k] = giro.n > 0 && ALFABETO.includes(obj) ? ALFABETO[(ALFABETO.indexOf(obj) + giro.n) % ALFABETO.length] : obj;
+          continue;
+        }
+        if (cur !== obj && Math.random() < 0.95 - k * 0.012)
+          c.actual[f][k] = ALFABETO.includes(obj) ? ALFABETO[(ALFABETO.indexOf(cur) + 1) % ALFABETO.length] : obj;
+      } else if (Math.random() < 0.35) {
+        c.actual[f][k] = ALFABETO[Math.floor(Math.random() * ALFABETO.length)];
+      }
+    }
+    if (junto && c.actual.every((fila, f) => fila.every((ch, k) => ch === c.objetivo[f][k]))) {
+      c.espera = (c.espera ?? 2) - 0.05;
+      if (c.espera <= 0) {
+        c.espera = 1.5 + Math.random() * 2.5;
+        const llenas = [];
+        c.objetivo.forEach((fila, f) => fila.forEach((ch, k) => { if (ch !== " ") llenas.push([f, k]); }));
+        const [f, k] = llenas[Math.floor(Math.random() * llenas.length)];
+        c.giros = (c.giros || []).filter((g) => g.n > 0);
+        c.giros.push({ f, k, n: 3 + Math.floor(Math.random() * 4) });
+      }
+    }
+    if (c.giros) c.giros = c.giros.filter((g) => g.n > 0);
+    dibujarCartel(c, c.vivo);
+  }
+}
+
+// ---------- Sombra del sol: fija, calculada para la habitación donde está el lector ----------
+// La luz no se mueve: el mapa de sombras se dibuja una vez y queda congelado. Se rehace solo al cambiar de habitación.
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;
+sol.castShadow = true;
+sol.shadow.mapSize.set(2048, 2048);
+Object.assign(sol.shadow.camera, { left: -72, right: 72, top: 72, bottom: -72, near: 20, far: 340 });
+sol.shadow.camera.updateProjectionMatrix();
+sol.shadow.bias = -0.0004;
+sol.shadow.normalBias = 0.04;
+scene.add(sol.target);
+const DIR_SOL = sol.position.clone().normalize();
+for (const n of [...salasObj, pieza.UNICO]) n.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+let salaSombra = "";
+function actualizarSombra() {
+  const b = [camera.position.x, -camera.position.z, camera.position.y];
+  const clave = b.map((c) => (c >= 0 ? "+" : "-")).join("");
+  if (clave === salaSombra) return;
+  salaSombra = clave;
+  const sg = clave.split("").map((c) => (c === "+" ? 1 : -1));
+  const centro = blenderAThree([36 * sg[0], 36 * sg[1], 30 * sg[2]]);
+  sol.target.position.copy(centro);
+  sol.target.updateMatrixWorld();
+  sol.position.copy(centro).addScaledVector(DIR_SOL, 160);
+  sol.updateMatrixWorld();
+  renderer.shadowMap.needsUpdate = true;
+}
 
 // ---------- Entorno: letras y palabras sueltas, translúcidas y en movimiento ----------
 // Anamorfosis: cada letra respira a lo largo de su rayo desde el punto de vista (se escala alrededor de ese
@@ -729,7 +1002,7 @@ function ponerModo(m) {
   vertical.hidden = m !== "orbitar";
   ayuda.textContent = m === "orbitar"
     ? "Cámara libre: arrastrá para girar, pellizcá para acercarte. La palanca y ▲▼ vuelan y atraviesan todo. En compu: WASD, Q/E y Shift."
-    : "Palanca izquierda: caminar · derecha: mirar. X Y Z cambian la gravedad: caés sobre ese piso. Las H son portales. En compu: WASD para caminar, clic para mirar con el mouse (Esc suelta), Shift corre, Espacio salta.";
+    : "Palanca izquierda: caminar · derecha: mirar. X Y Z cambian la gravedad: caés sobre ese piso. En el núcleo, el cuadrado rojo de la esquina lleva al capítulo siguiente; los rectángulos rojos de las paredes, a la voz de ese personaje. En compu: WASD para caminar, clic para mirar con el mouse (Esc suelta), Shift corre, Espacio salta.";
   if (m === "orbitar") {
     if (document.pointerLockElement) document.exitPointerLock();
     camera.up.set(0, 1, 0);
@@ -887,7 +1160,7 @@ function destellar() {
 }
 // Botón Recorrer: si hay piso debajo, el lector se apoya ahí; si está lejos (afuera del objeto), viaja a la
 // entrada de la habitación +++, frente a la H, sobre el piso z.
-const ENTRADA = { pies: [60, 10.2], mira: [-1, 0, 0] };
+const ENTRADA = { pies: [17.955, 59.355], mira: [0, -1, 0] };   // frente a la H de E4 (entrelazado)
 function recorrer(forzarEntrada) {
   if (vuelo) return;
   if (!forzarEntrada && entrarCaminar()) { ponerModo("caminar"); return; }
@@ -908,7 +1181,7 @@ document.getElementById("rapido").onclick = (e) => { rapido = !rapido; e.current
 
 function fovVertical(lente) {
   const horizontal = 2 * Math.atan(18 / lente);
-  return THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(horizontal / 2) / Math.max(camera.aspect, 1)));
+  return THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(horizontal / 2) / Math.max(isFinite(camera.aspect) && camera.aspect > 0 ? camera.aspect : 1.5, 1)));
 }
 
 // ---------- Instancias: 10 puntos de vista. Al elegir una, la cámara viaja hasta ahí ----------
@@ -1092,6 +1365,14 @@ marca.add(rumbo);
 mapa.add(marca);
 
 const ficha = document.getElementById("ficha");
+const capCaja = document.getElementById("capitulo");
+let capActual = -2;
+function pintarCapitulo(n) {
+  if (n === capActual) return;
+  capActual = n;
+  capCaja.querySelector("b").textContent = n >= 0 ? "Capítulo " + (n + 1) : "Afuera";
+  capCaja.querySelector("span").textContent = n >= 0 ? datos.titulos[n] : "";
+}
 const CUENTO = { x: "El jardín de senderos que se bifurcan", y: "El Aleph", z: "La biblioteca de Babel" };
 let fichaClave = "", fichaReloj = 0;
 const vM = new THREE.Vector3(), vMu = new THREE.Vector3(), vMf = new THREE.Vector3();
@@ -1126,7 +1407,11 @@ function actualizarMapa(dt) {
   const sp = A && A.SPACES.find((s) => s.roomSign === sala && s.p === i);
   espacioActual = sp || null;
   plagalActual = sala.split(" ")[i] === "-";            // del lado negativo del plano del piso: plagal
-  const filas = [["Habitación", "( " + sala.split(" ").join(" , ") + " )"],
+  const nCap = datos.ciclo.indexOf(sala.split(" ").join(""));
+  pintarCapitulo(nCap);
+  const filas = [["Capítulo", nCap >= 0 ? (nCap + 1) + " · " + datos.titulos[nCap] : "—"],
+                 ["Voz", datos.voces[ejeActivo] + " (" + ejeActivo + ")"],
+                 ["Habitación", "( " + sala.split(" ").join(" , ") + " )"],
                  ["Gravedad", ejeActivo + " · piso " + ejeActivo + " = 0"],
                  ["Cuento", CUENTO[ejeActivo]]];
   if (sp) {
@@ -1293,49 +1578,58 @@ pintarBotonSonido(false);
 // ---------- Portales: la contraforma de cada H ----------
 // Al atravesar la H caminando se pasa al otro lado del mismo piso: la habitación espejada a través de ese plano,
 // con la gravedad invertida. Es el mismo piso visto desde abajo (y, en el sistema sonoro, la misma tónica en otro acorde).
-const portal = datos.portal;
-const pasos = [];
-{
-  const salas = [new THREE.Matrix4(), ...Object.values(datos.habitaciones).map(matriz)];
-  const mods = [new THREE.Matrix4(), ...datos.modulo.map(matriz)];
-  for (const S of salas) mods.forEach((M, g) => pasos.push({ inv: S.clone().multiply(M).invert(), eje: "zxy"[g], prev: null }));
-}
+// Bajo el Aleph (en el núcleo de cada habitación) se pasa al capítulo siguiente, con la misma voz. Caminando hacia el
+// nombre de un personaje (en las paredes del núcleo) se pasa a esa voz, en el mismo capítulo. En los dos casos el
+// lector aparece al pie de la H de su voz, frente a la escalera E4. La H ya no es un portal.
 const destello = document.getElementById("destello");
 let enfriar = 0;
-const vB = new THREE.Vector3();
+const GIRO_VOZ = { z: GIROS[0], x: GIROS[1], y: GIROS[2] };
+const T_PLANO = 1.755;
+const signosDe = (clave) => clave.split("").map((c) => (c === "+" ? 1 : -1));
+function vozDe(U) { const b = [Math.abs(U.x), Math.abs(U.z), Math.abs(U.y)]; return "xyz"[b.indexOf(Math.max(...b))]; }
 function revisarPortales() {
-  if (!portal || vuelo || modo !== "caminar" || performance.now() < enfriar) return;
-  const camB = aBlender(camera.position);
-  for (const p of pasos) {
-    const L = vB.set(camB[0], camB[1], camB[2]).applyMatrix4(p.inv);
-    const dentro = L.y > portal.y[0] && L.y < portal.y[1] && L.z > portal.z[0] - 1 && L.z < portal.z[1];
-    const lado = Math.sign(L.x - portal.x);
-    if (dentro && p.prev && p.prev.dentro && p.prev.lado !== lado) { cruzar(p); return; }
-    p.prev = { dentro, lado };
+  if (vuelo || velo || modo !== "caminar" || performance.now() < enfriar || !cuerpo.suelo) return;
+  const pb = [cuerpo.pies.x, -cuerpo.pies.z, cuerpo.pies.y];
+  const sala = pb.map((c) => (c >= 0 ? "+" : "-")).join(""), sg = signosDe(sala);
+  const L = pb.map((c, k) => c * sg[k]);                       // en coordenadas de la habitación +++
+  const voz = vozDe(cuerpo.U), i = "xyz".indexOf(voz);
+  // el cuadrado de la esquina del núcleo (en el piso de cada gravedad): adentro, capítulo siguiente
+  const q = datos.salida, adentro = [0, 1, 2].every((k) => k === i || (L[k] > q.esquina && L[k] < q.esquina + q.lado));
+  if (adentro && L[i] < T_PLANO + 1.2) {
+    llevarA(datos.ciclo[(datos.ciclo.indexOf(sala) + 1) % datos.ciclo.length], voz, "aleph");
+    return;
+  }
+  for (const p of datos.placas) {
+    if (p.de !== voz) continue;
+    const d = L.map((c, k) => c - p.c[k]);
+    const pr = (v) => d[0] * v[0] + d[1] * v[1] + d[2] * v[2];
+    if (Math.abs(pr(p.n)) < 0.85 && Math.abs(pr(p.der)) < p.ancho / 2 && pr(p.arriba) > -1.9 && pr(p.arriba) < 1.0) {
+      llevarA(sala, p.a, "voz");
+      return;
+    }
   }
 }
-function cruzar(p) {
-  const i = "xyz".indexOf(p.eje);
-  const espejo = (v) => { const b = aBlender(v); b[i] = -b[i]; return deBlender(b); };
-  const adelante = espejo(new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion));
-  const arriba = espejo(new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion));
-  camera.position.copy(espejo(camera.position));
+function llevarA(sala, voz, motivo) {
+  const sg = signosDe(sala);
+  const W = new THREE.Matrix4().makeScale(sg[0], sg[1], sg[2]).multiply(GIRO_VOZ[voz]);
+  const ini = datos.inicio;
+  const ojo = blenderAThree(new THREE.Vector3(...ini.ojo).applyMatrix4(W).toArray());
+  const mira = blenderAThree(new THREE.Vector3(...ini.mira).transformDirection(W).toArray());
+  const arriba = blenderAThree(new THREE.Vector3(...ini.arriba).transformDirection(W).toArray()).normalize();
+  camera.position.copy(ojo);
   camera.up.copy(arriba);
-  camera.lookAt(camera.position.clone().add(adelante));
-  // El cuerpo pasa al otro lado del mismo piso: pies, arriba y rumbo, reflejados.
-  cuerpo.pies.copy(espejo(cuerpo.pies));
-  cuerpo.U.copy(espejo(cuerpo.U));
-  cuerpo.H.copy(espejo(cuerpo.H));
-  cuerpo.vu = 0; cuerpo.suelo = false; cuerpo.lag = 0; cuerpo.ultimo = null;
-  for (const q of pasos) q.prev = null;
-  enfriar = performance.now() + 1200;
+  camera.lookAt(ojo.clone().add(mira));
+  entrarCaminar(arriba);
+  cuerpo.ultimo = null;
+  enfriar = performance.now() + 1500;
   destellar();
-  const s = aBlender(camera.position).map((c) => (c >= 0 ? "+" : "−")).join("");
+  const n = datos.ciclo.indexOf(sala);
   actual = -1;
   botonesInst.forEach((b) => b.setAttribute("aria-pressed", false));
-  notaTitulo.textContent = "Portal · gravedad " + p.eje + " invertida";
-  notaTexto.textContent = "Atravesaste la H: estás del otro lado del mismo piso, en la habitación " + s +
-    ", que es su espejo. El piso es el mismo; ahora lo pisás desde abajo.";
+  notaTitulo.textContent = motivo === "aleph" ? "Capítulo " + (n + 1) + " · " + datos.titulos[n] : "Voz · " + datos.voces[voz];
+  notaTexto.textContent = motivo === "aleph"
+    ? "Pasaste por el Aleph: es el capítulo siguiente, con la misma voz (" + datos.voces[voz] + "). Estás al pie de su H."
+    : "Ahora leés con la voz de " + datos.voces[voz] + " (" + datos.cuentos[voz] + "), en el mismo capítulo. Estás al pie de su H.";
   legibCaja.hidden = true;
   nota.hidden = false;
 }
@@ -1347,31 +1641,34 @@ function cruzar(p) {
 // el lector sigue navegando. Las poses están en coordenadas del módulo z y se llevan a las 24 estructuras.
 // tipo: "escalera" muestra en el velo los renglones de las escaleras; "texto", los textos del módulo.
 // segundos: cuánto dura el velo, según el largo del texto.
-const LECTURAS = [
-  { tipo: "escalera", segundos: 5, esfera: [42.3, 10.2, 22.3], titulo: "Escalera 1", nota: "Los bolsillos de Yu Tsun, un renglón por escalón.", pos: [57.5, 10.16, 21.2], mira: [41, 10.16, 21.6] },
-  { tipo: "texto", segundos: 8, esfera: [40.3, 16.8, 26.8], titulo: "El muro de Babel", nota: "El muro es texto. De frente, a esta distancia, se lee.", pos: [58, 10.2, 34.5], mira: [34.5, 10.2, 34.5] },
-  { tipo: "escalera", segundos: 5, esfera: [32.4, 10.2, 46.4], titulo: "Escalera 2", nota: "El hexágono: anaqueles, libros, páginas, renglones.", pos: [37, 10.16, 46.3], mira: [26, 10.16, 46.6] },
-  { tipo: "escalera", segundos: 4, esfera: [22.3, 10.2, 49.3], titulo: "Escalera 3", nota: "Lo que se vio en el Aleph.", pos: [31, 16.15, 49.6], mira: [20, 16.15, 51.6] },
-  { tipo: "texto", segundos: 6, esfera: [32.8, 9.0, 5.3], titulo: "El índice", nota: "En el piso, al pasar la H.", pos: [50.8, 7.75, 8.7], mira: [45.7, 7.75, 1.8] },
-  { tipo: "texto", segundos: 5, esfera: [25.2, 9.8, 11.8], titulo: "La cita del descanso", nota: "Una cita en bloque, en el piso del descanso.", pos: [42.6, 9.5, 31.2], mira: [36.1, 9.5, 25.0] },
-  { tipo: "texto", segundos: 7, esfera: [57.3, 54.8, 4.8], titulo: "El glosario", nota: "Entradas de diccionario sobre la pared.", pos: [46.6, 12, 13.2], mira: [46.6, 1.8, 13.2] },
-  { tipo: "texto", segundos: 3.5, esfera: [49.8, 62.8, 14.8], titulo: "La cita del friso", nota: "«La Biblioteca es ilimitada y periódica.»", pos: [46, 56.5, 18.4], mira: [46, 62.4, 18.4] },
-];
+const LECTURAS = datos.lecturas || [];
 const disparadores = [];
 {
-  const salas = [new THREE.Matrix4(), ...Object.values(datos.habitaciones).map(matriz)];
-  const mods = [new THREE.Matrix4(), ...datos.modulo.map(matriz)];
-  const aMundo = (W, p) => deBlender(new THREE.Vector3(...p).applyMatrix4(W).toArray());
-  salas.forEach((S, r) => mods.forEach((M, g) => {
+  const aMundo = (W, p) => blenderAThree(new THREE.Vector3(...p).applyMatrix4(W).toArray());
+  salasM.forEach((S, r) => GIROS.forEach((M, g) => {
     const W = S.clone().multiply(M);
-    const mz = salasObj[r].children[2 * g], esc = salasObj[r].children[2 * g + 1];   // el módulo y sus escaleras
-    for (const L of LECTURAS) {
+    const nodos = {};
+    for (const h of salasObj[r].children) if (h.userData.g === g) nodos[h.userData.pieza] = h;
+    for (const L0 of LECTURAS) {
+      const L = L0.escalera && L0.escalera.voces ? { ...L0, escalera: { ...L0.escalera, palabras: L0.escalera.voces["zxy"[g]] } } : L0;
+      const nombre = L.pieza.replace(/_V$/, "_" + VOZ_G[g]);
       const ojo = aMundo(W, L.pos), blanco = aMundo(W, L.mira);
       const arriba = aMundo(W, [L.pos[0], L.pos[1], L.pos[2] + 1]).sub(ojo).normalize();
       const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(ojo, blanco, arriba));
-      disparadores.push({ L, mz, esc, centro: aMundo(W, L.esfera), pose: { p: ojo, q, f: fovVertical(24) } });
+      disparadores.push({ L, W, nodo: L.pieza === "CARTEL" ? carteles[r * 3 + g].m : nodos[nombre], centro: aMundo(W, L.esfera), pose: L.escalera ? poseEscalera(L.escalera, W, 0) : { p: ojo, q, f: fovVertical(L.tipo === "texto" ? 16 : L.tipo === "cartel" ? 20 : 24) } });
     }
   }));
+}
+// Las esferas: de vidrio, casi transparentes, con un resplandor mínimo que titila (una sola malla instanciada).
+{
+  const mat = new THREE.MeshPhongMaterial({ color: 0xf4f1ea, specular: 0xffffff, shininess: 140, transparent: true,
+                                            opacity: 0.22, depthWrite: false, emissive: new THREE.Color(0, 0, 0) });
+  lamparas.push(mat);
+  const im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.28, 20, 14), mat, disparadores.length);
+  const m4 = new THREE.Matrix4();
+  disparadores.forEach((d, i) => im.setMatrixAt(i, m4.makeTranslation(d.centro.x, d.centro.y, d.centro.z)));
+  im.renderOrder = 14;
+  scene.add(im);
 }
 function irALectura(d) {
   actual = -1;
@@ -1386,7 +1683,7 @@ function irALectura(d) {
   const dist = camera.position.distanceTo(d.pose.p);
   vuelo = { t0: performance.now(), dur: Math.min(5000, 1800 + dist * 40), p0: camera.position.clone(),
             c: camera.position.clone().add(d.pose.p).multiplyScalar(0.5), q0: camera.quaternion.clone(), f0: camera.fov,
-            d: { p: d.pose.p, q: d.pose.q, f: fovVertical(24) }, alTerminar: () => iniciarVelo(d, regreso) };
+            d: { p: d.pose.p, q: d.pose.q, f: d.pose.f }, alTerminar: () => iniciarVelo(d, regreso) };
   orbita.enabled = false;
   arrastre = null;
 }
@@ -1433,6 +1730,7 @@ renderer.domElement.addEventListener("pointerup", (e) => {
   if (!toque) return;
   const corto = Math.hypot(e.clientX - toque.x, e.clientY - toque.y) < 12 && performance.now() - toque.t < 700;
   toque = null;
+  if (velo && corto) { terminarVelo(); return; }
   if (!corto || vuelo || velo) return;
   const enMira = document.pointerLockElement === renderer.domElement;
   const d = enMira ? esferaBajo(innerWidth / 2, innerHeight / 2) : esferaBajo(e.clientX, e.clientY);
@@ -1448,21 +1746,146 @@ renderer.domElement.addEventListener("pointermove", (e) => {
 const capaVelo = document.getElementById("velo");
 let velo = null;
 const PAPEL = new THREE.Color(0xe9e3d6), NEGRO = new THREE.Color(0x0d0d0d);
+// Material del velo: color plano, recortado a la caja de la pieza leída (lo demás de la misma pieza no se ve).
+// En las escaleras se lee palabra por palabra: la palabra que se lee brilla; lo ya leído queda a media luz; lo que
+// sigue, apenas visible. r = posición a lo largo del renglón, en el sentido de lectura (en los reflejos, al revés).
+// Dos palabras a la vez: la que se enciende (pal, brillo) y la anterior, que se apaga más despacio (pal2, brillo2).
+const uLect = { fila: { value: 0 }, pal: { value: new THREE.Vector2(-99, -99) }, brillo: { value: 0 }, signo: { value: 1 },
+                fila2: { value: -9 }, pal2: { value: new THREE.Vector2(-99, -99) }, brillo2: { value: 0 } };
+function materialVelo(color, L, fondo) {
+  const m = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
+  const k = L.caja, e = L.escalera;
+  if (!k) return m;
+  m.onBeforeCompile = (sh) => {
+    const v3 = (a) => ({ value: new THREE.Vector3(...a) });
+    Object.assign(sh.uniforms, {
+      uC: v3(k.c), uU: v3(k.u), uV: v3(k.v), uW: v3(k.w), uH: v3(k.h), uFondo: { value: fondo.clone() },
+      uLeer: { value: e ? 1 : 0 }, uZ0: { value: e ? e.c0[2] - e.alza / 2 : 0 }, uAlza: { value: e ? e.alza : 1 },
+      uC0: v3(e ? e.c0 : [0, 0, 0]), uDer: v3(e ? e.der : [1, 0, 0]),
+      uSube: v3(e ? [-e.n[0] * e.paso, -e.n[1] * e.paso, e.alza] : [0, 0, 1]),
+      uFila: uLect.fila, uPal: uLect.pal, uBrillo: uLect.brillo, uSigno: uLect.signo,
+      uFila2: uLect.fila2, uPal2: uLect.pal2, uBrillo2: uLect.brillo2,
+    });
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vLoc;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLoc = transformed;");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
+        varying vec3 vLoc; uniform vec3 uC, uU, uV, uW, uH, uFondo, uC0, uDer, uSube;
+        uniform float uLeer, uZ0, uAlza, uFila, uBrillo, uSigno, uFila2, uBrillo2; uniform vec2 uPal, uPal2;`)
+      .replace("void main() {", `void main() {
+        vec3 dd = vLoc - uC;
+        if (abs(dot(dd, uU)) > uH.x || abs(dot(dd, uV)) > uH.y || abs(dot(dd, uW)) > uH.z) discard;`)
+      .replace("#include <output_fragment>", `
+        if (uLeer > 0.5) {
+          float fila = floor((vLoc.z - uZ0) / uAlza);
+          float r = dot(vLoc - (uC0 + uSube * fila), uDer) * uSigno;
+          bool esta = abs(fila - uFila) < 0.5;
+          float leido = fila < uFila - 0.5 ? 1.0 : (esta && r <= uPal.y + 0.04 ? 1.0 : 0.0);   // la palabra que brilla ya cuenta como leída: al apagarse queda en cian
+          float activo = esta && r >= uPal.x - 0.04 && r <= uPal.y + 0.04 ? uBrillo : 0.0;
+          if (abs(fila - uFila2) < 0.5 && r >= uPal2.x - 0.04 && r <= uPal2.y + 0.04) activo = max(activo, uBrillo2);
+          vec3 base = mix(uFondo, outgoingLight, 0.2 + 0.55 * leido);
+          outgoingLight = mix(base, vec3(1.0, 0.96, 0.82), activo);
+        }
+        #include <output_fragment>`);
+  };
+  m.customProgramCacheKey = () => "velo" + (e ? "e2" : "t");
+  return m;
+}
+// La escalera leída subiendo. La pose de lectura es la misma a la que viaja la cámara al tocar la esfera, así el
+// texto no salta cuando entra el velo. El lector arranca en el piso, antes del primer escalón; se lee palabra por
+// palabra, de izquierda a derecha, y al terminar un renglón la cámara sube un escalón (huella y contrahuella).
+// Al final, el lector queda parado en la bandeja de arriba, mirando hacia adelante, para seguir caminando.
+function poseEscalera(e, W, kc) {
+  // La cámara baja a la altura de la letra (a 3,4 m del renglón) y mira apenas hacia arriba: el renglón que se lee
+  // queda en el tercio de abajo de la pantalla y los de arriba suben por la escalera.
+  const DIST = 3.4, f = fovVertical(18);
+  const n = new THREE.Vector3(...e.n), c0 = new THREE.Vector3(...e.c0);
+  const sube = n.clone().multiplyScalar(-e.paso).add(new THREE.Vector3(0, 0, e.alza));
+  const fila = c0.clone().addScaledVector(sube, kc);
+  const ojo = fila.clone().addScaledVector(n, DIST);
+  const alzar = DIST * Math.tan(THREE.MathUtils.degToRad(f) / 2) / 3;     // un tercio de media pantalla
+  const blanco = fila.clone().add(new THREE.Vector3(0, 0, alzar));
+  const aM = (p) => blenderAThree(p.clone().applyMatrix4(W).toArray());
+  const o = aM(ojo), b = aM(blanco), arriba = aM(ojo.clone().add(new THREE.Vector3(0, 0, 1))).sub(o).normalize();
+  return { p: o, q: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(o, b, arriba)), f };
+}
+function llegadaEscalera(e, W) {
+  const n = new THREE.Vector3(...e.n), c0 = new THREE.Vector3(...e.c0), z = new THREE.Vector3(0, 0, 1);
+  const sube = n.clone().multiplyScalar(-e.paso).add(new THREE.Vector3(0, 0, e.alza));
+  const pies = c0.clone().addScaledVector(sube, e.filas - 1).addScaledVector(n, -(e.paso + 1.2)).addScaledVector(z, e.alza / 2 + 0.02);
+  const aM = (p) => blenderAThree(p.clone().applyMatrix4(W).toArray());
+  const P = aM(pies), U = aM(pies.clone().add(z)).sub(P).normalize(), H = aM(pies.clone().sub(n)).sub(P);
+  H.addScaledVector(U, -H.dot(U)).normalize();
+  const ojo = P.clone().addScaledVector(U, OJOS);
+  const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(ojo, ojo.clone().add(H), U));
+  return { pies: P, U, H, cab: 0, p: ojo, q, f: fovVertical(20) };
+}
+function guionEscalera(e, espejo) {
+  const SUBIR = 0.55, PAUSA = 0.125;                  // entre renglones: la mitad que antes
+  const ev = [];
+  let t = 1.2;
+  e.palabras.forEach((fila, k) => {
+    if (k > 0) t += SUBIR;
+    const pals = fila.map(([a, b]) => [a, b]).sort((x, y) => x[0] - y[0]);   // en orden de lectura
+    for (const [a, b] of pals) {
+      const dur = 0.32 + 0.42 * (b - a);
+      ev.push({ k, a, b, t0: t, t1: t + dur });
+      t += dur;
+    }
+    t += PAUSA;
+  });
+  return { ev, total: t + 0.8 };
+}
+function pasoLecturaEscalera() {
+  const v = velo.esc, tt = (performance.now() - v.t0) / 1000, ev = v.guion.ev;
+  const ENCENDER = 0.28, APAGAR = 0.75;                      // segundos: se enciende rápido y se apaga más despacio
+  let i = -1;
+  while (i + 1 < ev.length && ev[i + 1].t0 <= tt) i++;
+  let kc = 0;
+  const suave = (x) => x * x * (3 - 2 * x);
+  if (i < 0) {
+    uLect.fila.value = 0; uLect.pal.value.set(-99, -99); uLect.brillo.value = 0; uLect.brillo2.value = 0;
+  } else {
+    const a = ev[i], sig = ev[i + 1], prev = ev[i - 1];
+    kc = a.k;
+    uLect.fila.value = a.k;
+    uLect.pal.value.set(a.a, a.b);
+    // la palabra actual: se enciende en ENCENDER s; terminada, se apaga en APAGAR s (queda leída)
+    uLect.brillo.value = tt <= a.t1 ? suave(Math.min(1, (tt - a.t0) / ENCENDER)) : 1 - suave(Math.min(1, (tt - a.t1) / APAGAR));
+    // la anterior, apagándose mientras se enciende esta
+    if (prev && tt - a.t0 < APAGAR) {
+      uLect.fila2.value = prev.k; uLect.pal2.value.set(prev.a, prev.b);
+      uLect.brillo2.value = 1 - suave(Math.min(1, (tt - a.t0) / APAGAR));
+    } else uLect.brillo2.value = 0;
+    if (tt > a.t1 && sig && sig.k > a.k) kc = a.k + THREE.MathUtils.smoothstep(tt - a.t1, 0.05, sig.t0 - a.t1);
+    if (tt > a.t1 && !sig) uLect.pal.value.set(a.a, a.b);
+  }
+  const pose = poseEscalera(v.e, v.W, kc);
+  camera.position.copy(pose.p);
+  camera.quaternion.copy(pose.q);
+}
 function iniciarVelo(d, regreso) {
   const mostrar = new Map();                      // malla → color plano del texto
-  if (d.L.tipo === "escalera") mostrar.set(d.esc, new THREE.Color(0x1e6973));
-  else d.mz.traverse((o) => { if (o.isMesh && (o.userData.mat || "").startsWith("Tinta_")) mostrar.set(o, colorDe(o.userData.mat)); });
+  if (d.nodo) d.nodo.traverse((o) => { if (o.isMesh) mostrar.set(o, colorDe(o.userData.mat)); });
   // Fondo que contraste: si la mayoría del texto es oscuro → papel; si es claro o rojo → negro.
   const colores = [...mostrar.values()];
   const claro = colores.filter((c) => c.r + c.g + c.b > 0.9 || (c.r > 0.25 && c.g < 0.1)).length > colores.length / 2;
-  const fondo = claro ? NEGRO : PAPEL;
+  const fondo = claro || d.L.escalera || d.L.tipo === "cartel" ? NEGRO : PAPEL;
   const ocultos = [], materiales = [];
   scene.traverse((o) => {
     if (!(o.isMesh || o.isLine || o.isSprite || o.isPoints) || !o.visible) return;
-    if (mostrar.has(o)) { materiales.push([o, o.material]); o.material = new THREE.MeshBasicMaterial({ color: mostrar.get(o), side: THREE.DoubleSide }); }
+    if (mostrar.has(o)) { if (d.L.tipo !== "cartel") { materiales.push([o, o.material]); o.material = materialVelo(mostrar.get(o), d.L, fondo); } }
     else { ocultos.push(o); o.visible = false; }
   });
   velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + d.L.segundos * 1000, regreso };
+  if (d.L.escalera) {
+    const espejo = d.W.determinant() < 0;
+    const guion = guionEscalera(d.L.escalera, espejo);
+    velo.esc = { e: d.L.escalera, W: d.W, t0: performance.now(), guion };
+    velo.fin = performance.now() + guion.total * 1000;
+    velo.regreso = llegadaEscalera(d.L.escalera, d.W);       // al terminar: parado en la bandeja de arriba
+    uLect.signo.value = espejo ? -1 : 1;
+    uLect.fila.value = 0; uLect.pal.value.set(-99, -99); uLect.brillo.value = 0;
+  }
   scene.fog = null;
   scene.background = fondo;
   capaVelo.style.background = "#" + fondo.getHexString();
@@ -1600,10 +2023,12 @@ function cuadro() {
   const tt = reloj.elapsedTime, parpadeo = 0.55 + 0.25 * Math.sin(tt * 2.3) + 0.2 * Math.sin(tt * 7.1 + 1.3) * Math.sin(tt * 0.9);
   for (const m of lamparas) m.emissive.copy(LUZ_LAMPARA).multiplyScalar(0.16 * parpadeo);
   animarEntorno(reloj.elapsedTime);
+  animarCarteles(dt);
+  actualizarSombra();
   if (vuelo) {
     pasoVuelo(performance.now());
   } else if (velo) {
-    // durante el velo la cámara queda quieta
+    if (velo.esc) pasoLecturaEscalera();          // en las escaleras, se lee palabra por palabra y se sube
   } else {
     let f = -empuje.y, s = empuje.x, u = altura;
     if (teclas.has("KeyW") || teclas.has("ArrowUp")) f += 1;
