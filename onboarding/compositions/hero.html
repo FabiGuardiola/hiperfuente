@@ -1,0 +1,101 @@
+<template>
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #hero-svg { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+    #hero-titulo { position: absolute; left: 1040px; top: 430px; font-family: "FabiBlock"; font-size: 86px; line-height: 1; color: #9b3d2e; white-space: nowrap; }
+    #hero-bajada { position: absolute; left: 1044px; top: 545px; font-family: "IBM Plex Mono"; font-size: 34px; color: #1f1d1b; white-space: nowrap; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="hero" data-width="1920" data-height="1080">
+    <svg id="hero-svg" viewBox="0 0 1920 1080">
+      <path id="hero-aristas" d="" fill="none" stroke="#a8a398" stroke-width="1.6" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <polygon id="hero-p0" points="" />
+      <polygon id="hero-p1" points="" />
+      <polygon id="hero-p2" points="" />
+      <g id="hero-vertices"></g>
+    </svg>
+    <div id="hero-titulo" class="clip" data-start="0" data-duration="12">HIPERFUENTE</div>
+    <div id="hero-bajada" class="clip" data-start="0" data-duration="12">un cuento que se lee caminando</div>
+  </div>
+  <script>
+    (function () {
+      const A = 0.618, B = 1;                       // medio lado corto y medio lado largo del rectángulo áureo
+      const st = { th: 0.35, m: 0, k: 235, cx: 560, cy: 540 };
+      const C30 = Math.cos(Math.PI / 6);
+      function iso(p) {
+        const c = Math.cos(st.th), s = Math.sin(st.th);
+        const x = p[0] * c - p[1] * s, y = p[0] * s + p[1] * c, z = p[2];
+        return [st.cx + (x - y) * C30 * st.k, st.cy + (x + y) * 0.5 * st.k - z * st.k];
+      }
+      // los tres rectángulos: x = 0 (corto en y, largo en z), y = 0 (corto en z, largo en x), z = 0 (corto en x, largo en y)
+      const RECT = [
+        [[0, -A, -B], [0, A, -B], [0, A, B], [0, -A, B]],
+        [[-B, 0, -A], [B, 0, -A], [B, 0, A], [-B, 0, A]],
+        [[-A, -B, 0], [A, -B, 0], [A, B, 0], [-A, B, 0]],
+      ];
+      // la H: asta izquierda, asta derecha, travesaño (en pantalla); cada una se vuelve un plano
+      const H = [
+        [[380, 820], [490, 820], [490, 260], [380, 260]],
+        [[630, 820], [740, 820], [740, 260], [630, 260]],
+        [[490, 590], [630, 590], [630, 500], [490, 500]],
+      ];
+      const V = [];
+      for (const s1 of [-1, 1]) for (const s2 of [-1, 1]) {
+        V.push([0, s1 * A, s2 * B], [s2 * B, 0, s1 * A], [s1 * A, s2 * B, 0]);
+      }
+      const E = [];
+      for (let i = 0; i < 12; i++) for (let j = i + 1; j < 12; j++) {
+        const d = Math.hypot(V[i][0] - V[j][0], V[i][1] - V[j][1], V[i][2] - V[j][2]);
+        if (Math.abs(d - 2 * A) < 0.01) E.push([i, j]);
+      }
+      const svgNS = "http://www.w3.org/2000/svg";
+      const grupo = document.getElementById("hero-vertices");
+      const puntos = V.map(() => {
+        const c = document.createElementNS(svgNS, "circle");
+        c.setAttribute("r", "6"); c.setAttribute("fill", "#1f1d1b"); c.setAttribute("opacity", "0");
+        grupo.appendChild(c); return c;
+      });
+      const pol = [0, 1, 2].map((i) => document.getElementById("hero-p" + i));
+      function dibujar() {
+        const m = st.m;
+        pol.forEach((p, i) => {
+          const pts = RECT[i].map((q, j) => { const t = iso(q); return [H[i][j][0] + (t[0] - H[i][j][0]) * m, H[i][j][1] + (t[1] - H[i][j][1]) * m]; });
+          p.setAttribute("points", pts.map((q) => q[0].toFixed(1) + "," + q[1].toFixed(1)).join(" "));
+          p.setAttribute("fill", "#9b3d2e");
+          p.setAttribute("fill-opacity", (1 - m).toFixed(3));
+          p.setAttribute("stroke", "#1f1d1b");
+          p.setAttribute("stroke-width", "2");
+          p.setAttribute("stroke-opacity", Math.min(1, m * 1.5).toFixed(3));
+        });
+        let d = "";
+        for (const [i, j] of E) { const a = iso(V[i]), b = iso(V[j]); d += "M" + a[0].toFixed(1) + "," + a[1].toFixed(1) + "L" + b[0].toFixed(1) + "," + b[1].toFixed(1); }
+        document.getElementById("hero-aristas").setAttribute("d", d);
+        V.forEach((v, i) => { const q = iso(v); puntos[i].setAttribute("cx", q[0].toFixed(1)); puntos[i].setAttribute("cy", q[1].toFixed(1)); });
+      }
+      // el título se escribe letra por letra (como el cartel de aeropuerto), dos cuadros por letra
+      for (const id of ["hero-titulo", "hero-bajada"]) {
+        const el = document.getElementById(id);
+        el.innerHTML = [...el.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+      const tl = gsap.timeline({ paused: true, onUpdate: dibujar });
+      tl.set({}, {}, 12);
+      // 0.8–3.2 s: la H se abre en los tres planos
+      tl.fromTo(st, { m: 0 }, { m: 1, duration: 2.4, ease: "power3.inOut" }, 0.8);
+      // 3.2–6 s: se cierran las aristas y los vértices; el objeto gira 30°
+      tl.fromTo("#hero-aristas", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 1.6, ease: "power2.inOut" }, 3.0);
+      tl.fromTo(puntos, { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.4, stagger: 0.07, ease: "sine.out" }, 3.4);
+      tl.fromTo(st, { th: 0.35 }, { th: 0.35 + Math.PI / 6, duration: 2.6, ease: "power3.inOut" }, 3.4);
+      // 6–7.4 s: el título; 7.6 s: la bajada
+      tl.fromTo("#hero-titulo .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.067, ease: "none" }, 6.0);
+      tl.fromTo("#hero-bajada .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.035, ease: "none" }, 7.0);
+      // 10.6–12 s: vuelve a la H (el loop empalma con el cuadro 0)
+      tl.to("#hero-titulo .letra, #hero-bajada .letra", { opacity: 0, duration: 0.01, stagger: { each: 0.012, from: "end" }, ease: "none" }, 10.3);
+      tl.to(puntos, { attr: { opacity: 0 }, duration: 0.3, ease: "sine.in" }, 10.6);
+      tl.to("#hero-aristas", { attr: { "stroke-dashoffset": 1 }, duration: 0.6, ease: "power2.inOut" }, 10.6);
+      tl.to(st, { th: 0.35, m: 0, duration: 1.2, ease: "power3.inOut" }, 10.75);
+      dibujar();
+      window.__timelines["hero"] = tl;
+    })();
+  </script>
+</template>

@@ -1,0 +1,121 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #objeto-svg { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+    .medida { font-family: "IBM Plex Mono"; font-size: 30px; fill: #2f4858; }
+    .objeto-frase { position: absolute; left: 120px; top: 900px; font-family: "IBM Plex Mono"; font-size: 30px; color: #1f1d1b; white-space: nowrap; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="objeto" data-width="1920" data-height="1080">
+    <svg id="objeto-svg" viewBox="0 0 1920 1080">
+      <path id="objeto-cubos" d="" fill="none" stroke="#a8a398" stroke-width="1.5" opacity="0" />
+      <path id="objeto-aristas" d="" fill="none" stroke="#a8a398" stroke-width="1.6" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <path id="objeto-r2" d="" fill="none" stroke="#1f1d1b" stroke-width="2.5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <path id="objeto-r0" d="" fill="none" stroke="#1f1d1b" stroke-width="2.5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <path id="objeto-r1" d="" fill="none" stroke="#1f1d1b" stroke-width="2.5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <g id="objeto-vertices"></g>
+      <path id="objeto-sala" d="" fill="#a8a398" fill-opacity="0.18" stroke="#1f1d1b" stroke-width="2" opacity="0" />
+      <path id="objeto-ez" d="" fill="none" stroke="#1f1d1b" stroke-width="3" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <path id="objeto-ex" d="" fill="none" stroke="#2f4858" stroke-width="3" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <path id="objeto-ey" d="" fill="none" stroke="#7d786e" stroke-width="3" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <text id="objeto-corto" class="medida" opacity="0">69,6 m</text>
+      <text id="objeto-largo" class="medida" opacity="0">112,6 m</text>
+    </svg>
+    <div id="objeto-f1" class="objeto-frase clip" data-start="0" data-duration="12.6">Tres rectángulos áureos forman ocho habitaciones.</div>
+    <div id="objeto-f2" class="objeto-frase clip" data-start="12.6" data-duration="5.4">En cada una, la misma arquitectura en tres gravedades.</div>
+  </div>
+  <script>
+    (function () {
+      const A = 0.618, B = 1;
+      const st = { th: 0.6, k: 250, cx: 980, cy: 470 };
+      const C30 = Math.cos(Math.PI / 6);
+      const iso = (p) => {
+        const c = Math.cos(st.th), s = Math.sin(st.th);
+        const x = p[0] * c - p[1] * s, y = p[0] * s + p[1] * c;
+        return [st.cx + (x - y) * C30 * st.k, st.cy + (x + y) * 0.5 * st.k - p[2] * st.k];
+      };
+      const linea = (pts, cerrar) => pts.map((p, i) => { const q = iso(p); return (i ? "L" : "M") + q[0].toFixed(1) + "," + q[1].toFixed(1); }).join("") + (cerrar ? "Z" : "");
+      const RECT = [
+        [[0, -A, -B], [0, A, -B], [0, A, B], [0, -A, B]],
+        [[-B, 0, -A], [B, 0, -A], [B, 0, A], [-B, 0, A]],
+        [[-A, -B, 0], [A, -B, 0], [A, B, 0], [-A, B, 0]],
+      ];
+      const V = [];
+      for (const s1 of [-1, 1]) for (const s2 of [-1, 1]) V.push([0, s1 * A, s2 * B], [s2 * B, 0, s1 * A], [s1 * A, s2 * B, 0]);
+      const E = [];
+      for (let i = 0; i < 12; i++) for (let j = i + 1; j < 12; j++)
+        if (Math.abs(Math.hypot(V[i][0] - V[j][0], V[i][1] - V[j][1], V[i][2] - V[j][2]) - 2 * A) < 0.01) E.push([i, j]);
+      // las 8 habitaciones: los cubos de lado A en cada octante
+      const cubo = (sx, sy, sz) => {
+        const P = (i, j, k) => [i * sx * A, j * sy * A, k * sz * A];
+        let d = "";
+        for (const [a, b] of [[[0,0,0],[1,0,0]],[[0,0,0],[0,1,0]],[[0,0,0],[0,0,1]],[[1,0,0],[1,1,0]],[[1,0,0],[1,0,1]],[[0,1,0],[1,1,0]],[[0,1,0],[0,1,1]],[[0,0,1],[1,0,1]],[[0,0,1],[0,1,1]],[[1,1,0],[1,1,1]],[[1,0,1],[1,1,1]],[[0,1,1],[1,1,1]]])
+          d += linea([P(...a), P(...b)]);
+        return d;
+      };
+      // una estructura (gravedad z): una bandeja y una escalera que sube hasta ella; las otras, giradas (x, y, z) → (z, x, y)
+      const u = A;
+      const EST = [
+        [[0.15*u,0.15*u,0.42*u],[0.55*u,0.15*u,0.42*u],[0.55*u,0.55*u,0.42*u],[0.15*u,0.55*u,0.42*u],[0.15*u,0.15*u,0.42*u]],
+        [[0.55*u,0.3*u,0.42*u],[0.62*u,0.3*u,0.42*u],[0.62*u,0.3*u,0.35*u],[0.69*u,0.3*u,0.35*u],[0.69*u,0.3*u,0.28*u],[0.76*u,0.3*u,0.28*u],[0.76*u,0.3*u,0.21*u],[0.83*u,0.3*u,0.21*u],[0.83*u,0.3*u,0.14*u],[0.9*u,0.3*u,0.14*u],[0.9*u,0.3*u,0.07*u],[0.97*u,0.3*u,0.07*u],[0.97*u,0.3*u,0]],
+      ];
+      const giro = (p) => [p[2], p[0], p[1]];
+      const vertices = document.getElementById("objeto-vertices");
+      const puntos = V.map(() => { const c = document.createElementNS("http://www.w3.org/2000/svg", "circle"); c.setAttribute("r", "6"); c.setAttribute("fill", "#1f1d1b"); c.setAttribute("opacity", "0"); vertices.appendChild(c); return c; });
+      const $ = (id) => document.getElementById(id);
+      function dibujar() {
+        RECT.forEach((r, i) => $("objeto-r" + i).setAttribute("d", linea(r, true)));
+        $("objeto-aristas").setAttribute("d", E.map(([i, j]) => linea([V[i], V[j]])).join(""));
+        V.forEach((v, i) => { const q = iso(v); puntos[i].setAttribute("cx", q[0].toFixed(1)); puntos[i].setAttribute("cy", q[1].toFixed(1)); });
+        let d = "";
+        for (const sx of [1, -1]) for (const sy of [1, -1]) for (const sz of [1, -1]) d += cubo(sx, sy, sz);
+        $("objeto-cubos").setAttribute("d", d);
+        // la habitación (+,+,+): sus tres pisos
+        $("objeto-sala").setAttribute("d", linea([[0,0,0],[A,0,0],[A,A,0],[0,A,0]], true) + linea([[0,0,0],[0,A,0],[0,A,A],[0,0,A]], true) + linea([[0,0,0],[A,0,0],[A,0,A],[0,0,A]], true));
+        const e1 = EST.map((t) => t), e2 = EST.map((t) => t.map(giro)), e3 = EST.map((t) => t.map((p) => giro(giro(p))));
+        $("objeto-ez").setAttribute("d", e1.map((t) => linea(t)).join(""));
+        $("objeto-ex").setAttribute("d", e2.map((t) => linea(t)).join(""));
+        $("objeto-ey").setAttribute("d", e3.map((t) => linea(t)).join(""));
+        // medidas sobre el rectángulo z = 0
+        const c1 = iso([0, -B - 0.08, 0]), c2 = iso([A + 0.1, 0, 0]);
+        $("objeto-corto").setAttribute("x", (c1[0] - 60).toFixed(1)); $("objeto-corto").setAttribute("y", (c1[1] + 40).toFixed(1));
+        $("objeto-largo").setAttribute("x", (c2[0] + 10).toFixed(1)); $("objeto-largo").setAttribute("y", (c2[1] + 30).toFixed(1));
+      }
+      for (const id of ["objeto-f1", "objeto-f2"]) {
+        const el = $(id);
+        el.innerHTML = [...el.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+      const tl = gsap.timeline({ paused: true, onUpdate: dibujar });
+      tl.set({}, {}, 18);
+      const trazar = (id, t, dur) => tl.fromTo("#" + id, { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: dur || 0.9, ease: "power2.inOut" }, t);
+      // 0,3 s: un rectángulo áureo y sus medidas reales
+      trazar("objeto-r2", 0.3, 1.2);
+      tl.fromTo("#objeto-corto, #objeto-largo", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.4, stagger: 0.3, ease: "sine.out" }, 1.4);
+      // 3,4 s: dos más, cruzados
+      trazar("objeto-r0", 3.4, 1.1);
+      trazar("objeto-r1", 4.0, 1.1);
+      tl.to("#objeto-corto, #objeto-largo", { attr: { opacity: 0 }, duration: 0.4, ease: "sine.in" }, 4.6);
+      // 6 s: el icosaedro (aristas y vértices) y un giro
+      trazar("objeto-aristas", 6.0, 1.4);
+      tl.fromTo(puntos, { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.3, stagger: 0.06, ease: "sine.out" }, 6.2);
+      tl.fromTo(st, { th: 0.6 }, { th: 0.6 + 0.5, duration: 3.0, ease: "power3.inOut" }, 6.0);
+      tl.fromTo("#objeto-f1 .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.03, ease: "none" }, 7.0);
+      // 9 s: las ocho habitaciones
+      tl.fromTo("#objeto-cubos", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.8, ease: "sine.out" }, 9.0);
+      tl.fromTo(st, { th: 1.1 }, { th: 1.35, duration: 3.4, ease: "none", immediateRender: false }, 9.0);   // sigue girando mientras se ven las habitaciones
+      // 12,4 s: zoom a la habitación (+,+,+); lo demás queda detrás
+      const kz = 600, th1 = 1.35;
+      const cxy = (() => { const keep = { ...st }; st.th = th1; st.k = kz; st.cx = 0; st.cy = 0; const q = iso([A / 2, A / 2, A / 2]); Object.assign(st, keep); return [960 - q[0], 430 - q[1]]; })();
+      tl.fromTo(st, { k: 250, cx: 980, cy: 470 }, { k: kz, cx: cxy[0], cy: cxy[1], duration: 2.0, ease: "power3.inOut" }, 12.4);
+      tl.to("#objeto-aristas, #objeto-cubos, #objeto-r0, #objeto-r1, #objeto-r2", { opacity: 0.18, duration: 1.0, ease: "sine.inOut" }, 12.6);
+      tl.to(puntos, { attr: { opacity: 0 }, duration: 0.6, ease: "sine.in" }, 12.6);
+      tl.fromTo("#objeto-sala", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.6, ease: "sine.out" }, 13.6);
+      trazar("objeto-ez", 14.2, 0.9);
+      trazar("objeto-ex", 14.8, 0.9);
+      trazar("objeto-ey", 15.4, 0.9);
+      tl.fromTo("#objeto-f2 .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.03, ease: "none" }, 13.0);
+      dibujar();
+      window.__timelines["objeto"] = tl;
+    })();
+  </script>
+</template>

@@ -3,7 +3,7 @@
 <title>Hiperfuente navegable</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap">
 <style>
 /* Pantalla completa: el espacio ocupa todo; la interfaz son tiras finas en los bordes, como marginalia. */
 @font-face { font-family: "FabiBlock"; src: url(data:font/otf;base64,T1RUTwAKAIAAAwAgQ0ZGIJZt8QkAAACsAAAeBU9TLzJpH4XgAAAetAAAAGBjbWFwTJrvDQAAHxQAAAD8Z2FzcAAAAAsAACAQAAAACGhlYWRjOEOOAAAgGAAAADZoaGVhCAEDzgAAIFAAAAAkaG10eCuNHUgAACB0AAABsG1heHAAbFAAAAAiJAAAAAZuYW1ln/BRSAAAIiwAAALZcG9zdP+fADIAACUIAAAAIAEABAQAAQEBEkZhYmlCbG9jay1SZWd1bGFyAAEBAS/4hgL4hwP4iASL+5j6fPpABR0AAAQ4ER0AAB0sDx0AAB4DEB0AAAAAHQAAHgUSAG4CAAEACAAPABYAHQAkACsAMgA5AEAARwBOAFUAXABjAGoAcQB4AH8AhgCNAJQAmwCiAKkAsAC3AL4AxQDMANMA2gDhAOgA7wD2AP0BBAELARIBGQEgAScBLgE1ATwBQwFKAVEBWAFfAWYBbQF0AXsBggGJAZABlwGeAaUBrAGzAboBwQHIAc8B1gHdAeQB6wHyAfkCAAIHAg4CFQIcAiMCKgIxAjgCPwJGAk0CVAJbAmICaQJwAncCfgKFAowCkwKaAqECqAKvArYCvQLEAssC0gLZAuAC5wLuAvgDAgMJdW5pMDAyMHVuaTAwMjF1bmkwMDIydW5pMDAyM3VuaTAwMjR1bmkwMDI1dW5pMDAyNnVuaTAwMjd1bmkwMDI4dW5pMDAyOXVuaTAwMkF1bmkwMDJCdW5pMDAyQ3VuaTAwMkR1bmkwMDJFdW5pMDAyRnVuaTAwMzB1bmkwMDMxdW5pMDAzMnVuaTAwMzN1bmkwMDM0dW5pMDAzNXVuaTAwMzZ1bmkwMDM3dW5pMDAzOHVuaTAwMzl1bmkwMDNBdW5pMDAzQnVuaTAwM0R1bmkwMDNGdW5pMDA0MHVuaTAwNDF1bmkwMDQydW5pMDA0M3VuaTAwNDR1bmkwMDQ1dW5pMDA0NnVuaTAwNDd1bmkwMDQ4dW5pMDA0OXVuaTAwNEF1bmkwMDRCdW5pMDA0Q3VuaTAwNER1bmkwMDRFdW5pMDA0RnVuaTAwNTB1bmkwMDUxdW5pMDA1MnVuaTAwNTN1bmkwMDU0dW5pMDA1NXVuaTAwNTZ1bmkwMDU3dW5pMDA1OHVuaTAwNTl1bmkwMDVBdW5pMDA1QnVuaTAwNUN1bmkwMDVEdW5pMDA1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) format("opentype"); font-display: swap; }
@@ -140,6 +140,7 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
     <button class="grav" data-eje="z" aria-pressed="true">Z<small>Madden</small></button>
   </div>
   <div class="grupo">
+    <button id="ayudaIntro" title="Cómo se usa: la introducción">?</button>
     <button id="enderezar" title="Vuelve a poner el horizonte derecho">Enderezar</button>
     <button id="rapido" aria-pressed="false">Rápido</button>
   </div>
@@ -2074,4 +2075,145 @@ function ajustarTamano() {
 }
 addEventListener("resize", ajustarTamano);
 })().catch((err) => mostrarError(err && err.message || String(err)));
+</script>
+<!-- Onboarding en el navegador (2026-11-21). Lo inserta herramientas/armar_visor_v3.py antes de </body>.
+     Muestra las siete escenas del onboarding (onboarding/compositions, hechas con HyperFrames) en vivo: cada una se
+     carga, se escala a la pantalla y se anima con su propia línea de tiempo de GSAP. Aparece la primera vez que se
+     abre el enlace (o con ?intro); después, con el botón «?» de la barra. Mientras tanto, el espacio carga detrás. -->
+<style>
+  #onb { position: fixed; inset: 0; z-index: 1000; background: #e9e3d6; overflow: hidden; }
+  #onb[hidden] { display: none; }
+  #onb-escenario { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 50% 50%; }
+  #onb-escenario .clip { will-change: opacity; }
+  #onb-barra { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center;
+               gap: 18px; padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px)); }
+  #onb button { font-family: "DM Mono", monospace; font-size: 15px; letter-spacing: .04em; border: 1.5px solid #1f1d1b;
+                background: #e9e3d6; color: #1f1d1b; padding: 10px 18px; cursor: pointer; border-radius: 0; }
+  #onb button:hover { background: #1f1d1b; color: #e9e3d6; }
+  #onb #onb-seguir { background: #9b3d2e; border-color: #9b3d2e; color: #e9e3d6; min-width: 150px; }
+  #onb #onb-seguir:hover { background: #7e2f23; }
+  #onb #onb-atras[disabled] { opacity: .3; cursor: default; }
+  #onb-puntos { display: flex; gap: 8px; }
+  #onb-puntos i { width: 9px; height: 9px; border: 1.5px solid #1f1d1b; display: block; }
+  #onb-puntos i.si { background: #1f1d1b; }
+  #onb-saltar { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px; }
+  #onb-cargando { position: absolute; left: 16px; top: calc(18px + env(safe-area-inset-top, 0px)); font-family: "DM Mono", monospace;
+                  font-size: 13px; color: #6f6a60; }
+  @media (max-width: 600px) { #onb button { font-size: 13px; padding: 9px 12px; } #onb #onb-seguir { min-width: 110px; } }
+</style>
+<div id="onb" hidden role="dialog" aria-label="Cómo se usa Hiperfuente">
+  <div id="onb-escenario"></div>
+  <span id="onb-cargando"></span>
+  <button id="onb-saltar">Saltar la introducción</button>
+  <div id="onb-barra">
+    <button id="onb-atras" aria-label="Página anterior">← Atrás</button>
+    <div id="onb-puntos" aria-hidden="true"></div>
+    <button id="onb-seguir">Seguir →</button>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/gsap.min.js"></script>
+<script>
+(function () {
+  const CLAVE = "hiperfuente-intro-vista";
+  const ESCENAS = [
+    { id: "hero", loop: true, boton: "Empezar →" },
+    { id: "idea" }, { id: "objeto" }, { id: "cuento" }, { id: "interfaz" }, { id: "escrituras" },
+    { id: "esferas", boton: "Entrar al espacio →" },
+  ];
+  const $ = (id) => document.getElementById(id);
+  const capa = $("onb"), escenario = $("onb-escenario"), puntos = $("onb-puntos");
+  ESCENAS.forEach(() => puntos.appendChild(document.createElement("i")));
+  window.__timelines = window.__timelines || {};
+  let actual = -1, tl = null, clips = [], pedido = 0;
+  const cache = {};
+
+  function ajustar() {
+    const s = Math.min(innerWidth / 1920, (innerHeight - 70) / 1080);
+    escenario.style.transform = "translate(-50%, calc(-50% - 28px)) scale(" + s.toFixed(4) + ")";
+  }
+  addEventListener("resize", ajustar);
+
+  async function traer(id) {
+    if (!cache[id]) {
+      const r = await fetch("onboarding/compositions/" + id + ".html", { cache: "no-cache" });
+      // las rutas de la escena son relativas a su proyecto: se llevan a la carpeta del onboarding
+      cache[id] = (await r.text()).replace(/(["'(])assets\//g, "$1onboarding/assets/");
+    }
+    return cache[id];
+  }
+  // La visibilidad de cada clip ([inicio, inicio + duración)) la maneja el reproductor de HyperFrames; acá, este tic.
+  function visibilidad() {
+    if (!tl) return;
+    const t = tl.time();
+    for (const c of clips) c.el.style.visibility = t >= c.a && t < c.b ? "" : "hidden";
+  }
+  gsap.ticker.add(visibilidad);
+
+  async function ir(i) {
+    if (i < 0 || i >= ESCENAS.length) return;
+    const mio = ++pedido;
+    const e = ESCENAS[i];
+    $("onb-cargando").textContent = "";
+    const html = await traer(e.id);
+    if (mio !== pedido) return;
+    if (tl) tl.kill();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const frag = doc.querySelector("template").content.cloneNode(true);
+    const guiones = [...frag.querySelectorAll("script")];
+    guiones.forEach((s) => s.remove());
+    escenario.replaceChildren(frag);
+    delete window.__timelines[e.id];
+    for (const s of guiones) new Function(s.textContent)();
+    tl = window.__timelines[e.id];
+    clips = [...escenario.querySelectorAll(".clip")].map((el) => {
+      const a = parseFloat(el.dataset.start) || 0;
+      return { el, a, b: a + (parseFloat(el.dataset.duration) || 1e9) };
+    });
+    actual = i;
+    [...puntos.children].forEach((p, k) => p.classList.toggle("si", k === i));
+    $("onb-atras").disabled = i === 0;
+    $("onb-seguir").textContent = e.boton || "Seguir →";
+    if (tl) {
+      tl.eventCallback("onComplete", e.loop ? () => tl.play(0) : null);
+      tl.play(0);
+    }
+    visibilidad();
+    // la siguiente escena se va bajando mientras se mira esta
+    if (ESCENAS[i + 1]) traer(ESCENAS[i + 1].id);
+  }
+  function abrir() {
+    capa.hidden = false;
+    ajustar();
+    ir(0);
+  }
+  function cerrar(entrar) {
+    capa.hidden = true;
+    pedido++;
+    if (tl) tl.kill();
+    tl = null;
+    escenario.replaceChildren();
+    try { localStorage.setItem(CLAVE, "1"); } catch (err) { /* sin almacenamiento: se vuelve a mostrar la próxima vez */ }
+    if (entrar) {
+      // al terminar: el lector empieza caminando al pie de la H (instancia «La H»), cuando el espacio esté listo
+      const empezar = () => (window.visor && window.visor.irAInstancia ? window.visor.irAInstancia(1) : setTimeout(empezar, 400));
+      empezar();
+    }
+  }
+  $("onb-seguir").onclick = () => (actual === ESCENAS.length - 1 ? cerrar(true) : ir(actual + 1));
+  $("onb-atras").onclick = () => ir(actual - 1);
+  $("onb-saltar").onclick = () => cerrar(false);
+  // mientras está abierto, el teclado es del onboarding (no mueve el espacio de atrás)
+  addEventListener("keydown", (e) => {
+    if (capa.hidden) return;
+    e.stopImmediatePropagation();
+    if (e.key === "ArrowRight" || e.key === "Enter" || e.key === " ") { e.preventDefault(); $("onb-seguir").click(); }
+    else if (e.key === "ArrowLeft") ir(actual - 1);
+    else if (e.key === "Escape") cerrar(false);
+  }, true);
+  const boton = $("ayudaIntro");
+  if (boton) boton.onclick = abrir;
+  let vista = false;
+  try { vista = localStorage.getItem(CLAVE) === "1"; } catch (err) { /* sin almacenamiento */ }
+  if (!vista || /[?&]intro/.test(location.search)) abrir();
+})();
 </script>

@@ -1,0 +1,80 @@
+<template>
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #interfaz-svg { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+    .mini { font-family: "IBM Plex Mono"; font-size: 15px; fill: #1f1d1b; }
+    .mini-h { font-family: "FabiBlock"; font-size: 20px; fill: #1f1d1b; }
+    .zona-texto { position: absolute; left: 1420px; top: 330px; width: 400px; }
+    .zona-texto b { display: block; font-family: "FabiBlock"; font-weight: 400; font-size: 52px; line-height: 1.1; color: #9b3d2e; }
+    .zona-texto > span { display: block; margin-top: 18px; font-family: "IBM Plex Mono"; font-size: 30px; line-height: 1.4; color: #1f1d1b; }
+    #interfaz-frase { position: absolute; left: 120px; top: 900px; font-family: "IBM Plex Mono"; font-size: 30px; color: #1f1d1b; white-space: nowrap; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="interfaz" data-width="1920" data-height="1080">
+    <svg id="interfaz-svg" viewBox="0 0 1920 1080">
+      <!-- la pantalla del visor, a línea -->
+      <rect id="interfaz-marco" x="120" y="150" width="1200" height="675" fill="none" stroke="#1f1d1b" stroke-width="2.5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <g id="interfaz-contenido" opacity="0">
+        <!-- el espacio: un rincón de habitación -->
+        <path d="M720,330 L720,560 L520,675 M720,560 L920,675 M560,560 L720,470 L880,560" fill="none" stroke="#a8a398" stroke-width="2" />
+        <!-- barra de arriba -->
+        <line x1="120" y1="205" x2="1320" y2="205" stroke="#1f1d1b" stroke-width="1.5" />
+        <text data-layout-ignore class="mini-h" x="140" y="186">HIPERFUENTE</text><text data-layout-ignore class="mini" x="335" y="184">Capítulo 1</text>
+        <text data-layout-ignore class="mini-h" x="300" y="186"> </text>
+        <rect id="iz-modos" x="440" y="163" width="150" height="32" fill="none" stroke="#1f1d1b" stroke-width="1.5" />
+        <text data-layout-ignore class="mini" x="452" y="184">Orbitar Recorrer</text>
+        <rect id="iz-xyz" x="610" y="163" width="120" height="32" fill="none" stroke="#1f1d1b" stroke-width="1.5" />
+        <text data-layout-ignore class="mini" x="628" y="184">X  Y  Z</text>
+        <rect id="iz-inst" x="140" y="215" width="900" height="26" fill="none" stroke="#1f1d1b" stroke-width="1.2" />
+        <path d="M230,215V241M320,215V241M410,215V241M500,215V241M590,215V241M680,215V241M770,215V241M860,215V241M950,215V241" stroke="#1f1d1b" stroke-width="1" />
+        <!-- panel de la derecha: sonido, mapa y ficha -->
+        <rect id="iz-sonido" x="1150" y="255" width="150" height="30" fill="none" stroke="#1f1d1b" stroke-width="1.5" />
+        <text data-layout-ignore class="mini" x="1162" y="276">♪ Sonido</text>
+        <rect id="iz-mapa" x="1150" y="295" width="150" height="330" fill="none" stroke="#1f1d1b" stroke-width="1.5" />
+        <path d="M1225,315 L1280,345 L1280,405 L1225,435 L1170,405 L1170,345 Z M1225,315 L1225,435 M1170,345 L1280,405 M1280,345 L1170,405" fill="none" stroke="#1f1d1b" stroke-width="1" />
+        <path d="M1225,375 L1250,390 L1225,405 L1200,390 Z" fill="#9b3d2e" />
+        <path d="M1165,460H1285M1165,485H1260M1165,510H1285M1165,535H1240M1165,560H1275M1165,585H1250M1165,610H1270" stroke="#a8a398" stroke-width="3" />
+        <!-- palancas -->
+        <circle id="iz-palanca1" cx="215" cy="735" r="52" fill="none" stroke="#1f1d1b" stroke-width="1.5" />
+        <circle cx="215" cy="735" r="18" fill="#a8a398" />
+        <circle id="iz-palanca2" cx="1060" cy="735" r="52" fill="none" stroke="#1f1d1b" stroke-width="1.5" />
+        <circle cx="1060" cy="735" r="18" fill="#a8a398" />
+      </g>
+      <!-- las zonas que se señalan -->
+      <g id="iz-z1" opacity="0"><circle cx="215" cy="735" r="62" fill="#9b3d2e" fill-opacity="0.15" stroke="#9b3d2e" stroke-width="3" /><circle cx="1060" cy="735" r="62" fill="#9b3d2e" fill-opacity="0.15" stroke="#9b3d2e" stroke-width="3" /><path d="M1122,735H1390" stroke="#9b3d2e" stroke-width="2" /></g>
+      <g id="iz-z2" opacity="0"><rect x="432" y="155" width="166" height="48" fill="#9b3d2e" fill-opacity="0.15" stroke="#9b3d2e" stroke-width="3" /><path d="M598,179H1390V330" fill="none" stroke="#9b3d2e" stroke-width="2" /></g>
+      <g id="iz-z3" opacity="0"><rect x="602" y="155" width="136" height="48" fill="#9b3d2e" fill-opacity="0.15" stroke="#9b3d2e" stroke-width="3" /><path d="M738,179H1390V330" fill="none" stroke="#9b3d2e" stroke-width="2" /></g>
+      <g id="iz-z4" opacity="0"><rect x="132" y="209" width="916" height="38" fill="#9b3d2e" fill-opacity="0.15" stroke="#9b3d2e" stroke-width="3" /><path d="M1048,228H1390V330" fill="none" stroke="#9b3d2e" stroke-width="2" /></g>
+      <g id="iz-z5" opacity="0"><rect x="1142" y="287" width="166" height="346" fill="#9b3d2e" fill-opacity="0.15" stroke="#9b3d2e" stroke-width="3" /><path d="M1308,460H1390" stroke="#9b3d2e" stroke-width="2" /></g>
+      <g id="iz-z6" opacity="0"><rect x="1142" y="247" width="166" height="46" fill="#9b3d2e" fill-opacity="0.15" stroke="#9b3d2e" stroke-width="3" /><path d="M1308,270H1390V330" fill="none" stroke="#9b3d2e" stroke-width="2" /></g>
+    </svg>
+    <div id="iz-t1" class="zona-texto clip" data-start="2.8" data-duration="3.3"><b>PALANCAS</b><span>La izquierda camina. La derecha mira.</span></div>
+    <div id="iz-t2" class="zona-texto clip" data-start="6.1" data-duration="3.3"><b>ORBITAR / RECORRER</b><span>Desde afuera, o adentro y a pie.</span></div>
+    <div id="iz-t3" class="zona-texto clip" data-start="9.4" data-duration="3.3"><b>X Y Z</b><span>Cada piso es un personaje.</span></div>
+    <div id="iz-t4" class="zona-texto clip" data-start="12.7" data-duration="3.3"><b>INSTANCIAS</b><span>Diez vistas para empezar.</span></div>
+    <div id="iz-t5" class="zona-texto clip" data-start="16" data-duration="3.3"><b>MAPA Y FICHA</b><span>Dónde estás: capítulo, voz y lugar.</span></div>
+    <div id="iz-t6" class="zona-texto clip" data-start="19.3" data-duration="2.7"><b>SONIDO</b><span>Cada espacio suena distinto.</span></div>
+    <div id="interfaz-frase" class="clip" data-start="0" data-duration="22">Todo lo que hace falta está en los bordes.</div>
+  </div>
+  <script>
+    (function () {
+      for (const el of document.querySelectorAll("#root .zona-texto b, #root .zona-texto > span, #interfaz-frase")) {
+        el.innerHTML = [...el.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+      const tl = gsap.timeline({ paused: true });
+      tl.set({}, {}, 22);
+      tl.fromTo("#interfaz-marco", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 1.2, ease: "power2.inOut" }, 0.2);
+      tl.fromTo("#interfaz-contenido", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.6, ease: "sine.out" }, 1.3);
+      tl.fromTo("#interfaz-frase .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.03, ease: "none" }, 1.0);
+      const T = [2.8, 6.1, 9.4, 12.7, 16.0, 19.3, 22.0];
+      for (let i = 0; i < 6; i++) {
+        tl.fromTo("#iz-z" + (i + 1), { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.25, ease: "sine.out" }, T[i]);
+        if (i < 5) tl.to("#iz-z" + (i + 1), { attr: { opacity: 0 }, duration: 0.2, ease: "sine.in" }, T[i + 1] - 0.2);
+        tl.fromTo("#iz-t" + (i + 1) + " b .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.04, ease: "none" }, T[i] + 0.1);
+        tl.fromTo("#iz-t" + (i + 1) + " > span .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.022, ease: "none" }, T[i] + 0.6);
+      }
+      window.__timelines["interfaz"] = tl;
+    })();
+  </script>
+</template>

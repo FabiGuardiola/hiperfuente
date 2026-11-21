@@ -1,0 +1,131 @@
+<template>
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #cuento-svg { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+    .nombre { font-family: "FabiBlock"; font-size: 40px; fill: #2f4858; text-anchor: middle; }
+    .nombre-portal { font-family: "FabiBlock"; font-size: 34px; fill: #9b3d2e; text-anchor: middle; }
+    .numero { font-family: "FabiBlock"; font-size: 46px; fill: #1f1d1b; text-anchor: middle; dominant-baseline: middle; }
+    .cap { position: absolute; left: 120px; top: 96px; }
+    .cap b { display: block; font-family: "FabiBlock"; font-weight: 400; font-size: 64px; color: #1f1d1b; }
+    .cap > span { display: block; margin-top: 8px; font-family: "IBM Plex Mono"; font-size: 30px; color: #1f1d1b; }
+    .cuento-frase { position: absolute; left: 120px; top: 900px; font-family: "IBM Plex Mono"; font-size: 30px; color: #1f1d1b; white-space: nowrap; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="cuento" data-width="1920" data-height="1080">
+    <svg id="cuento-svg" viewBox="0 0 1920 1080">
+      <path id="cuento-cubos" d="" fill="none" stroke="#a8a398" stroke-width="1.5" opacity="0" />
+      <path id="cuento-pz" d="" fill="#a8a398" fill-opacity="0" stroke="#1f1d1b" stroke-width="2" />
+      <path id="cuento-px" d="" fill="#a8a398" fill-opacity="0" stroke="#1f1d1b" stroke-width="2" />
+      <path id="cuento-py" d="" fill="#a8a398" fill-opacity="0" stroke="#1f1d1b" stroke-width="2" />
+      <path id="cuento-nucleo" d="" fill="none" stroke="#1f1d1b" stroke-width="1.6" opacity="0" />
+      <path id="cuento-cuadrado" d="" fill="none" stroke="#9b3d2e" stroke-width="5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <path id="cuento-rect" d="" fill="#9b3d2e" opacity="0" />
+      <text id="cuento-n-z" class="nombre" opacity="0">MADDEN</text>
+      <text id="cuento-n-x" class="nombre" opacity="0">YU TSUN</text>
+      <text id="cuento-n-y" class="nombre" opacity="0">ROBERTO</text>
+      <text id="cuento-n-portal" class="nombre-portal" opacity="0">YU TSUN</text>
+      <path id="cuento-ciclo" d="" fill="none" stroke="#9b3d2e" stroke-width="4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <g id="cuento-numeros"></g>
+      <circle id="cuento-lector" r="13" cx="0" cy="0" fill="#9b3d2e" opacity="0" />
+    </svg>
+    <div id="cuento-cap1" class="cap clip" data-start="0" data-duration="8.6"><b>CAPÍTULO 1</b><span>El llamado</span></div>
+    <div id="cuento-cap2" class="cap clip" data-start="8.6" data-duration="9"><b>CAPÍTULO 2</b><span>El hexágono</span></div>
+    <div id="cuento-cap8" class="cap clip" data-start="17.6" data-duration="4.4"><b>8 CAPÍTULOS</b><span>un libro cíclico</span></div>
+    <div id="cuento-f1" class="cuento-frase clip" data-start="0" data-duration="5.6">Cada habitación es un capítulo. Cada piso, la voz de un personaje.</div>
+    <div id="cuento-f2" class="cuento-frase clip" data-start="5.6" data-duration="5.6">El cuadrado rojo del núcleo lleva al capítulo siguiente.</div>
+    <div id="cuento-f3" class="cuento-frase clip" data-start="11.2" data-duration="6.4">Los rectángulos rojos de las paredes llevan a otro personaje.</div>
+    <div id="cuento-f4" class="cuento-frase clip" data-start="17.6" data-duration="4.4">Del capítulo ocho se vuelve al uno.</div>
+  </div>
+  <script>
+    (function () {
+      const st = { th: 0, k: 330, cx: 1000, cy: 540, p1: 0, p2: 0 };
+      const C30 = Math.cos(Math.PI / 6);
+      const iso = (p) => {
+        const c = Math.cos(st.th), s = Math.sin(st.th);
+        const x = p[0] * c - p[1] * s, y = p[0] * s + p[1] * c;
+        return [st.cx + (x - y) * C30 * st.k, st.cy + (x + y) * 0.5 * st.k - p[2] * st.k];
+      };
+      const linea = (pts, cerrar) => pts.map((p, i) => { const q = iso(p); return (i ? "L" : "M") + q[0].toFixed(1) + "," + q[1].toFixed(1); }).join("") + (cerrar ? "Z" : "");
+      const $ = (id) => document.getElementById(id);
+      const N = 0.22, S = 0.11;                         // lado del núcleo y del cuadrado de «siguiente capítulo»
+      const CICLO = ["+++", "++-", "+--", "+-+", "--+", "---", "-+-", "-++"];
+      const sg = (c) => c.split("").map((x) => (x === "+" ? 1 : -1));
+      const numeros = CICLO.map((c, i) => {
+        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        t.setAttribute("class", "numero"); t.setAttribute("opacity", "0"); t.textContent = i + 1;
+        $("cuento-numeros").appendChild(t); return t;
+      });
+      const lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+      function cuboD(s) {
+        const P = (i, j, k) => [i * s[0], j * s[1], k * s[2]];
+        const A = [[[0,0,0],[1,0,0]],[[0,0,0],[0,1,0]],[[0,0,0],[0,0,1]],[[1,0,0],[1,1,0]],[[1,0,0],[1,0,1]],[[0,1,0],[1,1,0]],[[0,1,0],[0,1,1]],[[0,0,1],[1,0,1]],[[0,0,1],[0,1,1]],[[1,1,0],[1,1,1]],[[1,0,1],[1,1,1]],[[0,1,1],[1,1,1]]];
+        return A.map(([a, b]) => linea([P(...a), P(...b)])).join("");
+      }
+      function dibujar() {
+        $("cuento-pz").setAttribute("d", linea([[0,0,0],[1,0,0],[1,1,0],[0,1,0]], true));
+        $("cuento-px").setAttribute("d", linea([[0,0,0],[0,1,0],[0,1,1],[0,0,1]], true));
+        $("cuento-py").setAttribute("d", linea([[0,0,0],[1,0,0],[1,0,1],[0,0,1]], true));
+        $("cuento-cubos").setAttribute("d", CICLO.map((c) => cuboD(sg(c))).join(""));
+        $("cuento-nucleo").setAttribute("d", cuboD([N, N, N]));
+        // el cuadrado de la esquina: dos líneas en cada uno de los tres pisos
+        $("cuento-cuadrado").setAttribute("d", linea([[S,0,0],[S,S,0],[0,S,0]]) + linea([[0,S,0],[0,S,S],[0,0,S]]) + linea([[0,0,S],[S,0,S],[S,0,0]]));
+        // el rectángulo rojo a mitad de la pared x = 0, al ras del piso
+        $("cuento-rect").setAttribute("d", linea([[0,0.43,0],[0,0.57,0],[0,0.57,0.13],[0,0.43,0.13]], true));
+        const pon = (id, p, dy) => { const q = iso(p); $(id).setAttribute("x", q[0].toFixed(1)); $(id).setAttribute("y", (q[1] + (dy || 0)).toFixed(1)); };
+        pon("cuento-n-z", [0.62, 0.62, 0], 12); pon("cuento-n-x", [0, 0.55, 0.6]); pon("cuento-n-y", [0.6, 0, 0.6]);
+        pon("cuento-n-portal", [0, 0.5, 0.2]);
+        // el lector: al cuadrado del núcleo; después, al rectángulo de la pared
+        const ruta1 = lerp([0.72, 0.62, 0], [S / 2, S / 2, 0], st.p1), ruta2 = lerp([0.72, 0.62, 0], [0.04, 0.5, 0], st.p2);
+        const q = iso(st.p2 > 0 ? ruta2 : ruta1);
+        $("cuento-lector").setAttribute("cx", q[0].toFixed(1)); $("cuento-lector").setAttribute("cy", q[1].toFixed(1));
+        // el ciclo de los 8 capítulos: una línea por los centros de las habitaciones
+        const centros = CICLO.map((c) => sg(c).map((v) => v * 0.5));
+        $("cuento-ciclo").setAttribute("d", linea([...centros, centros[0]]));
+        centros.forEach((c, i) => { const r = iso(c); numeros[i].setAttribute("x", r[0].toFixed(1)); numeros[i].setAttribute("y", r[1].toFixed(1)); });
+      }
+      for (const el of document.querySelectorAll("#root .cap, #root .cuento-frase")) {
+        const parte = el.querySelectorAll("b, span").length ? el.querySelectorAll("b, span") : [el];
+        for (const p of parte) p.innerHTML = [...p.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+      const escribir = (sel, t, cada) => tl.fromTo(sel + " .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: cada || 0.03, ease: "none" }, t);
+      const tl = gsap.timeline({ paused: true, onUpdate: dibujar });
+      tl.set({}, {}, 22);
+      // 0–5,6 s: capítulo 1; los tres pisos, uno por uno, con su personaje
+      escribir("#cuento-cap1", 0.2, 0.05);
+      escribir("#cuento-f1", 0.6);
+      [["z", 1.0], ["x", 2.0], ["y", 3.0]].forEach(([e, t]) => {
+        tl.fromTo("#cuento-p" + e, { attr: { "fill-opacity": 0 } }, { attr: { "fill-opacity": 0.22 }, duration: 0.4, ease: "sine.out" }, t);
+        tl.fromTo("#cuento-n-" + e, { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.3, ease: "sine.out" }, t + 0.2);
+      });
+      // 5,6–11,2 s: el núcleo y su cuadrado; el lector entra → capítulo 2
+      escribir("#cuento-f2", 5.8);
+      tl.fromTo("#cuento-nucleo", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.4, ease: "sine.out" }, 5.8);
+      tl.fromTo("#cuento-cuadrado", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 0.9, ease: "power2.inOut" }, 6.2);
+      tl.fromTo("#cuento-lector", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.2, ease: "none" }, 6.9);
+      tl.fromTo(st, { p1: 0 }, { p1: 1, duration: 1.5, ease: "power2.inOut" }, 7.0);
+      escribir("#cuento-cap2", 8.6, 0.05);
+      tl.to("#cuento-lector", { attr: { opacity: 0 }, duration: 0.15, ease: "none" }, 8.55);
+      // 11,2–17,6 s: el rectángulo rojo de Yu Tsun; el lector entra → su piso pasa a ser el de la lectura
+      escribir("#cuento-f3", 11.4);
+      tl.fromTo("#cuento-rect", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.4, ease: "sine.out" }, 11.6);
+      tl.fromTo("#cuento-n-portal", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.3, ease: "sine.out" }, 11.9);
+      tl.fromTo("#cuento-lector", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.2, ease: "none" }, 12.4);
+      tl.fromTo(st, { p2: 0 }, { p2: 1, duration: 1.6, ease: "power2.inOut" }, 12.5);
+      tl.to("#cuento-pz", { attr: { "fill-opacity": 0.08 }, duration: 0.5, ease: "sine.inOut" }, 14.2);
+      tl.to("#cuento-px", { attr: { "fill-opacity": 0.5 }, duration: 0.5, ease: "sine.inOut" }, 14.2);
+      tl.to("#cuento-n-z", { attr: { opacity: 0.35 }, duration: 0.5, ease: "sine.inOut" }, 14.2);
+      // 17,6–22 s: las ocho habitaciones y el ciclo
+      tl.to("#cuento-lector, #cuento-rect, #cuento-n-portal, #cuento-n-x, #cuento-n-y, #cuento-n-z, #cuento-nucleo, #cuento-cuadrado", { attr: { opacity: 0 }, duration: 0.4, ease: "sine.in" }, 17.4);
+      tl.to("#cuento-pz, #cuento-px, #cuento-py", { attr: { "fill-opacity": 0 }, duration: 0.4, ease: "sine.in" }, 17.4);
+      tl.fromTo(st, { k: 330, cx: 1000, cy: 540, th: 0 }, { k: 240, cx: 1080, cy: 500, th: 0.45, duration: 1.6, ease: "power3.inOut" }, 17.6);
+      tl.fromTo("#cuento-cubos", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.6, ease: "sine.out" }, 18.0);
+      tl.fromTo(numeros, { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.2, stagger: 0.12, ease: "none" }, 18.8);
+      tl.fromTo("#cuento-ciclo", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 2.0, ease: "power1.inOut" }, 19.0);
+      escribir("#cuento-cap8", 17.8, 0.05);
+      escribir("#cuento-f4", 18.2);
+      dibujar();
+      window.__timelines["cuento"] = tl;
+    })();
+  </script>
+</template>

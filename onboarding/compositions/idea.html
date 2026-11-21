@@ -1,0 +1,85 @@
+<template>
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #idea-svg { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+    .lomo-titulo { font-family: "FabiBlock"; font-size: 40px; fill: #1f1d1b; }
+    .lomo-autor { font-family: "IBM Plex Mono"; font-size: 28px; fill: #1f1d1b; }
+    #idea-titulo { position: absolute; left: 1290px; top: 300px; font-family: "FabiBlock"; font-size: 44px; line-height: 1.12; color: #9b3d2e; }
+    #idea-hechos { position: absolute; left: 120px; top: 330px; width: 700px; font-family: "IBM Plex Mono"; font-size: 32px; line-height: 1.5; color: #1f1d1b; }
+    #idea-frase { position: absolute; left: 120px; top: 900px; font-family: "IBM Plex Mono"; font-size: 30px; color: #1f1d1b; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="idea" data-width="1920" data-height="1080">
+    <svg id="idea-svg" viewBox="0 0 1920 1080">
+      <defs>
+        <g id="idea-lomo0">
+          <rect x="200" y="220" width="120" height="640" fill="#e9e3d6" stroke="#1f1d1b" stroke-width="2" />
+          <text class="lomo-titulo" transform="translate(274 830) rotate(-90)">EL ALEPH</text>
+          <text class="lomo-autor" transform="translate(230 830) rotate(-90)">J. L. BORGES</text>
+        </g>
+        <g id="idea-lomo1">
+          <rect x="380" y="220" width="120" height="640" fill="#e9e3d6" stroke="#1f1d1b" stroke-width="2" />
+          <text class="lomo-titulo" transform="translate(454 830) rotate(-90)">EL JARDÍN DE SENDEROS</text>
+          <text class="lomo-autor" transform="translate(410 830) rotate(-90)">J. L. BORGES</text>
+        </g>
+        <g id="idea-lomo2">
+          <rect x="560" y="220" width="120" height="640" fill="#e9e3d6" stroke="#1f1d1b" stroke-width="2" />
+          <text class="lomo-titulo" transform="translate(634 830) rotate(-90)">LA BIBLIOTECA DE BABEL</text>
+          <text class="lomo-autor" transform="translate(590 830) rotate(-90)">J. L. BORGES</text>
+        </g>
+      </defs>
+      <g id="idea-piezas"></g>
+      <path id="idea-cortes" d="M170,380H710M170,540H710M170,700H710" stroke="#9b3d2e" stroke-width="3" fill="none" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <rect id="idea-marco" x="880" y="220" width="360" height="640" fill="none" stroke="#9b3d2e" stroke-width="4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+    </svg>
+    <div id="idea-titulo" class="clip" data-start="0" data-duration="16">EL EXPEDIENTE<br>DE LA<br>BIBLIOTECA<br>BABEL</div>
+    <div id="idea-hechos" class="clip" data-start="0" data-duration="16">Fenton, 28 de julio de 1916.<br>Cuatro muertos en la Biblioteca.<br>El mismo día bombardean Albert,<br>y esa noticia tapa la otra.</div>
+    <div id="idea-frase" class="clip" data-start="0" data-duration="16">Un cuento hecho con partes de otros tres, en una lectura libre.</div>
+  </div>
+  <script>
+    (function () {
+      const NS = "http://www.w3.org/2000/svg", XL = "http://www.w3.org/1999/xlink";
+      const piezas = document.getElementById("idea-piezas"), defs = document.querySelector("#idea-svg defs");
+      const X0 = [200, 380, 560], H = 160, Y0 = 220;
+      const lista = [];
+      // cada lomo se corta en cuatro franjas; la franja s del libro b va a la columna (b + s) mod 3 del libro nuevo
+      for (let b = 0; b < 3; b++) for (let s = 0; s < 4; s++) {
+        const cp = document.createElementNS(NS, "clipPath");
+        cp.setAttribute("id", "idea-c" + b + s);
+        const r = document.createElementNS(NS, "rect");
+        r.setAttribute("x", X0[b] - 4); r.setAttribute("y", Y0 + s * H); r.setAttribute("width", 128); r.setAttribute("height", H);
+        cp.appendChild(r); defs.appendChild(cp);
+        const g = document.createElementNS(NS, "g");
+        g.setAttribute("id", "idea-pieza" + b + s);
+        g.setAttribute("clip-path", "url(#idea-c" + b + s + ")");
+        const u = document.createElementNS(NS, "use");
+        u.setAttribute("href", "#idea-lomo" + b); u.setAttributeNS(XL, "xlink:href", "#idea-lomo" + b);
+        g.appendChild(u); piezas.appendChild(g);
+        lista.push({ g, dx: 880 + ((b + s) % 3) * 120 - X0[b] });
+      }
+      for (const id of ["idea-titulo", "idea-hechos", "idea-frase"]) {
+        const el = document.getElementById(id);
+        el.innerHTML = el.innerHTML.split("<br>").map((linea) => [...linea].map((ch) => '<span class="letra">' + ch + "</span>").join("")).join("<br>");
+      }
+      const tl = gsap.timeline({ paused: true });
+      tl.set({}, {}, 16);
+      // 0–2,2 s: los tres lomos, de a uno
+      tl.fromTo(lista.map((p) => p.g), { opacity: 0 }, { opacity: 1, duration: 0.4, stagger: { each: 0.05, grid: [3, 4], from: "start" }, ease: "sine.out" }, 0.2);
+      // 2,6–3,4 s: los cortes
+      tl.fromTo("#idea-cortes", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 0.8, ease: "power2.inOut" }, 2.6);
+      // 3,6–6,4 s: las franjas viajan y se rearman en el libro nuevo
+      lista.forEach((p, i) => {
+        tl.fromTo(p.g, { x: 0 }, { x: p.dx, duration: 1.6, ease: "power3.inOut" }, 3.6 + i * 0.1);
+      });
+      tl.to("#idea-cortes", { opacity: 0, duration: 0.4, ease: "sine.in" }, 4.2);
+      // 6,6 s: el libro nuevo, con su título en lacre
+      tl.fromTo("#idea-marco", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 0.9, ease: "power2.inOut" }, 6.6);
+      tl.fromTo("#idea-titulo .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.05, ease: "none" }, 7.0);
+      // 8,8 s: lo que pasó
+      tl.fromTo("#idea-hechos .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.03, ease: "none" }, 8.8);
+      tl.fromTo("#idea-frase .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.025, ease: "none" }, 12.0);
+      window.__timelines["idea"] = tl;
+    })();
+  </script>
+</template>

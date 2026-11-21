@@ -1,0 +1,108 @@
+<template>
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #esf-svg { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+    #esf-frase { position: absolute; left: 120px; top: 900px; font-family: "IBM Plex Mono"; font-size: 30px; color: #1f1d1b; white-space: nowrap; }
+    #esf-final { position: absolute; left: 120px; top: 120px; font-family: "FabiBlock"; font-size: 104px; color: #9b3d2e; white-space: nowrap; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="esferas" data-width="1920" data-height="1080">
+    <svg id="esf-svg" viewBox="0 0 1920 1080">
+      <g id="esf-mundo">
+        <path id="esf-escalera" d="" fill="#a8a398" fill-opacity="0.16" stroke="#1f1d1b" stroke-width="2" />
+        <path id="esf-bandeja" d="" fill="#a8a398" fill-opacity="0.16" stroke="#1f1d1b" stroke-width="2" />
+        <g id="esf-palabras"></g>
+        <circle id="esf-aro" r="30" cx="0" cy="0" fill="none" stroke="#9b3d2e" stroke-width="3" opacity="0" />
+        <circle id="esf-esfera" r="26" cx="0" cy="0" fill="#e9e3d6" fill-opacity="0.6" stroke="#1f1d1b" stroke-width="2" />
+        <circle id="esf-lector" r="13" cx="0" cy="0" fill="#9b3d2e" opacity="0" />
+      </g>
+      <circle id="esf-dedo" r="22" cx="0" cy="0" fill="#1f1d1b" fill-opacity="0.18" stroke="#1f1d1b" stroke-width="2" opacity="0" />
+    </svg>
+    <div id="esf-frase" class="clip" data-start="0" data-duration="11.6">Tocá una esfera: queda solo el texto, y se lee subiendo.</div>
+    <div id="esf-final" class="clip" data-start="11.6" data-duration="2.4">AHORA, CAMINÁ.</div>
+  </div>
+  <script>
+    (function () {
+      const st = { k: 360, cx: 1000, cy: 430, t: -1, sube: 0, velo: 0 };
+      const C30 = Math.cos(Math.PI / 6);
+      const iso = (p) => [st.cx + (p[0] - p[1]) * C30 * st.k, st.cy + (p[0] + p[1]) * 0.5 * st.k - p[2] * st.k];
+      const pts = (arr) => arr.map((p) => { const q = iso(p); return q[0].toFixed(1) + "," + q[1].toFixed(1); }).join(" ");
+      const linea = (arr, cerrar) => arr.map((p, i) => { const q = iso(p); return (i ? "L" : "M") + q[0].toFixed(1) + "," + q[1].toFixed(1); }).join("") + (cerrar ? "Z" : "");
+      const $ = (id) => document.getElementById(id);
+      // una escalera que sube hacia -x: cada contrahuella mira al lector (+x) y lleva un renglón
+      const N = 6, P = 0.14, H = 0.12, X0 = 0.9, W0 = 0.0, W1 = 0.7;
+      const PAL = [[0.2, 0.14, 0.24], [0.1, 0.22, 0.12, 0.16], [0.24, 0.1, 0.22], [0.14, 0.2, 0.14, 0.1], [0.18, 0.12, 0.26], [0.22, 0.2, 0.16]];
+      const palabras = [];
+      let tt = 3.2;
+      PAL.forEach((fila, i) => {
+        let y = W0 + 0.05;
+        fila.forEach((w) => {
+          const pol = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+          $("esf-palabras").appendChild(pol);
+          const dur = 0.18 + w * 0.6;
+          palabras.push({ pol, i, y0: y, y1: y + w, t0: tt, t1: tt + dur });
+          tt += dur; y += w + 0.04;
+        });
+        tt += 0.2;
+      });
+      const FIN = tt;
+      const mezcla = (a, b, t) => { const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16); const c = [16, 8, 0].map((s) => Math.round(((A >> s) & 255) + (((B >> s) & 255) - ((A >> s) & 255)) * t)); return "rgb(" + c.join(",") + ")"; };
+      function dibujar() {
+        let d = "";
+        for (let i = 0; i < N; i++) {
+          const x = X0 - i * P, z0 = i * H, z1 = (i + 1) * H;
+          d += linea([[x, W0, z0], [x, W1, z0], [x, W1, z1], [x, W0, z1]], true);       // contrahuella
+          d += linea([[x, W0, z1], [x, W1, z1], [x - P, W1, z1], [x - P, W0, z1]], true); // huella
+        }
+        $("esf-escalera").setAttribute("d", d);
+        const xb = X0 - N * P, zb = N * H;
+        $("esf-bandeja").setAttribute("d", linea([[xb, W0 - 0.2, zb], [xb, W1 + 0.2, zb], [xb - 0.7, W1 + 0.2, zb], [xb - 0.7, W0 - 0.2, zb]], true));
+        for (const w of palabras) {
+          const x = X0 - w.i * P + 0.004, zc = w.i * H + H / 2;
+          w.pol.setAttribute("points", pts([[x, w.y0, zc - H * 0.28], [x, w.y1, zc - H * 0.28], [x, w.y1, zc + H * 0.28], [x, w.y0, zc + H * 0.28]]));
+          // por leer: piedra · leyéndose: lacre (entra rápido, sale despacio) · leída: carbón
+          let color;
+          if (st.t < w.t0) color = "#c9c3b6";
+          else if (st.t < w.t1) color = mezcla("#c9c3b6", "#9b3d2e", Math.min(1, (st.t - w.t0) / 0.2));
+          else color = mezcla("#9b3d2e", "#1f1d1b", Math.min(1, (st.t - w.t1) / 0.6));
+          w.pol.setAttribute("fill", color);
+        }
+        const e = iso([X0 + 0.22, W1 - 0.05, 0.16]);
+        for (const id of ["esf-esfera", "esf-aro"]) { $(id).setAttribute("cx", e[0].toFixed(1)); $(id).setAttribute("cy", e[1].toFixed(1)); }
+        const l = iso([xb - 0.3, (W0 + W1) / 2, zb]);
+        $("esf-lector").setAttribute("cx", l[0].toFixed(1)); $("esf-lector").setAttribute("cy", l[1].toFixed(1));
+        // la vista sube con la lectura: el renglón que se lee queda a la misma altura de la pantalla
+        $("esf-mundo").setAttribute("transform", "translate(" + (-st.sube * P * C30 * st.k).toFixed(1) + " " + (st.sube * (H + P * 0.5) * st.k).toFixed(1) + ")");
+      }
+      for (const id of ["esf-frase", "esf-final"]) {
+        const el = $(id);
+        el.innerHTML = [...el.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+      const tl = gsap.timeline({ paused: true, onUpdate: dibujar });
+      tl.set({}, {}, 14);
+      tl.fromTo("#esf-frase .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.025, ease: "none" }, 0.3);
+      // 0,6–2,4 s: el dedo llega y toca la esfera; el aro late una vez
+      const e0 = iso([X0 + 0.22, W1 - 0.05, 0.16]);
+      tl.fromTo("#esf-dedo", { attr: { opacity: 0, cx: e0[0] + 260, cy: e0[1] + 160 } }, { attr: { opacity: 1, cx: e0[0] + 10, cy: e0[1] + 8 }, duration: 1.2, ease: "power3.out" }, 0.6);
+      tl.fromTo("#esf-dedo", { attr: { r: 22 } }, { attr: { r: 16 }, duration: 0.15, ease: "power2.in", yoyo: true, repeat: 1 }, 1.9);
+      tl.fromTo("#esf-aro", { attr: { r: 28, opacity: 1 } }, { attr: { r: 70, opacity: 0 }, duration: 0.8, ease: "power2.out" }, 2.0);
+      tl.to("#esf-dedo", { attr: { opacity: 0 }, duration: 0.3, ease: "sine.in" }, 2.4);
+      // 2,6 s: queda solo el texto (la escalera se vuelve papel); se lee palabra por palabra y la vista sube
+      tl.to("#esf-escalera, #esf-bandeja", { attr: { "stroke-opacity": 0.12, "fill-opacity": 0.03 }, duration: 0.6, ease: "sine.inOut" }, 2.6);
+      tl.to("#esf-esfera", { attr: { opacity: 0 }, duration: 0.4, ease: "sine.in" }, 2.6);
+      tl.fromTo(st, { t: 0 }, { t: FIN + 1, duration: FIN + 1, ease: "none" }, 0);
+      PAL.forEach((fila, i) => {
+        if (i === 0) return;
+        const primera = palabras.find((w) => w.i === i);
+        tl.fromTo(st, { sube: i - 1 }, { sube: i, duration: 0.5, ease: "power2.inOut", immediateRender: false }, primera.t0 - 0.45);
+      });
+      // al final: el lector queda arriba, en la bandeja
+      tl.to("#esf-escalera, #esf-bandeja", { attr: { "stroke-opacity": 1, "fill-opacity": 0.16 }, duration: 0.6, ease: "sine.inOut" }, FIN + 0.2);
+      tl.fromTo("#esf-lector", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.3, ease: "sine.out" }, FIN + 0.5);
+      tl.fromTo("#esf-final .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.06, ease: "none" }, 11.7);
+      dibujar();
+      window.__timelines["esferas"] = tl;
+    })();
+  </script>
+</template>
