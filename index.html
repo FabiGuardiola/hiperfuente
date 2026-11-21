@@ -187,6 +187,9 @@ document.getElementById("textoCarga").textContent = "Cargando librerías…";
 </script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/TTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/FontLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <!-- Sistema sonoro de los 24 espacios (audio/engine.js del proyecto): notas, tríadas, modos y timbres. -->
 <script src="audio24.js"></script>
@@ -377,7 +380,7 @@ async function cargarModelo(url) {
 const gltf = await cargarModelo("modelo.gltf.json");
 const gltfEspejo = await cargarModelo("espejo.gltf.json");
 // 2026-11-20: lo que dice cada personaje (x e y aparte, para que cada archivo pese menos de 16 MB) y las columnatas
-for (const [archivo, destino] of [["personajes.gltf.json", gltf], ["columnatas.gltf.json", gltf], ["espejo_personajes.gltf.json", gltfEspejo]]) {
+for (const [archivo, destino] of [["columnatas.gltf.json", gltf]]) {
   const extra = await cargarModelo(archivo);
   for (const c of [...extra.scene.children]) destino.scene.add(c);
 }
@@ -460,7 +463,7 @@ function materialEscalera(hex) {
   return m;
 }
 const matsEscalera = { Color_5cc6d2: materialEscalera(0x5cc6d2), Color_1e6973: materialEscalera(0x1e6973) };
-for (const V of "ZXY") pieza["ESCALERAS_" + V].traverse((o) => { if (o.isMesh) o.material = matsEscalera[o.userData.mat] || matsEscalera.Color_1e6973; });
+for (const V of "ZXY") if (pieza["ESCALERAS_" + V]) pieza["ESCALERAS_" + V].traverse((o) => { if (o.isMesh) o.material = matsEscalera[o.userData.mat] || matsEscalera.Color_1e6973; });
 
 // ---------- Anamorfosis: cada letra respira sobre su rayo desde el mirador y tiembla apenas ----------
 // El centro de cada letra viene en COLOR_0. Desde el mirador la frase se sigue leyendo aunque se mueva.
@@ -483,7 +486,7 @@ matAnamorfosis.onBeforeCompile = (sh) => {
       transformed = uOjo + anS * (anC - uOjo) + anP * anS + vec3(0.0, 0.0, 0.025 * sin(uTiempo * 1.3 + anF * 2.0));`);
   sh.fragmentShader = sh.fragmentShader.replace("#include <color_fragment>", "");
 };
-for (const V of "ZXY") pieza["ANAMORFOSIS_" + V].traverse((o) => { if (o.isMesh) o.material = matAnamorfosis; });
+for (const V of "ZXY") if (pieza["ANAMORFOSIS_" + V]) pieza["ANAMORFOSIS_" + V].traverse((o) => { if (o.isMesh) o.material = matAnamorfosis; });
 
 function fijar(obj, m) { obj.matrixAutoUpdate = false; obj.matrix.copy(m); return obj; }
 
@@ -501,13 +504,10 @@ const estructura = new THREE.Group();
 const VOZ_G = ["Z", "X", "Y"];                 // la gravedad g habla con la voz VOZ_G[g]
 GIROS.forEach((m, g) => {
   estructura.add(copia("MODULO_Z", m, g, EJE_G[g]));
-  estructura.add(copia("ESCALERAS_" + VOZ_G[g], m, g));
 });
 estructura.add(copia("ESTRUCTURA", new THREE.Matrix4(), -1, "n"));
 GIROS.forEach((m, g) => {
   estructura.add(copia("TEXTOS", m, g));
-  estructura.add(copia("TEXTOS_" + VOZ_G[g], m, g));
-  estructura.add(copia("ANAMORFOSIS_" + VOZ_G[g], m, g));
 });
 estructura.add(copia("PLACAS", new THREE.Matrix4(), -1));
 raiz.add(estructura);
@@ -967,6 +967,294 @@ function rayoCol(o, d, max) {
   if (nv.dot(d) > 0) nv.negate();
   return { t: mejor, n: nv };
 }
+
+// ---------- El escritor: los textos de cada capa, escritos en el visor con FabiBlock (2026-11-21) ----------
+// Lo pega herramientas/armar_visor_v3.py dentro del visor, después de la colisión.
+// En vez de bajar la geometría de las letras, el visor baja la fuente (10 KB) y el texto de las 24 capas
+// (datos.capas), y escribe en la habitación donde está el lector, con el texto de su capítulo:
+//   · muros M1 y M3: el testimonio de cada voz (justificado, de muro en muro);
+//   · escaleras: la narración de cada voz, un renglón por escalón (gira como cartel de aeropuerto);
+//   · anamorfosis: la cita de cada voz, letras sueltas sobre sus rayos desde el mirador.
+// Las otras habitaciones muestran placas lisas en su lugar (pesan casi nada). En las habitaciones reflejo, el texto
+// se escribe dado vuelta en su lugar, así se lee derecho.
+const fuenteFB = await new Promise((ok, mal) => new THREE.TTFLoader().load("FabiBlock-Regular.otf", (j) => ok(new THREE.Font(j)), undefined, mal));
+const FB = fuenteFB.data, FB_RES = FB.resolution;
+// TTFLoader escala las coordenadas a 100000/72 unidades por em (con resolución 1000): un em queda en 1,39. Con
+// EM = 0,72 el tamaño queda como en Blender (tamaño = em).
+const EM = 0.72;
+const glifos = {};
+function glifo(ch, prof) {
+  const clave = ch + "|" + prof;
+  if (glifos[clave]) return glifos[clave];
+  const g = FB.glyphs[ch];
+  const adv = g ? (g.ha / FB_RES) * EM : 0.3;
+  let frente = null, canto = null, caja = null;
+  if (g && ch.trim()) {
+    const formas = fuenteFB.generateShapes(ch, EM);
+    let geo = prof > 0 ? new THREE.ExtrudeGeometry(formas, { depth: prof, bevelEnabled: false, curveSegments: 1 }) : new THREE.ShapeGeometry(formas, 1);
+    geo.translate(0, 0, -prof / 2);
+    const grupos = geo.groups.length ? geo.groups : [{ start: 0, count: geo.index ? geo.index.count : geo.attributes.position.count, materialIndex: 0 }];
+    geo = geo.index ? geo.toNonIndexed() : geo;
+    const p = geo.attributes.position.array, f = [], c = [];
+    for (const gr of grupos) for (let t = gr.start; t < gr.start + gr.count; t += 3) {
+      const tri = p.slice(t * 3, t * 3 + 9);
+      if (gr.materialIndex === 0 && prof > 0 && tri[2] < 0 && tri[5] < 0 && tri[8] < 0) continue;   // sin cara de atrás
+      (gr.materialIndex === 0 ? f : c).push(...tri);
+    }
+    frente = new Float32Array(f); canto = new Float32Array(c);
+    geo.computeBoundingBox(); caja = geo.boundingBox;
+  }
+  return (glifos[clave] = { adv, frente, canto, caja });
+}
+const ALTO_REF = (() => { const c = glifo("Á", 0.1).caja; return c ? c.max.y - Math.min(0, c.min.y) : 0.8; })();
+const mayus = (t) => t.toUpperCase().replace(/[«»—“”]/g, (m) => (FB.glyphs[m] ? m : m === "—" ? "-" : '"'));
+const ancho = (w, tam, tr) => [...w].reduce((a, ch) => a + glifo(ch, 0).adv * tam * tr, 0);
+
+// Junta letras en un BufferGeometry: cada letra es la geometría de su glifo con una matriz (der, arriba, normal, origen).
+class Juntador {
+  constructor() { this.f = []; this.c = []; this.cf = []; this.cc = []; }
+  letra(gl, M, color) {
+    for (const [src, dst, col] of [[gl.frente, this.f, this.cf], [gl.canto, this.c, this.cc]]) {
+      if (!src) continue;
+      const e = M.elements;
+      for (let i = 0; i < src.length; i += 3) {
+        const x = src[i], y = src[i + 1], z = src[i + 2];
+        dst.push(e[0] * x + e[4] * y + e[8] * z + e[12], e[1] * x + e[5] * y + e[9] * z + e[13], e[2] * x + e[6] * y + e[10] * z + e[14]);
+        if (color) col.push(...color);
+      }
+    }
+  }
+  malla(arr, colores, material) {
+    if (!arr.length) return null;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(arr, 3));
+    if (colores.length) g.setAttribute("color", new THREE.Float32BufferAttribute(colores, 4));
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, material);
+    m.userData.mat = material.userData.nombre || "";
+    return m;
+  }
+}
+const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+const mLetra = (der, arriba, normal, origen, esc) =>
+  new THREE.Matrix4().makeBasis(der.clone().multiplyScalar(esc), arriba.clone().multiplyScalar(esc), normal.clone().multiplyScalar(esc)).setPosition(origen);
+const COD = datos.codigo;
+const codigo = (c, extraR, extraG) => [(c.x - COD.min) / COD.rango * 0.5 + extraR, (c.y - COD.min) / COD.rango * 0.5 + extraG, (c.z - COD.min) / COD.rango, 1];
+const V3 = (a) => new THREE.Vector3(...a);
+
+// Muros de testimonio: llenan su rectángulo, justificados; el texto sigue del M1 al M3 y vuelve a empezar.
+function escribirMuros(texto, espejo) {
+  const j = new Juntador();
+  const pal = (mayus(texto) + " ").repeat(20).split(/\s+/).filter(Boolean);
+  let k = 0;
+  for (const m of datos.muros_voz) {
+    const tam = m.tam, tr = 0.94, linea = tam * 0.92, esp = glifo(" ", 0).adv * tam;
+    let der = V3(m.der), o = V3(m.o);
+    const arriba = V3(m.arriba), n = V3(m.n);
+    if (espejo) { o.addScaledVector(der, m.ancho); der.negate(); }
+    for (let y = -tam * 0.78; -y < m.alto - tam * 0.1; y -= linea) {
+      const fila = [];
+      let w = 0;
+      while (fila.length === 0 || w + esp * tr + ancho(pal[k % pal.length], tam, tr) <= m.ancho) {
+        const p = pal[k % pal.length];
+        w += (fila.length ? esp * tr : 0) + ancho(p, tam, tr);
+        fila.push(p); k++;
+        if (w > m.ancho) break;
+      }
+      const extra = fila.length > 1 ? (m.ancho - w) / (fila.length - 1) : 0;
+      let x = 0;
+      for (const p of fila) {
+        for (const ch of p) {
+          const gl = glifo(ch, m.espesor / tam);
+          j.letra(gl, mLetra(der, arriba, n, o.clone().addScaledVector(der, x).addScaledVector(arriba, y), tam));
+          x += gl.adv * tam * tr;
+        }
+        x += esp * tr + extra;
+      }
+    }
+  }
+  const malla = j.malla(j.f.concat(j.c), [], material("Color_3d3c39", datos.materiales.Color_3d3c39 || [0.05, 0.05, 0.05, 1]));
+  if (malla) malla.userData.mat = "Color_3d3c39";
+  return malla;
+}
+
+// Escaleras: un renglón por escalón, parado en su contrahuella, de frente al pie; la narración sigue de una escalera
+// a la otra (empieza en E4, la de la H). Devuelve el grupo y las palabras de cada renglón (para la lectura).
+const ESCALERAS_DATOS = (datos.lecturas || []).filter((l) => l.escalera).map((l) => l.escalera)
+  .sort((a, b) => (a.id === "E4" ? -1 : b.id === "E4" ? 1 : a.id < b.id ? -1 : 1));
+function escribirEscaleras(texto, espejo) {
+  const j = new Juntador(), filas = {};
+  const pal = (mayus(texto) + " ").repeat(40).split(/\s+/).filter(Boolean);
+  let k = 0;
+  const arriba = new THREE.Vector3(0, 0, 1);
+  for (const e of ESCALERAS_DATOS) {
+    const n = V3(e.n), c0 = V3(e.c0), der0 = V3(e.der), eje = Math.abs(n.x) > Math.abs(n.y) ? 0 : 1;
+    const der = espejo ? der0.clone().negate() : der0;
+    const sube = n.clone().multiplyScalar(-e.paso).add(new THREE.Vector3(0, 0, e.alza));
+    const tam = (e.alza * 0.9) / ALTO_REF, tr = 0.94, esp = glifo(" ", 0).adv * tam;
+    const extraR = n.getComponent(eje) > 0 ? 0.5 : 0, extraG = eje === 1 ? 0.5 : 0;
+    filas[e.id] = [];
+    for (let r = 0; r < e.filas; r++) {
+      const centro = c0.clone().addScaledVector(sube, r);
+      const fila = [];
+      let w = 0;
+      while (fila.length === 0 || w + esp * tr + ancho(pal[k % pal.length], tam, tr) <= e.ancho) {
+        const p = pal[k % pal.length];
+        w += (fila.length ? esp * tr : 0) + ancho(p, tam, tr);
+        fila.push(p); k++;
+      }
+      let u = -w / 2;
+      const palabras = [];
+      for (const p of fila) {
+        let u0 = null, u1 = u;
+        for (const ch of p) {
+          const gl = glifo(ch, 0.06 / tam);
+          if (gl.caja) {
+            const cy = (gl.caja.min.y + gl.caja.max.y) / 2 * tam, cx = (gl.caja.min.x + gl.caja.max.x) / 2 * tam;
+            // línea de base: el renglón queda centrado en el alto del escalón
+            const origen = centro.clone().addScaledVector(der, u).addScaledVector(arriba, -ALTO_REF * tam / 2);
+            const cLetra = origen.clone().addScaledVector(der, cx).addScaledVector(arriba, cy);
+            j.letra(gl, mLetra(der, arriba, n, origen, tam), codigo(cLetra, extraR, extraG));
+            if (u0 === null) u0 = u + gl.caja.min.x * tam;
+            u1 = u + gl.caja.max.x * tam;
+          }
+          u += gl.adv * tam * tr;
+        }
+        palabras.push([+(u0 === null ? u1 : u0).toFixed(3), +u1.toFixed(3)]);   // en el sentido de lectura, desde el centro
+        u += esp * tr;
+      }
+      filas[e.id].push(palabras);
+    }
+  }
+  const grupo = new THREE.Group();
+  const mf = j.malla(j.f, j.cf, matsEscalera.Color_5cc6d2), mc = j.malla(j.c, j.cc, matsEscalera.Color_1e6973);
+  if (mf) { mf.userData.mat = "Color_5cc6d2"; grupo.add(mf); }
+  if (mc) { mc.userData.mat = "Color_1e6973"; grupo.add(mc); }
+  return { grupo, filas };
+}
+
+// Anamorfosis: la cita en letras sueltas; cada una sobre su rayo desde el mirador, a una distancia al azar (6 a
+// 24 m) donde el rayo esté libre, con un tamaño proporcional a la distancia (desde el ojo se lee entera).
+function escribirAnamorfosis(lineas, W, espejo, semilla) {
+  const j = new Juntador();
+  const ojo = V3(datos.mirador.ojo), d = V3(datos.mirador.mira).normalize(), arriba = new THREE.Vector3(0, 0, 1);
+  const der = d.clone().cross(arriba).normalize();
+  const D0 = 8, ALTO = 0.34, INTER = 0.07;
+  let s = semilla;
+  const azar = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const aMundo = (p) => blenderAThree(p.clone().applyMatrix4(W).toArray());
+  const ojoW = aMundo(ojo);
+  const F = (p) => (espejo ? p.clone().addScaledVector(der, -2 * p.clone().sub(ojo).dot(der)) : p);
+  lineas.forEach((linea, nl) => {
+    const vC = (lineas.length - 1) / 2 * 0.5 - nl * 0.5;
+    const esc = ALTO / ALTO_REF;
+    const letras = [...mayus(linea)].map((ch) => ({ ch, gl: glifo(ch, 0.1) }));
+    const total = letras.reduce((a, l) => a + (l.gl.caja ? (l.gl.caja.max.x - l.gl.caja.min.x) : 0.6) * esc + INTER, 0) - INTER;
+    let u = -total / 2;
+    for (const { gl } of letras) {
+      const w = gl.caja ? (gl.caja.max.x - gl.caja.min.x) * esc : 0.6 * esc;
+      const uC = u + w / 2;
+      u += w + INTER;
+      if (!gl.caja) continue;
+      const P = ojo.clone().addScaledVector(d, D0).addScaledVector(der, uC).addScaledVector(arriba, vC);
+      const rayo = P.clone().sub(ojo).normalize();
+      let t = 0;
+      for (let i = 0; i < 40; i++) {
+        const tt = 6 + azar() * 18;
+        const Q = F(ojo.clone().addScaledVector(rayo, tt));
+        const dirW = aMundo(Q).sub(ojoW);
+        const largo = dirW.length();
+        if (!rayoCol(ojoW, dirW.normalize(), largo + 0.5)) { t = tt; break; }
+      }
+      if (!t) continue;
+      const k = esc * t * rayo.dot(d) / D0;
+      const normal = rayo.clone().negate();
+      const up = arriba.clone().addScaledVector(normal, -arriba.dot(normal)).normalize();
+      let rgt = up.clone().cross(normal);
+      let Q = ojo.clone().addScaledVector(rayo, t);
+      let nrm = normal.clone();
+      if (espejo) {                                   // dada vuelta sobre el plano vertical del ojo: se lee derecha
+        const refl = (v) => v.addScaledVector(der, -2 * v.dot(der));
+        Q = F(Q); refl(rgt); refl(nrm); refl(up);
+      }
+      const cx = (gl.caja.min.x + gl.caja.max.x) / 2, cy = (gl.caja.min.y + gl.caja.max.y) / 2;
+      const o = Q.clone().addScaledVector(rgt, -cx * k).addScaledVector(up, -cy * k);
+      j.letra(gl, mLetra(rgt, up, nrm, o, k), codigo(Q, 0, 0));
+    }
+  });
+  const malla = j.malla(j.f.concat(j.c), j.cf.concat(j.cc), matAnamorfosis);
+  if (malla) malla.userData.mat = "Color_9b3d2e";
+  return malla;
+}
+
+// Las placas lisas de las habitaciones lejanas: un bloque por muro y una chapa por renglón.
+function suplente() {
+  const g = new THREE.Group();
+  const caja = (c, der, arriba, n, a, h, e, mat) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(a, h, e), mat);
+    m.matrixAutoUpdate = false;
+    m.matrix.makeBasis(der, arriba, n).setPosition(c);
+    g.add(m);
+  };
+  const muroMat = material("Color_3d3c39", datos.materiales.Color_3d3c39 || [0.05, 0.05, 0.05, 1]);
+  for (const m of datos.muros_voz) {
+    const der = V3(m.der), arriba = V3(m.arriba);
+    caja(V3(m.o).addScaledVector(der, m.ancho / 2).addScaledVector(arriba, -m.alto / 2), der, arriba, V3(m.n), m.ancho, m.alto, m.espesor, muroMat);
+  }
+  const cian = material("Color_1e6973", datos.materiales.Color_1e6973 || [0.1, 0.4, 0.45, 1]);
+  for (const e of ESCALERAS_DATOS) {
+    const n = V3(e.n), sube = n.clone().multiplyScalar(-e.paso).add(new THREE.Vector3(0, 0, e.alza));
+    for (let r = 0; r < e.filas; r++) caja(V3(e.c0).addScaledVector(sube, r), V3(e.der), new THREE.Vector3(0, 0, 1), n, e.ancho * 0.85, e.alza * 0.6, 0.06, cian);
+  }
+  return g;
+}
+const SUPLENTE = suplente();
+salasObj.forEach((sala) => GIROS.forEach((M, g) => {
+  const c = fijar(SUPLENTE.clone(), M);
+  c.userData.pieza = "SUPLENTE"; c.userData.g = g;
+  sala.add(c);
+}));
+
+// La habitación escrita: la del lector. Al cambiar de habitación se borra la anterior y se escribe la nueva.
+const escrita = { r: -1, nodos: [], filas: {} };
+function escribirSala(r) {
+  if (escrita.r === r) return;
+  for (const n of escrita.nodos) { n.parent && n.parent.remove(n); n.traverse((o) => o.geometry && o.geometry.dispose()); }
+  if (escrita.r >= 0) for (const h of salasObj[escrita.r].children) if (h.userData.pieza === "SUPLENTE") h.visible = true;
+  escrita.nodos = []; escrita.filas = {}; escrita.r = r;
+  const S = salasM[r], espejo = S.determinant() < 0;
+  const cap = datos.ciclo.indexOf(SALA_CLAVE[r]) + 1;
+  const capa = datos.capas[String(cap)] || datos.capas["1"];
+  GIROS.forEach((M, g) => {
+    const v = "zxy"[g], t = capa[v], W = S.clone().multiply(M);
+    const poner = (obj, pieza) => {
+      if (!obj) return;
+      const c = fijar(obj, M);
+      c.userData.pieza = pieza + "_" + VOZ_G[g]; c.userData.g = g;
+      c.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      salasObj[r].add(c);
+      escrita.nodos.push(c);
+    };
+    const muros = escribirMuros(t.testimonio, espejo);
+    poner(muros && new THREE.Group().add(muros), "TEXTOS");
+    const esc = escribirEscaleras(t.narracion, espejo);
+    poner(esc.grupo, "ESCALERAS");
+    escrita.filas[g] = esc.filas;
+    const ana = escribirAnamorfosis(t.cita, W, espejo, 7 + cap * 31 + g * 7);
+    poner(ana && new THREE.Group().add(ana), "ANAMORFOSIS");
+  });
+  for (const h of salasObj[r].children) if (h.userData.pieza === "SUPLENTE") h.visible = false;
+  renderer.shadowMap.needsUpdate = true;
+}
+function salaDeCamara() {
+  const b = [camera.position.x, -camera.position.z, camera.position.y];
+  return SALA_CLAVE.indexOf(b.map((c) => (c >= 0 ? "+" : "-")).join(""));
+}
+function revisarEscritura() {
+  const r = salaDeCamara();
+  if (r >= 0 && r !== escrita.r) escribirSala(r);
+}
+revisarEscritura();
 
 document.getElementById("carga").hidden = true;
 window.__espacioAbierto = true;
@@ -1651,12 +1939,17 @@ const disparadores = [];
     const nodos = {};
     for (const h of salasObj[r].children) if (h.userData.g === g) nodos[h.userData.pieza] = h;
     for (const L0 of LECTURAS) {
-      const L = L0.escalera && L0.escalera.voces ? { ...L0, escalera: { ...L0.escalera, palabras: L0.escalera.voces["zxy"[g]] } } : L0;
+      let L = L0;
+      if (L0.escalera) {                       // las palabras de cada renglón las da el escritor (texto del capítulo)
+        const e = { ...L0.escalera };
+        Object.defineProperty(e, "palabras", { get: () => (escrita.r === r && escrita.filas[g] && escrita.filas[g][L0.escalera.id]) || [] });
+        L = { ...L0, escalera: e };
+      }
       const nombre = L.pieza.replace(/_V$/, "_" + VOZ_G[g]);
       const ojo = aMundo(W, L.pos), blanco = aMundo(W, L.mira);
       const arriba = aMundo(W, [L.pos[0], L.pos[1], L.pos[2] + 1]).sub(ojo).normalize();
       const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(ojo, blanco, arriba));
-      disparadores.push({ L, W, nodo: L.pieza === "CARTEL" ? carteles[r * 3 + g].m : nodos[nombre], centro: aMundo(W, L.esfera), pose: L.escalera ? poseEscalera(L.escalera, W, 0) : { p: ojo, q, f: fovVertical(L.tipo === "texto" ? 16 : L.tipo === "cartel" ? 20 : 24) } });
+      disparadores.push({ L, W, r, get nodo() { return L.pieza === "CARTEL" ? carteles[r * 3 + g].m : salasObj[r].children.find((h) => h.userData.g === g && h.userData.pieza === nombre); }, centro: aMundo(W, L.esfera), pose: L.escalera ? poseEscalera(L.escalera, W, 0) : { p: ojo, q, f: fovVertical(L.tipo === "texto" ? 16 : L.tipo === "cartel" ? 20 : 24) } });
     }
   }));
 }
@@ -1865,6 +2158,7 @@ function pasoLecturaEscalera() {
   camera.quaternion.copy(pose.q);
 }
 function iniciarVelo(d, regreso) {
+  if (d.r !== undefined) escribirSala(d.r);       // la habitación de esa lectura tiene que estar escrita
   const mostrar = new Map();                      // malla → color plano del texto
   if (d.nodo) d.nodo.traverse((o) => { if (o.isMesh) mostrar.set(o, colorDe(o.userData.mat)); });
   // Fondo que contraste: si la mayoría del texto es oscuro → papel; si es claro o rojo → negro.
@@ -2026,6 +2320,7 @@ function cuadro() {
   animarEntorno(reloj.elapsedTime);
   animarCarteles(dt);
   actualizarSombra();
+  revisarEscritura();
   if (vuelo) {
     pasoVuelo(performance.now());
   } else if (velo) {
