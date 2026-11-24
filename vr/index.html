@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icono-192.png">
 <title>Hiperfuente · prueba VR</title>
 <!--
   Prueba del visor VR (2026-11-24). Sirve para comprobar, antes de la versión completa:
@@ -12,6 +14,10 @@
     · el rendimiento con la habitación real (+++), la colisión y las texturas.
   No toca el visor principal: usa sus mismos datos (../escena.json, ../modelo.gltf.json, ../texturas).
   Parámetros: ?ojos=0.064 (separación en m) · ?fov=85 · ?calidad=1.5 (resolución) · ?texturas=0 · ?vel=1.4 (m/s)
+  Control de PS4 (mapeo estándar): palanca izq. camina · palanca der., L1/R1 o cruz giran 30° · R2 acelera ·
+    X elige la esfera que mirás · △ cambia la gravedad (z → x → y) · ○ vuelve a la entrada · □ muestra/oculta el panel ·
+    Options mantenido 1,5 s recarga la página (y vuelve sola al visor). En el menú, X entra al visor.
+  Con el manifiesto, «Agregar a la pantalla principal» la abre a pantalla completa y horizontal (sin barra, aun al recargar).
 -->
 <style>
   :root { --papel: #e9e3d6; --lacre: #9b3d2e; --carbon: #1f1d1b; --piedra: #a8a398; }
@@ -60,9 +66,10 @@
     <button id="bDiag">Probar el control (sin visor)</button>
     <button id="bMono" disabled>Ver sin partir la pantalla</button>
   </div>
-  <p>En el visor: <b>palanca</b> camina hacia donde mirás · <b>palanca derecha</b> o <b>Q / E</b> gira de a 30° ·
-     mantener <b>tocada la pantalla</b> (o el botón del visor) también camina · mirá una <b>esfera</b> 1,5 s (o apretá cualquier botón mirándola) para ir ahí ·
-     <b>mirá hacia abajo</b> para ver el diagnóstico · <b>atrás</b> del celular para salir.</p>
+  <p>Control de PS4: <b>palanca izquierda</b> camina hacia donde mirás · <b>palanca derecha</b>, <b>L1 / R1</b> o la cruz giran de a 30° ·
+     <b>R2</b> acelera · <b>X</b> elige la esfera que mirás (o mirala 1,5 s) · <b>△</b> cambia la gravedad · <b>○</b> vuelve a la entrada ·
+     <b>□</b> muestra u oculta el panel (mirando hacia abajo) · <b>Options</b> mantenido recarga. En esta pantalla, <b>X</b> entra al visor.</p>
+  <p>Sin control: mantener <b>tocada la pantalla</b> camina. En la compu: WASD, Q / E, G (gravedad), H (entrada), Enter (elegir).</p>
 </div>
 <div id="diag">
   <button class="cerrar" id="bCerrarDiag">Volver</button>
@@ -92,7 +99,9 @@ const anotar = (lista, s, max = 10) => { lista.unshift(s); if (lista.length > ma
 addEventListener("keydown", (e) => {
   ent.teclas.add(e.code || e.key);
   anotar(ent.ultimasTeclas, `↓ key="${e.key}"  code="${e.code}"  keyCode=${e.keyCode}`);
-  if (!e.repeat) accion("tecla " + (e.code || e.key));
+  if (!e.repeat && (e.code === "Enter" || e.code === "Space")) accion("tecla " + e.code);
+  if (!e.repeat && e.code === "KeyG" && enRecorrido()) siguienteGravedad();
+  if (!e.repeat && e.code === "KeyH" && enRecorrido()) volverEntrada();
   if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter"].includes(e.code)) e.preventDefault();
 });
 addEventListener("keyup", (e) => { ent.teclas.delete(e.code || e.key); anotar(ent.ultimasTeclas, `↑ key="${e.key}"  code="${e.code}"`); });
@@ -102,6 +111,8 @@ addEventListener("pointerdown", (e) => {
   if (e.pointerType === "mouse") { ent.mouse.clics++; ent.mouse.ultimo = "clic botón " + e.button; }
   else { ent.toques++; ent.toque = true; }
   if (modo !== "menu" && modo !== "diag") accion("toque");
+  // si se abrió solo (al recargar), el primer toque pide la pantalla completa
+  if (modo === "vr" && !document.fullscreenElement && !matchMedia("(display-mode: fullscreen)").matches) pantallaCompleta();
 });
 addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") ent.toque = false; });
 addEventListener("pointercancel", () => { ent.toque = false; });
@@ -340,13 +351,30 @@ function rayoCol(o, d, max) {
   return { t: mejor, n: nv };
 }
 
-// ---------- El cuerpo (gravedad z: "arriba" = +Y de Three) ----------
+// ---------- Gravedades ----------
+// El cuerpo vive en un marco "local" donde arriba es siempre +Y. Cada gravedad es un giro de ese marco:
+// z (Madden) = Y de Three; x (Yu Tsun) = +X; y (Roberto) = −Z de Three (= +y de Blender). Los rayos se giran al mundo.
+const GRAV = {
+  z: new THREE.Quaternion(),
+  x: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2),
+  y: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2),
+};
+const VOZ = { z: "Madden", x: "Yu Tsun", y: "Roberto" }, ORDEN = ["z", "x", "y"];
+let grav = "z";
+const qG = new THREE.Quaternion(), qGi = new THREE.Quaternion(), wO = new THREE.Vector3(), wD = new THREE.Vector3();
+function rayoLocal(o, d, max) {
+  const r = rayoCol(wO.copy(o).applyQuaternion(qG), wD.copy(d).applyQuaternion(qG), max);
+  if (r) r.n.applyQuaternion(qGi);
+  return r;
+}
+
+// ---------- El cuerpo (en el marco local: "arriba" = +Y) ----------
 // Camina hacia donde mira la cabeza (sin inclinar), sube escalones de hasta 55 cm, no atraviesa paredes y no cae por los bordes.
 const OJOS = 1.6, RADIO = 0.3, ESCALON = 0.55, U = new THREE.Vector3(0, 1, 0), ABAJO = new THREE.Vector3(0, -1, 0);
 const pies = new THREE.Vector3();
 let vu = 0, enSuelo = false, lag = 0;
 const vMov = new THREE.Vector3(), vDir = new THREE.Vector3(), vOri = new THREE.Vector3(), vNorm = new THREE.Vector3(), vAntes = new THREE.Vector3(), vP = new THREE.Vector3();
-const pisoBajo = (desde, max) => { const r = rayoCol(desde, ABAJO, max); return r && r.n.y > 0.3 ? r : null; };
+const pisoBajo = (desde, max) => { const r = rayoLocal(desde, ABAJO, max); return r && r.n.y > 0.3 ? r : null; };
 const hayPiso = (p) => !!pisoBajo(vP.copy(p).addScaledVector(U, ESCALON), ESCALON + 0.6);
 function pasoCuerpo(dt, mx, mz) {                     // mx, mz: desplazamiento horizontal deseado (m)
   vAntes.copy(pies);
@@ -357,7 +385,7 @@ function pasoCuerpo(dt, mx, mz) {                     // mx, mz: desplazamiento 
     let choque = null;
     for (const h of [0.6, 1.15, 1.7]) {
       vOri.copy(pies).addScaledVector(U, h);
-      const r = rayoCol(vOri, vDir, L + RADIO);
+      const r = rayoLocal(vOri, vDir, L + RADIO);
       if (r && Math.abs(r.n.y) < 0.75 && (!choque || r.t < choque.t)) choque = r;
     }
     if (!choque) { pies.add(vMov); break; }
@@ -447,7 +475,9 @@ const rayo = new THREE.Raycaster(), CENTRO = new THREE.Vector2(0, 0);
 let mirando = null, mirandoT = 0, viaje = null;
 const DWELL = 1.5;
 
+function ponerGravedad(g) { grav = g; qG.copy(GRAV[g]); qGi.copy(qG).invert(); }
 function irA(d) {
+  ponerGravedad("z");                                 // los destinos son de la gravedad z
   const p = deBlender(d.pos);
   pies.copy(p).addScaledVector(U, -OJOS);
   const r = pisoBajo(vP.copy(pies).addScaledVector(U, 1), 3);
@@ -457,14 +487,57 @@ function irA(d) {
   recentrar(Math.atan2(-m.x, -m.z));
 }
 // Teletransporte con fundido: 0,35 s a negro, salta, 0,45 s de vuelta (en VR los viajes de cámara marean).
-function viajarA(d) { if (!viaje) viaje = { d, t: 0, hecho: false }; }
+function transicion(fn, titulo) { if (!viaje) viaje = { fn, titulo, t: 0, hecho: false }; }
+function viajarA(d) { transicion(() => irA(d), d.titulo); }
+function enRecorrido() { return modo === "vr" || modo === "mono"; }
 function accion(origen) {
   ultimaAccion = origen;
-  if (mirando && (modo === "vr" || modo === "mono")) viajarA(mirando.userData.destino);
+  if (mirando && enRecorrido()) viajarA(mirando.userData.destino);
 }
+function volverEntrada() { ultimaAccion = "volver a la entrada"; viajarA(INICIO); }
 let ultimaAccion = "—";
 
+// Cambio de gravedad: fundido a negro, el cuerpo gira para que su "arriba" sea el nuevo eje y aparece apoyado
+// en lo primero que haya debajo (sin caída visible: en VR marea). Conserva hacia dónde se miraba.
+function cambiarGravedad(nueva) {
+  const ojoW = camera.position.clone(), adelW = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  const antes = grav;
+  ponerGravedad(nueva);
+  const ojoL = ojoW.applyQuaternion(qGi);
+  const r = pisoBajo(ojoL, 400);
+  if (!r) { ponerGravedad(antes); aviso("No hay piso hacia " + nueva); return; }
+  pies.copy(ojoL).addScaledVector(ABAJO, r.t);
+  vu = 0; enSuelo = true; lag = 0;
+  const a = adelW.applyQuaternion(qGi); a.y = 0;
+  recentrar(a.lengthSq() > 1e-4 ? Math.atan2(-a.x, -a.z) : 0);
+  aviso("Gravedad " + nueva + " · " + VOZ[nueva]);
+}
+function siguienteGravedad() {
+  const nueva = ORDEN[(ORDEN.indexOf(grav) + 1) % 3];
+  ultimaAccion = "gravedad " + nueva;
+  transicion(() => cambiarGravedad(nueva), "gravedad " + nueva);
+}
+
+// Aviso flotante (adelante de la vista, se desvanece): gravedad, recarga, etc.
+const lienzoAviso = document.createElement("canvas"); lienzoAviso.width = 1024; lienzoAviso.height = 128;
+const texAviso = new THREE.CanvasTexture(lienzoAviso); texAviso.encoding = THREE.sRGBEncoding;
+const avisoS = new THREE.Sprite(new THREE.SpriteMaterial({ map: texAviso, depthTest: false, fog: false, transparent: true, opacity: 0 }));
+avisoS.scale.set(2.4, 0.3, 1); avisoS.position.set(0, -0.35, -3); avisoS.renderOrder = 150; camera.add(avisoS);
+let avisoT = 0;
+function aviso(texto, seg = 2.5) {
+  const x = lienzoAviso.getContext("2d");
+  x.clearRect(0, 0, 1024, 128);
+  x.font = "56px DM Mono, ui-monospace, monospace"; x.textAlign = "center"; x.textBaseline = "middle";
+  const w = Math.min(1000, x.measureText(texto).width + 60);
+  x.fillStyle = "rgba(31,29,27,.82)"; x.fillRect(512 - w / 2, 10, w, 108);
+  x.fillStyle = "#e9e3d6"; x.fillText(texto, 512, 66);
+  texAviso.needsUpdate = true; avisoT = seg;
+}
+
 // ---------- Panel de diagnóstico dentro del visor (mirando hacia abajo) ----------
+// Nombres del mapeo estándar (así llega el control de PS4 a Chrome en Android)
+const NOMBRES = ["X", "○", "□", "△", "L1", "R1", "L2", "R2", "Share", "Options", "L3", "R3", "↑", "↓", "←", "→", "PS", "Panel táctil"];
+function nombreBoton(g, i) { return g.mapping === "standard" && NOMBRES[i] ? i + "·" + NOMBRES[i] : String(i); }
 const lienzo = document.createElement("canvas"); lienzo.width = 1024; lienzo.height = 640;
 const ctx = lienzo.getContext("2d");
 const texPanel = new THREE.CanvasTexture(lienzo); texPanel.encoding = THREE.sRGBEncoding;
@@ -478,7 +551,7 @@ function lineasControl() {
     L.push(`Gamepad ${g.index}: ${g.id.slice(0, 60)}`);
     L.push(`  mapeo: ${g.mapping || "(sin mapeo estándar)"}`);
     L.push("  ejes: " + g.axes.map((a, i) => i + "=" + a.toFixed(2)).join("  "));
-    const b = g.buttons.map((x, i) => (x.pressed || x.value > 0.1 ? i + (x.value < 1 && x.value > 0 ? "(" + x.value.toFixed(1) + ")" : "") : null)).filter((x) => x !== null);
+    const b = g.buttons.map((x, i) => (x.pressed || x.value > 0.1 ? nombreBoton(g, i) + (x.value < 1 && x.value > 0 ? "(" + x.value.toFixed(1) + ")" : "") : null)).filter((x) => x !== null);
     L.push(`  botones (${g.buttons.length}): ` + (b.length ? "apretados " + b.join(", ") : "ninguno apretado"));
   }
   return L;
@@ -492,7 +565,7 @@ function dibujarPanel() {
   const L = [`DIAGNÓSTICO · ${fps} cuadros/s · ${COL.n} triángulos de colisión`, ...lineasControl(),
     "Teclas: " + (ent.ultimasTeclas[0] || "—"), "Mouse: " + ent.mouse.ultimo + "  · toques: " + ent.toques,
     "Giroscopio: " + (ent.giro ? `a ${ent.giro.a.toFixed(0)}  b ${ent.giro.b.toFixed(0)}  g ${ent.giro.g.toFixed(0)}` : "sin datos"),
-    "Última acción: " + ultimaAccion,
+    "Última acción: " + ultimaAccion + "  · gravedad " + grav,
     `Pies: ${pies.x.toFixed(1)}, ${(-pies.z).toFixed(1)}, ${pies.y.toFixed(2)} (Blender x, y, z)`];
   let y = 52;
   for (const s of L) { ctx.fillText(s.slice(0, 62), 26, y); y += 42; if (y > 620) break; }
@@ -507,7 +580,7 @@ function pintarDiag() {
   else div.innerHTML = pads.map((g) =>
     `<b>Gamepad ${g.index}</b>: ${g.id}\nmapeo: ${g.mapping || "(sin mapeo estándar)"}\n` +
     `<div class="ejes">` + g.axes.map((a, i) => `eje ${i} <span><i style="left:${(50 + a * 50).toFixed(0)}%"></i></span>${a.toFixed(2)}`).join("<br>") + `</div>` +
-    g.buttons.map((b, i) => `<span class="bt ${b.pressed || b.value > 0.1 ? "on" : ""}">${i}</span>`).join("")).join("\n\n");
+    g.buttons.map((b, i) => `<span class="bt ${b.pressed || b.value > 0.1 ? "on" : ""}">${nombreBoton(g, i)}</span>`).join("")).join("\n\n");
   $("dTeclas").textContent = ent.ultimasTeclas.length ? ent.ultimasTeclas.join("\n") : "Ninguna todavía.";
   $("dMouse").textContent = `Mouse: ${ent.mouse.ultimo} · clics: ${ent.mouse.clics} · movimiento acumulado ${ent.mouse.dx.toFixed(0)}, ${ent.mouse.dy.toFixed(0)}\nToques en pantalla: ${ent.toques}`;
   $("dGiro").textContent = ent.giro ? `alpha ${ent.giro.a.toFixed(1)} · beta ${ent.giro.b.toFixed(1)} · gamma ${ent.giro.g.toFixed(1)} · eventos ${ent.giroEventos}` : "Sin datos (en la compu es normal; en el celular, tocá «Entrar al visor» para dar permiso).";
@@ -520,18 +593,29 @@ async function entrar(m) {
   $("menu").style.display = "none";
   document.body.classList.toggle("vr", m === "vr");
   pedirGiroscopio();
-  // pantalla completa, horizontal y sin que se apague: se piden sin esperar (algunos navegadores no contestan nunca)
-  const nada = () => {};
-  try { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen({ navigationUI: "hide" })
-          .then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(nada); }).catch(nada); } catch (_) {}
-  try { if (navigator.wakeLock) navigator.wakeLock.request("screen").then((w) => { wake = w; }).catch(nada); } catch (_) {}
+  pantallaCompleta();
   camera.fov = m === "vr" ? AJ.fov : 70;
   ajustar();
   irA(INICIO);
   setTimeout(() => irA(INICIO), 500);                  // el giroscopio tarda un instante en dar datos: se recentra de nuevo
-  $("ayuda").textContent = m === "vr" ? "" : "Arrastrá para mirar · WASD o flechas para caminar · Q / E giran · mirá una esfera para ir ahí · Esc vuelve al menú";
+  $("ayuda").textContent = m === "vr" ? "" : "Arrastrá para mirar · WASD o flechas caminan (Shift acelera) · Q / E giran · G gravedad · H entrada · Enter elige la esfera · Esc vuelve al menú";
 }
 let wake = null;
+// pantalla completa, horizontal y sin que se apague: se piden sin esperar (algunos navegadores no contestan nunca)
+function pantallaCompleta() {
+  const nada = () => {};
+  const girar = () => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(nada); };
+  try {
+    if (document.fullscreenElement || matchMedia("(display-mode: fullscreen)").matches) girar();
+    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(girar).catch(nada);
+  } catch (_) {}
+  try { if (navigator.wakeLock && !wake) navigator.wakeLock.request("screen").then((w) => { wake = w; w.addEventListener("release", () => { wake = null; }); }).catch(nada); } catch (_) {}
+}
+// recargar (Options mantenido): la página vuelve sola al visor
+function recargar() {
+  try { sessionStorage.setItem("hiperfuente-vr-volver", modo); } catch (_) {}
+  location.reload();
+}
 function salir() {
   modo = "menu";
   $("menu").style.display = "flex"; $("diag").style.display = "none"; $("ayuda").textContent = "";
@@ -545,8 +629,14 @@ $("bMono").onclick = () => entrar("mono");
 $("bDiag").onclick = async () => { await pedirGiroscopio(); modo = "diag"; $("diag").style.display = "block"; };
 $("bCerrarDiag").onclick = salir;
 $("bVR").disabled = $("bMono").disabled = false;
-estado.textContent = "Listo.";
+estado.textContent = "Listo. Con el control: X entra al visor.";
 relleno.style.width = "100%";
+{ // después de una recarga con Options se vuelve al mismo modo, sin tocar la pantalla
+  let volver = null;
+  try { volver = sessionStorage.getItem("hiperfuente-vr-volver"); sessionStorage.removeItem("hiperfuente-vr-volver"); } catch (_) {}
+  if (volver === "vr" || volver === "mono") setTimeout(() => { entrar(volver); aviso("Recargado"); }, 50);
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && enRecorrido()) pantallaCompleta(); });
 
 function ajustar() {
   if (!innerWidth || !innerHeight) return;            // pestaña oculta: se ajusta en el próximo cuadro
@@ -560,21 +650,36 @@ addEventListener("resize", ajustar);
 // ---------- Movimiento ----------
 let giroListo = true;
 const ZM = 0.22;                                      // zona muerta de la palanca
-function palancas() {
-  let x = 0, y = 0, giro = 0, boton = false;
+// Mapeo del control de PS4 (mapeo "standard" de Chrome): ver NOMBRES.
+//   0 X elegir · 1 ○ entrada · 2 □ panel · 3 △ gravedad · 4/5 L1/R1 girar · 7 R2 acelerar · 9 Options (mantener) recargar
+//   12/13 cruz ↑↓ caminar · 14/15 cruz ←→ girar. Un control sin mapeo estándar: cualquier botón elige.
+const EVENTOS_BOTON = { 0: "elegir", 1: "entrada", 2: "panel", 3: "gravedad" };
+const antesBoton = new Map();                         // "pad:botón" → estaba apretado
+let optionsT = 0;
+function palancas(dt) {
+  let x = 0, y = 0, giro = 0, rapido = 0, options = false;
+  const eventos = [];
   for (const g of navigator.getGamepads ? navigator.getGamepads() : []) {
     if (!g) continue;
-    const a = g.axes;
+    const a = g.axes, B = g.buttons, std = g.mapping === "standard";
+    const ap = (i) => !!(B[i] && (B[i].pressed || B[i].value > 0.5));
     if (Math.hypot(a[0] || 0, a[1] || 0) > ZM) { x += a[0] || 0; y += a[1] || 0; }
     if (Math.abs(a[2] || 0) > 0.6) giro = Math.sign(a[2]);
-    else if (a.length > 4 && Math.abs(a[3] || 0) > 0.6 && Math.abs(a[2] || 0) < 0.3 && g.mapping !== "standard") giro = 0;
-    // la cruz de los gamepads estándar (14 izquierda, 15 derecha) también gira
-    if (g.buttons[14] && g.buttons[14].pressed) giro = -1;
-    if (g.buttons[15] && g.buttons[15].pressed) giro = 1;
-    if (g.buttons[12] && g.buttons[12].pressed) y = -1;
-    if (g.buttons[13] && g.buttons[13].pressed) y = 1;
-    g.buttons.forEach((b, i) => { if (b.pressed && ![12, 13, 14, 15].includes(i)) boton = true; });
+    if (ap(14) || ap(4)) giro = -1;
+    if (ap(15) || ap(5)) giro = 1;
+    if (ap(12)) y = -1;
+    if (ap(13)) y = 1;
+    if (std) { rapido = Math.max(rapido, B[7] ? B[7].value : 0); if (ap(9)) options = true; }
+    B.forEach((b, i) => {
+      const k = g.index + ":" + i, on = ap(i);
+      if (on && !antesBoton.get(k)) {
+        if (std && EVENTOS_BOTON[i]) eventos.push(EVENTOS_BOTON[i]);
+        else if (!std && ![12, 13, 14, 15].includes(i)) eventos.push("elegir");
+      }
+      antesBoton.set(k, on);
+    });
   }
+  optionsT = options ? optionsT + dt : 0;
   const T = ent.teclas;
   if (T.has("KeyW") || T.has("ArrowUp")) y -= 1;
   if (T.has("KeyS") || T.has("ArrowDown")) y += 1;
@@ -588,9 +693,9 @@ function palancas() {
     x += THREE.MathUtils.clamp(ent.mouse.dx / 25, -1, 1); y += THREE.MathUtils.clamp(ent.mouse.dy / 25, -1, 1);
   }
   ent.mouse.dx *= 0.8; ent.mouse.dy *= 0.8;
-  return { x: THREE.MathUtils.clamp(x, -1, 1), y: THREE.MathUtils.clamp(y, -1, 1), giro, boton };
+  if (T.has("ShiftLeft") || T.has("ShiftRight")) rapido = 1;
+  return { x: THREE.MathUtils.clamp(x, -1, 1), y: THREE.MathUtils.clamp(y, -1, 1), giro, rapido, eventos };
 }
-let botonAntes = false;
 
 // ---------- Bucle ----------
 const reloj = new THREE.Clock();
@@ -603,31 +708,41 @@ function cuadro() {
   if (ahora - tFps > 1000) { fps = Math.round(cuadros * 1000 / (ahora - tFps)); cuadros = 0; tFps = ahora; }
   if (renderer.domElement.width !== Math.floor(innerWidth * renderer.getPixelRatio())) ajustar();
   if (modo === "diag") { pintarDiag(); return; }
-  if (modo === "menu") { renderer.render(scene, camera); return; }
+  if (modo === "menu") {
+    if (palancas(dt).eventos.includes("elegir") && !$("bVR").disabled) entrar("vr");   // X en el menú: entra al visor
+    renderer.render(scene, camera); return;
+  }
 
-  const c = palancas();
-  if (c.boton && !botonAntes) accion("botón del gamepad");
-  botonAntes = c.boton;
+  const c = palancas(dt);
+  for (const e of c.eventos) {
+    if (e === "elegir") accion("botón X");
+    else if (e === "entrada") volverEntrada();
+    else if (e === "gravedad") siguienteGravedad();
+    else if (e === "panel") { panel.visible = !panel.visible; ultimaAccion = "panel " + (panel.visible ? "sí" : "no"); }
+  }
+  if (optionsT > 0 && optionsT - dt <= 0) aviso("Mantené Options para recargar…", 1.5);
+  if (optionsT > 1.5) { optionsT = -1e9; aviso("Recargando…", 5); setTimeout(recargar, 300); }
   if (c.giro && giroListo) { desfase -= c.giro * Math.PI / 6; giroListo = false; }   // giro de a 30°, sin animar: no marea
   if (!c.giro) giroListo = true;
 
-  // cabeza = desfase × giroscopio
+  // cabeza (en el marco de la gravedad) = desfase × giroscopio; en el mundo, además, el giro de la gravedad
   cabeza(qCabeza);
-  qDesfase.setFromAxisAngle(U, desfase);
-  camera.quaternion.copy(qDesfase).multiply(qCabeza);
+  qDesfase.setFromAxisAngle(U, desfase).multiply(qCabeza);           // qDesfase queda como la cabeza local
+  camera.quaternion.copy(qG).multiply(qDesfase);
 
-  // caminar hacia donde mira la cabeza, sin la inclinación
+  // caminar hacia donde mira la cabeza, sin la inclinación (en el marco local)
   if (!viaje) {
-    vAdel.set(0, 0, -1).applyQuaternion(camera.quaternion); vAdel.y = 0;
-    if (vAdel.lengthSq() < 1e-4) vAdel.set(0, 1, 0).applyQuaternion(camera.quaternion).negate().setY(0);
+    vAdel.set(0, 0, -1).applyQuaternion(qDesfase); vAdel.y = 0;
+    if (vAdel.lengthSq() < 1e-4) vAdel.set(0, 1, 0).applyQuaternion(qDesfase).negate().setY(0);
     vAdel.normalize();
     vDer.set(-vAdel.z, 0, vAdel.x);
-    const v = AJ.vel * dt;
+    const v = AJ.vel * (1 + 1.5 * c.rapido) * dt;      // R2 (o Shift) acelera hasta ×2,5
     pasoCuerpo(dt, (vAdel.x * -c.y + vDer.x * c.x) * v, (vAdel.z * -c.y + vDer.z * c.x) * v);
   }
   lag *= Math.exp(-dt * 10);
-  camera.position.copy(pies).addScaledVector(U, OJOS + lag);
+  camera.position.copy(pies).addScaledVector(U, OJOS + lag).applyQuaternion(qG);
   camera.updateMatrixWorld();
+  if (avisoT > 0) { avisoT -= dt; avisoS.material.opacity = Math.min(1, avisoT / 0.6); }
 
   // mirada sobre las esferas
   rayo.setFromCamera(CENTRO, camera);
@@ -648,16 +763,17 @@ function cuadro() {
   // fundido del teletransporte
   if (viaje) {
     viaje.t += dt;
-    if (!viaje.hecho && viaje.t >= 0.35) { irA(viaje.d); viaje.hecho = true; ultimaAccion = "fue a: " + viaje.d.titulo; }
+    if (!viaje.hecho && viaje.t >= 0.35) { viaje.fn(); viaje.hecho = true; ultimaAccion = "fue a: " + viaje.titulo; }
     negro.material.opacity = viaje.t < 0.35 ? viaje.t / 0.35 : Math.max(0, 1 - (viaje.t - 0.35) / 0.45);
     if (viaje.t > 0.8) { viaje = null; negro.material.opacity = 0; }
   }
 
   // panel de diagnóstico: en el piso, adelante del rumbo del cuerpo (se ve mirando hacia abajo)
-  vF.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  vF.set(0, 0, -1).applyQuaternion(qDesfase);
   if (Math.abs(vF.y) < 0.9) rumboPanel = Math.atan2(-vF.x, -vF.z);   // mirando muy abajo, el panel no se mueve
   const rumbo = rumboPanel;
-  panel.position.set(pies.x - Math.sin(rumbo) * 0.95, pies.y + 0.15, pies.z - Math.cos(rumbo) * 0.95);
+  panel.position.set(pies.x - Math.sin(rumbo) * 0.95, pies.y + 0.15, pies.z - Math.cos(rumbo) * 0.95).applyQuaternion(qG);
+  panel.up.copy(U).applyQuaternion(qG);
   panel.lookAt(camera.position);
   tPanel -= dt;
   if (tPanel <= 0) { dibujarPanel(); tPanel = 0.2; }
@@ -666,7 +782,7 @@ function cuadro() {
   else renderer.render(scene, camera);
 }
 renderer.setAnimationLoop(cuadro);
-window.pruebaVR = { camera, pies, irA, destinos, datos, ent, get modo() { return modo; }, get estado() { return { desfase, mouseYaw, mousePitch }; },
+window.pruebaVR = { camera, pies, irA, destinos, datos, ent, siguienteGravedad, get modo() { return modo; }, get estado() { return { desfase, mouseYaw, mousePitch, grav }; },
   mirarA(obj) {                                         // para probar sin giroscopio: apunta la vista a un objeto
     const d = obj.position.clone().sub(camera.position).normalize();
     desfase = 0; mouseYaw = Math.atan2(-d.x, -d.z); mousePitch = Math.asin(d.y);
