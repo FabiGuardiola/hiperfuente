@@ -71,7 +71,8 @@
      <b>R2</b> acelera · <b>X</b> elige la esfera que mirás (o mirala 1,5 s) · <b>△</b> cambia la gravedad · <b>○</b> vuelve a la entrada ·
      <b>□</b> muestra u oculta el panel (mirando hacia abajo) · <b>Options</b> mantenido recarga. En esta pantalla, <b>X</b> entra al visor.</p>
   <p><b>Calibrar el visor</b> (se guarda en el celular): con <b>L2</b> apretado, <b>cruz ← →</b> junta o separa las dos imágenes ·
-     <b>↑ ↓</b> campo de visión · <b>△</b> deformación de las lentes · <b>X</b> vuelve a los valores de fábrica.</p>
+     <b>↑ ↓</b> campo de visión · <b>△</b> deformación de las lentes · <b>□</b> profundidad (real, media, baja, plano) · <b>X</b> vuelve a los valores de fábrica.
+     Si el celular no da giroscopio, la <b>palanca derecha</b> mira.</p>
   <p>Sin control: mantener <b>tocada la pantalla</b> camina. En la compu: WASD, Q / E, G (gravedad), H (entrada), Enter (elegir).</p>
 </div>
 <div id="diag">
@@ -105,7 +106,7 @@ addEventListener("keydown", (e) => {
   if (!e.repeat && (e.code === "Enter" || e.code === "Space")) accion("tecla " + e.code);
   if (!e.repeat && e.code === "KeyG" && enRecorrido()) siguienteGravedad();
   if (!e.repeat && e.code === "KeyH" && enRecorrido()) volverEntrada();
-  const TECLAS_CAL = { BracketLeft: "sep-", BracketRight: "sep+", Equal: "fov+", Minus: "fov-", KeyK: "dist", Digit0: "reset" };
+  const TECLAS_CAL = { BracketLeft: "sep-", BracketRight: "sep+", Equal: "fov+", Minus: "fov-", KeyK: "dist", KeyL: "prof", Digit0: "reset" };
   if (TECLAS_CAL[e.code] && enRecorrido()) calibrar(TECLAS_CAL[e.code]);
   if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter"].includes(e.code)) e.preventDefault();
 });
@@ -188,9 +189,13 @@ document.body.prepend(renderer.domElement);
 // Se calibra con el control (L2 + cruz / △ / X) y queda guardado en el celular.
 const LS = (k, d) => { try { const v = localStorage.getItem("hiperfuente-vr-" + k); return v !== null && isFinite(+v) ? +v : d; } catch (_) { return d; } };
 const guardarLS = (k, v) => { try { localStorage.setItem("hiperfuente-vr-" + k, String(v)); } catch (_) {} };
-const VIS_BASE = { sep: 0.42, fov: 90, dist: 2 };
+// ojos = separación de las dos cámaras (profundidad). Con 6,4 cm (real) cada distancia pide otra convergencia y en un
+// visor barato solo una queda nítida; con menos, todo se funde más fácil (0 = plano, sin profundidad).
+const VIS_BASE = { sep: 0.42, fov: 90, dist: 2, ojos: 0.03 };
+const PROFUNDIDADES = [0.064, 0.03, 0.012, 0];
 const DISTORSIONES = [[0, 0, "sin deformación"], [0.12, 0.04, "deformación suave"], [0.22, 0.12, "deformación media"], [0.34, 0.55, "deformación fuerte (Cardboard)"]];
-const VIS = { sep: num("sep", LS("sep", VIS_BASE.sep)), fov: num("fov", LS("fov", VIS_BASE.fov)), dist: num("dist", LS("dist", VIS_BASE.dist)) };
+const VIS = { sep: num("sep", LS("sep", VIS_BASE.sep)), fov: num("fov", LS("fov", VIS_BASE.fov)), dist: num("dist", LS("dist", VIS_BASE.dist)),
+              ojos: num("ojos", LS("ojos", VIS_BASE.ojos)) };
 const tipoRT = renderer.capabilities.isWebGL2 ? THREE.HalfFloatType : THREE.UnsignedByteType;
 const rtOjo = [0, 1].map(() => new THREE.WebGLRenderTarget(4, 4, { type: tipoRT }));
 const camOjo = [0, 1].map(() => new THREE.PerspectiveCamera(90, 1, 0.05, 3500));
@@ -224,7 +229,7 @@ function renderVR() {
     const ancho = Math.round(vw * pr * 1.15), alto = Math.round(H * pr * 1.15);   // un poco más: la deformación agranda el centro
     if (rt.width !== ancho || rt.height !== alto) rt.setSize(ancho, alto);
     c.fov = VIS.fov; c.aspect = vw / H; c.updateProjectionMatrix();
-    c.position.copy(camera.position).addScaledVector(vDerOjo, (i ? 0.5 : -0.5) * AJ.ojos);
+    c.position.copy(camera.position).addScaledVector(vDerOjo, (i ? 0.5 : -0.5) * VIS.ojos);
     c.quaternion.copy(camera.quaternion); c.updateMatrixWorld();
     renderer.setRenderTarget(rt); renderer.render(scene, c);
   }
@@ -247,9 +252,11 @@ function calibrar(e) {
   else if (e === "fov+") VIS.fov = Math.min(120, VIS.fov + 3);
   else if (e === "fov-") VIS.fov = Math.max(50, VIS.fov - 3);
   else if (e === "dist") VIS.dist = (VIS.dist + 1) % 4;
+  else if (e === "prof") { const i = PROFUNDIDADES.indexOf(VIS.ojos); VIS.ojos = PROFUNDIDADES[(i + 1) % PROFUNDIDADES.length]; }
   else if (e === "reset") Object.assign(VIS, VIS_BASE);
-  for (const k of ["sep", "fov", "dist"]) guardarLS(k, VIS[k]);
-  aviso(`separación ${(VIS.sep * 100).toFixed(1)} % · campo ${VIS.fov}° · ${DISTORSIONES[VIS.dist][2]}`, 3);
+  for (const k of ["sep", "fov", "dist", "ojos"]) guardarLS(k, VIS[k]);
+  const prof = VIS.ojos === 0 ? "plano" : VIS.ojos >= 0.06 ? "profundidad real" : VIS.ojos >= 0.025 ? "profundidad media" : "profundidad baja";
+  aviso(`sep ${(VIS.sep * 100).toFixed(1)} % · ${VIS.fov}° · ${DISTORSIONES[VIS.dist][2].replace("deformación", "deform.")} · ${prof}`, 3);
 }
 
 const scene = new THREE.Scene();
@@ -545,7 +552,8 @@ function etiqueta(texto, alto) {
   x.fillStyle = "rgba(31,29,27,.78)"; const w = Math.min(1000, x.measureText(texto).width + 60); x.fillRect(512 - w / 2, 14, w, 100);
   x.fillStyle = "#e9e3d6"; x.fillText(texto, 512, 66);
   const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, fog: false }));
+  // con depthTest: un cartel que se dibuja encima de una pared más cercana contradice la profundidad y no se funde
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, fog: false }));
   s.scale.set(alto * 8, alto, 1); s.renderOrder = 50;
   return s;
 }
@@ -660,14 +668,17 @@ function dibujarPanel() {
   ctx.clearRect(0, 0, 1024, 640);
   ctx.fillStyle = "rgba(20,19,18,.86)"; ctx.fillRect(0, 0, 1024, 640);
   ctx.fillStyle = "#9b3d2e"; ctx.fillRect(0, 0, 1024, 6);
-  ctx.font = "30px DM Mono, ui-monospace, monospace"; ctx.fillStyle = "#e9e3d6";
+  ctx.font = "26px DM Mono, ui-monospace, monospace"; ctx.fillStyle = "#e9e3d6";
   const L = [`DIAGNÓSTICO · ${fps} cuadros/s · ${COL.n} triángulos de colisión`, ...lineasControl(),
     "Teclas: " + (ent.ultimasTeclas[0] || "—"), "Mouse: " + ent.mouse.ultimo + "  · toques: " + ent.toques,
-    "Giroscopio: " + (ent.giro ? `a ${ent.giro.a.toFixed(0)}  b ${ent.giro.b.toFixed(0)}  g ${ent.giro.g.toFixed(0)}` : "sin datos"),
+    "Giroscopio: " + (ent.giro ? `a ${ent.giro.a.toFixed(0)}  b ${ent.giro.b.toFixed(0)}  g ${ent.giro.g.toFixed(0)} (${ent.giro.fuente})` : qSensor ? "sensor genérico" : "SIN DATOS"),
+    "  relativo: " + fuentes.relativo, "  absoluto: " + fuentes.absoluto, "  movimiento: " + fuentes.movimiento,
+    "  sensor: " + fuentes.sensor + " · permiso giroscopio: " + (fuentes.permiso_gyroscope || "?"),
+    `Visor: sep ${(VIS.sep * 100).toFixed(1)} % · campo ${VIS.fov}° · deform. ${VIS.dist} · profundidad ${VIS.ojos} m`,
     "Última acción: " + ultimaAccion + "  · gravedad " + grav,
     `Pies: ${pies.x.toFixed(1)}, ${(-pies.z).toFixed(1)}, ${pies.y.toFixed(2)} (Blender x, y, z)`];
   let y = 52;
-  for (const s of L) { ctx.fillText(s.slice(0, 62), 26, y); y += 42; if (y > 620) break; }
+  for (const s of L) { ctx.fillText(s.slice(0, 62), 26, y); y += 36; if (y > 630) break; }
   texPanel.needsUpdate = true;
 }
 
@@ -695,6 +706,7 @@ async function entrar(m) {
   document.body.classList.toggle("vr", m === "vr");
   pedirGiroscopio();
   pantallaCompleta();
+  tEntrada = performance.now(); avisoGiro = false;
   camera.fov = 70;
   ajustar();
   irA(INICIO);
@@ -727,7 +739,8 @@ document.addEventListener("fullscreenchange", () => { if (!document.fullscreenEl
 addEventListener("keydown", (e) => { if (e.code === "Escape" && modo !== "menu") { if (document.fullscreenElement) document.exitFullscreen(); salir(); } });
 $("bVR").onclick = () => entrar("vr");
 $("bMono").onclick = () => entrar("mono");
-$("bDiag").onclick = async () => { await pedirGiroscopio(); modo = "diag"; $("diag").style.display = "block"; };
+// (antes no se ocultaba el menú, que quedaba encima: parecía que el botón no hacía nada)
+$("bDiag").onclick = () => { modo = "diag"; $("menu").style.display = "none"; $("diag").style.display = "block"; pedirGiroscopio(); };
 $("bCerrarDiag").onclick = salir;
 $("bVR").disabled = $("bMono").disabled = false;
 estado.textContent = "Listo. Con el control: X entra al visor.";
@@ -754,12 +767,15 @@ const ZM = 0.22;                                      // zona muerta de la palan
 //   0 X elegir · 1 ○ entrada · 2 □ panel · 3 △ gravedad · 4/5 L1/R1 girar · 7 R2 acelerar · 9 Options (mantener) recargar
 //   12/13 cruz ↑↓ caminar · 14/15 cruz ←→ girar. Un control sin mapeo estándar: cualquier botón elige.
 const EVENTOS_BOTON = { 0: "elegir", 1: "entrada", 2: "panel", 3: "gravedad" };
+function sinGiroscopio() { return !ent.giro && !qSensor; }
+let avisoGiro = false, tEntrada = 0;
 // con L2 apretado: ← → separación de las imágenes · ↑ ↓ campo de visión · △ deformación · X valores de fábrica
-const CALIBRAR = { 14: "sep-", 15: "sep+", 12: "fov+", 13: "fov-", 3: "dist", 0: "reset" };
+//                  □ profundidad (separación de las cámaras: real, media, baja, plano)
+const CALIBRAR = { 14: "sep-", 15: "sep+", 12: "fov+", 13: "fov-", 3: "dist", 2: "prof", 0: "reset" };
 const antesBoton = new Map();                         // "pad:botón" → estaba apretado
 let optionsT = 0;
 function palancas(dt) {
-  let x = 0, y = 0, giro = 0, rapido = 0, options = false;
+  let x = 0, y = 0, giro = 0, rapido = 0, options = false, mx = 0, my = 0;
   const eventos = [];
   for (const g of navigator.getGamepads ? navigator.getGamepads() : []) {
     if (!g) continue;
@@ -767,7 +783,8 @@ function palancas(dt) {
     const ap = (i) => !!(B[i] && (B[i].pressed || B[i].value > 0.5));
     const cal = std && ap(6);                         // L2 apretado: la cruz, △ y X calibran el visor
     if (Math.hypot(a[0] || 0, a[1] || 0) > ZM) { x += a[0] || 0; y += a[1] || 0; }
-    if (Math.abs(a[2] || 0) > 0.6) giro = Math.sign(a[2]);
+    if (Math.hypot(a[2] || 0, a[3] || 0) > ZM) { mx += a[2] || 0; my += a[3] || 0; }
+    if (Math.abs(a[2] || 0) > 0.6 && !sinGiroscopio()) giro = Math.sign(a[2]);
     if (ap(4)) giro = -1;
     if (ap(5)) giro = 1;
     if (!cal) {
@@ -803,7 +820,7 @@ function palancas(dt) {
   }
   ent.mouse.dx *= 0.8; ent.mouse.dy *= 0.8;
   if (T.has("ShiftLeft") || T.has("ShiftRight")) rapido = 1;
-  return { x: THREE.MathUtils.clamp(x, -1, 1), y: THREE.MathUtils.clamp(y, -1, 1), giro, rapido, eventos };
+  return { x: THREE.MathUtils.clamp(x, -1, 1), y: THREE.MathUtils.clamp(y, -1, 1), giro, rapido, eventos, mx, my };
 }
 
 // ---------- Bucle ----------
@@ -832,6 +849,12 @@ function cuadro() {
   }
   if (optionsT > 0 && optionsT - dt <= 0) aviso("Mantené Options para recargar…", 1.5);
   if (optionsT > 1.5) { optionsT = -1e9; aviso("Recargando…", 5); setTimeout(recargar, 300); }
+  // sin giroscopio, la palanca derecha mira (girar y subir/bajar la vista, continuo)
+  if (sinGiroscopio()) {
+    mouseYaw -= c.mx * 1.5 * dt;
+    mousePitch = THREE.MathUtils.clamp(mousePitch - c.my * 1.1 * dt, -1.4, 1.4);
+    if (modo === "vr" && !avisoGiro && performance.now() - tEntrada > 2500) { avisoGiro = true; aviso("Sin giroscopio: mirá con la palanca derecha", 5); }
+  }
   if (c.giro && giroListo) { desfase -= c.giro * Math.PI / 6; giroListo = false; }   // giro de a 30°, sin animar: no marea
   if (!c.giro) giroListo = true;
 
