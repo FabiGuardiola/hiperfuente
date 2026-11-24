@@ -1,0 +1,39 @@
+<template>
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #vr-ent-svg { position: absolute; left: 0; top: 0; width: 1080px; height: 1080px; }
+    #vr-ent-titulo { position: absolute; left: 90px; right: 90px; top: 560px; text-align: center; font-family: "FabiBlock"; font-size: 84px; line-height: 1; color: #9b3d2e; white-space: nowrap; }
+    #vr-ent-frase { position: absolute; left: 90px; right: 90px; top: 700px; text-align: center; font-family: "IBM Plex Mono"; font-size: 36px; line-height: 1.42; color: #1f1d1b; }
+    #vr-ent-frase > div { white-space: nowrap; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="vr-entrar" data-width="1080" data-height="1080">
+    <svg id="vr-ent-svg" viewBox="0 0 1080 1080">
+      <!-- la H, a línea, con el paso entre las astas: por ahí se entra -->
+      <path id="vr-ent-h" d="M420,480 V170 H480 V295 H600 V170 H660 V480 H600 V355 H480 V480 Z" fill="none" stroke="#1f1d1b" stroke-width="3" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <path id="vr-ent-piso" d="M300,480 H780" stroke="#a8a398" stroke-width="3" fill="none" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <circle id="vr-ent-lector" cx="540" cy="470" r="11" fill="#1f1d1b" opacity="0" />
+    </svg>
+    <div id="vr-ent-titulo" class="clip" data-start="0" data-duration="8">AHORA, CAMINÁ.</div>
+    <div id="vr-ent-frase" class="clip" data-start="0" data-duration="8"><div>Empezás en el capítulo 1,</div><div>con la voz de Madden, al pie</div><div>de la H. Apretá ✕ para entrar.</div></div>
+  </div>
+  <script>
+    (function () {
+      for (const el of document.querySelectorAll("#vr-ent-titulo, #vr-ent-frase > div")) {
+        el.innerHTML = [...el.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+      const tl = gsap.timeline({ paused: true });
+      tl.set({}, {}, 8);
+      tl.fromTo("#vr-ent-piso", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 0.6, ease: "power2.inOut" }, 0.1);
+      tl.fromTo("#vr-ent-h", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 1.2, ease: "power2.inOut" }, 0.3);
+      tl.fromTo("#vr-ent-titulo .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.06, ease: "none" }, 0.8);
+      tl.fromTo("#vr-ent-frase .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.025, ease: "none" }, 1.8);
+      // el lector se acerca a la H y la atraviesa
+      tl.fromTo("#vr-ent-lector", { attr: { opacity: 0, cy: 470, r: 11 } }, { attr: { opacity: 1 }, duration: 0.3, ease: "sine.out" }, 4.2);
+      tl.to("#vr-ent-lector", { attr: { cy: 330, r: 6 }, duration: 2.2, ease: "sine.inOut" }, 4.6);
+      tl.to("#vr-ent-lector", { attr: { opacity: 0 }, duration: 0.4, ease: "sine.in" }, 6.9);
+      window.__timelines["vr-entrar"] = tl;
+    })();
+  </script>
+</template>

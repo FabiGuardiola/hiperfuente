@@ -1,0 +1,78 @@
+<template>
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #vr-proy-svg { position: absolute; left: 0; top: 0; width: 1080px; height: 1080px; }
+    .vr-proy-lomo-t { font-family: "FabiBlock"; font-size: 30px; fill: #1f1d1b; }
+    .vr-proy-lomo-a { font-family: "IBM Plex Mono"; font-size: 22px; fill: #1f1d1b; }
+    .vr-proy-bloque { position: absolute; left: 90px; right: 90px; text-align: center; }
+    .vr-proy-bloque > div { white-space: nowrap; }
+    #vr-proy-titulo { top: 640px; font-family: "FabiBlock"; font-size: 58px; line-height: 1.1; color: #9b3d2e; }
+    #vr-proy-a, #vr-proy-b { top: 800px; font-family: "IBM Plex Mono"; font-size: 36px; line-height: 1.42; color: #1f1d1b; }
+    #vr-proy-b .vr-proy-voces { color: #2f4858; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="vr-proyecto" data-width="1080" data-height="1080">
+    <svg id="vr-proy-svg" viewBox="0 0 1080 1080">
+      <defs>
+        <g id="vr-proy-lomo0">
+          <rect x="300" y="130" width="120" height="480" fill="#e9e3d6" stroke="#1f1d1b" stroke-width="2.5" />
+          <text class="vr-proy-lomo-t" transform="translate(378 590) rotate(-90)">EL ALEPH</text>
+          <text class="vr-proy-lomo-a" transform="translate(334 590) rotate(-90)">J. L. BORGES</text>
+        </g>
+        <g id="vr-proy-lomo1">
+          <rect x="480" y="130" width="120" height="480" fill="#e9e3d6" stroke="#1f1d1b" stroke-width="2.5" />
+          <text class="vr-proy-lomo-t" transform="translate(558 590) rotate(-90)">EL JARDÍN</text>
+          <text class="vr-proy-lomo-a" transform="translate(514 590) rotate(-90)">J. L. BORGES</text>
+        </g>
+        <g id="vr-proy-lomo2">
+          <rect x="660" y="130" width="120" height="480" fill="#e9e3d6" stroke="#1f1d1b" stroke-width="2.5" />
+          <text class="vr-proy-lomo-t" transform="translate(738 590) rotate(-90)">LA BIBLIOTECA</text>
+          <text class="vr-proy-lomo-a" transform="translate(694 590) rotate(-90)">J. L. BORGES</text>
+        </g>
+      </defs>
+      <g id="vr-proy-piezas"></g>
+      <path id="vr-proy-cortes" d="M270,250H810M270,370H810M270,490H810" stroke="#9b3d2e" stroke-width="3" fill="none" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <rect id="vr-proy-marco" x="360" y="130" width="360" height="480" fill="none" stroke="#9b3d2e" stroke-width="5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+    </svg>
+    <div id="vr-proy-titulo" class="vr-proy-bloque clip" data-start="0" data-duration="16"><div>EL EXPEDIENTE DE LA</div><div>BIBLIOTECA BABEL</div></div>
+    <div id="vr-proy-a" class="vr-proy-bloque clip" data-start="0" data-duration="11.2"><div>Un cuento hecho con partes de</div><div>tres cuentos de Borges, escrito</div><div>con una tipografía propia.</div></div>
+    <div id="vr-proy-b" class="vr-proy-bloque clip" data-start="11.2" data-duration="4.8"><div>Ocho habitaciones: ocho capítulos.</div><div>Tres pisos en cada una: tres voces.</div><div class="vr-proy-voces">MADDEN · YU TSUN · ROBERTO</div></div>
+  </div>
+  <script>
+    (function () {
+      const NS = "http://www.w3.org/2000/svg", XL = "http://www.w3.org/1999/xlink";
+      const piezas = document.getElementById("vr-proy-piezas"), defs = document.querySelector("#vr-proy-svg defs");
+      const X0 = [300, 480, 660], H = 120, Y0 = 130;
+      const lista = [];
+      // cada lomo se corta en cuatro franjas; la franja s del libro b va a la columna (b + s) mod 3 del libro nuevo
+      for (let b = 0; b < 3; b++) for (let s = 0; s < 4; s++) {
+        const cp = document.createElementNS(NS, "clipPath");
+        cp.setAttribute("id", "vr-proy-c" + b + s);
+        const r = document.createElementNS(NS, "rect");
+        r.setAttribute("x", X0[b] - 4); r.setAttribute("y", Y0 + s * H); r.setAttribute("width", 128); r.setAttribute("height", H);
+        cp.appendChild(r); defs.appendChild(cp);
+        const g = document.createElementNS(NS, "g");
+        g.setAttribute("clip-path", "url(#vr-proy-c" + b + s + ")");
+        const u = document.createElementNS(NS, "use");
+        u.setAttribute("href", "#vr-proy-lomo" + b); u.setAttributeNS(XL, "xlink:href", "#vr-proy-lomo" + b);
+        g.appendChild(u); piezas.appendChild(g);
+        lista.push({ g, dx: 360 + ((b + s) % 3) * 120 - X0[b] });
+      }
+      for (const el of document.querySelectorAll("#vr-proy-titulo > div, #vr-proy-a > div, #vr-proy-b > div")) {
+        el.innerHTML = [...el.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+      const tl = gsap.timeline({ paused: true });
+      tl.set({}, {}, 16);
+      tl.fromTo(lista.map((p) => p.g), { opacity: 0 }, { opacity: 1, duration: 0.4, stagger: 0.05, ease: "sine.out" }, 0.2);
+      tl.fromTo("#vr-proy-cortes", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 0.8, ease: "power2.inOut" }, 2.0);
+      lista.forEach((p, i) => tl.fromTo(p.g, { x: 0 }, { x: p.dx, duration: 1.6, ease: "power3.inOut" }, 3.0 + i * 0.08));
+      tl.to("#vr-proy-cortes", { opacity: 0, duration: 0.4, ease: "sine.in" }, 3.4);
+      tl.fromTo("#vr-proy-marco", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 0.9, ease: "power2.inOut" }, 5.6);
+      tl.fromTo("#vr-proy-titulo .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.05, ease: "none" }, 5.9);
+      tl.fromTo("#vr-proy-a .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.028, ease: "none" }, 6.7);
+      tl.fromTo("#vr-proy-b .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.03, ease: "none" }, 11.3);
+      window.__timelines["vr-proyecto"] = tl;
+    })();
+  </script>
+</template>

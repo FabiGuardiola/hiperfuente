@@ -1,0 +1,61 @@
+<template>
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #vr-inst-svg { position: absolute; left: 0; top: 0; width: 1080px; height: 1080px; }
+    .vr-inst-rot { position: absolute; text-align: center; white-space: nowrap; }
+    .vr-inst-rot b { display: block; font-family: "FabiBlock"; font-weight: 400; font-size: 46px; line-height: 1.1; }
+    .vr-inst-rot > span { display: block; font-family: "IBM Plex Mono"; font-size: 34px; line-height: 1.35; color: #1f1d1b; }
+    #vr-inst-sitio { left: 110px; width: 420px; top: 140px; }
+    #vr-inst-sitio b { color: #1f1d1b; }
+    #vr-inst-visor { left: 550px; width: 420px; top: 140px; }
+    #vr-inst-visor b { color: #9b3d2e; }
+    #vr-inst-titulo { position: absolute; left: 90px; right: 90px; top: 650px; text-align: center; font-family: "FabiBlock"; font-size: 60px; color: #1f1d1b; white-space: nowrap; }
+    #vr-inst-frase { position: absolute; left: 90px; right: 90px; top: 750px; text-align: center; font-family: "IBM Plex Mono"; font-size: 36px; line-height: 1.42; color: #1f1d1b; }
+    #vr-inst-frase > div { white-space: nowrap; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="vr-instancia" data-width="1080" data-height="1080">
+    <svg id="vr-inst-svg" viewBox="0 0 1080 1080">
+      <!-- el sitio: una pantalla con el objeto entero y sus barras -->
+      <rect id="vr-inst-pantalla" x="150" y="300" width="340" height="230" fill="none" stroke="#1f1d1b" stroke-width="3" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <g id="vr-inst-objeto" opacity="0">
+        <line x1="150" y1="330" x2="490" y2="330" stroke="#1f1d1b" stroke-width="2" />
+        <rect x="430" y="345" width="45" height="170" fill="none" stroke="#a8a398" stroke-width="2" />
+        <path d="M300,360 L300,500 M250,395 L350,465 M350,395 L250,465 M255,430 L345,430" stroke="#a8a398" stroke-width="2.5" fill="none" />
+        <path d="M300,360 L350,395 L345,430 L350,465 L300,500 L250,465 L255,430 L250,395 Z" stroke="#1f1d1b" stroke-width="2" fill="none" />
+      </g>
+      <!-- el visor: dos lentes, y adentro el lector al pie de una escalera -->
+      <circle id="vr-inst-lente0" cx="680" cy="415" r="95" fill="none" stroke="#9b3d2e" stroke-width="4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <circle id="vr-inst-lente1" cx="870" cy="415" r="95" fill="none" stroke="#9b3d2e" stroke-width="4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <g id="vr-inst-adentro" opacity="0">
+        <path d="M615,470 H650 V445 H675 V420 H700 V395 H725 V370 H745" stroke="#1f1d1b" stroke-width="2.5" fill="none" />
+        <path d="M805,470 H840 V445 H865 V420 H890 V395 H915 V370 H935" stroke="#1f1d1b" stroke-width="2.5" fill="none" />
+        <path d="M615,486 H745 M805,486 H935" stroke="#a8a398" stroke-width="2" />
+      </g>
+    </svg>
+    <div id="vr-inst-sitio" class="vr-inst-rot clip" data-start="0" data-duration="12"><b>EL SITIO</b><span>el objeto entero,</span><span>desde afuera</span></div>
+    <div id="vr-inst-visor" class="vr-inst-rot clip" data-start="0" data-duration="12"><b>EL VISOR</b><span>adentro, en</span><span>primera persona</span></div>
+    <div id="vr-inst-titulo" class="clip" data-start="0" data-duration="12">ESTA ES OTRA INSTANCIA</div>
+    <div id="vr-inst-frase" class="clip" data-start="0" data-duration="12"><div>del mismo objeto: sin barras ni</div><div>botones. Se recorre y se lee</div><div>con el cuerpo.</div></div>
+  </div>
+  <script>
+    (function () {
+      for (const el of document.querySelectorAll("#vr-inst-sitio b, #vr-inst-sitio span, #vr-inst-visor b, #vr-inst-visor span, #vr-inst-titulo, #vr-inst-frase > div")) {
+        el.innerHTML = [...el.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+      const tl = gsap.timeline({ paused: true });
+      tl.set({}, {}, 12);
+      tl.fromTo("#vr-inst-pantalla", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 0.9, ease: "power2.inOut" }, 0.2);
+      tl.fromTo("#vr-inst-objeto", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.4, ease: "sine.out" }, 1.0);
+      tl.fromTo("#vr-inst-sitio .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.035, ease: "none" }, 1.1);
+      tl.fromTo("#vr-inst-lente0, #vr-inst-lente1", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 0.9, stagger: 0.13, ease: "power2.inOut" }, 3.0);
+      tl.fromTo("#vr-inst-adentro", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.4, ease: "sine.out" }, 3.9);
+      tl.fromTo("#vr-inst-visor .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.035, ease: "none" }, 4.0);
+      tl.to("#vr-inst-pantalla, #vr-inst-objeto", { opacity: 0.35, duration: 0.5, ease: "sine.inOut" }, 5.8);
+      tl.fromTo("#vr-inst-titulo .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.05, ease: "none" }, 6.0);
+      tl.fromTo("#vr-inst-frase .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.03, ease: "none" }, 7.2);
+      window.__timelines["vr-instancia"] = tl;
+    })();
+  </script>
+</template>

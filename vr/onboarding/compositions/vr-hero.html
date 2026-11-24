@@ -1,0 +1,95 @@
+<template>
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #vr-hero-svg { position: absolute; left: 0; top: 0; width: 1080px; height: 1080px; }
+    .vr-hero-linea { position: absolute; left: 0; right: 0; text-align: center; white-space: nowrap; }
+    #vr-hero-titulo { top: 700px; font-family: "FabiBlock"; font-size: 104px; line-height: 1; color: #9b3d2e; }
+    #vr-hero-bajada { top: 830px; font-family: "IBM Plex Mono"; font-size: 38px; color: #1f1d1b; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="vr-hero" data-width="1080" data-height="1080">
+    <svg id="vr-hero-svg" viewBox="0 0 1080 1080">
+      <path id="vr-hero-aristas" d="" fill="none" stroke="#a8a398" stroke-width="2" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <polygon id="vr-hero-p0" points="" />
+      <polygon id="vr-hero-p1" points="" />
+      <polygon id="vr-hero-p2" points="" />
+      <g id="vr-hero-vertices"></g>
+    </svg>
+    <div id="vr-hero-titulo" class="vr-hero-linea clip" data-start="0" data-duration="10">HIPERFUENTE</div>
+    <div id="vr-hero-bajada" class="vr-hero-linea clip" data-start="0" data-duration="10">VR · un cuento que se recorre</div>
+  </div>
+  <script>
+    (function () {
+      const A = 0.618, B = 1;
+      const st = { th: 0.35, m: 0, k: 175, cx: 540, cy: 400 };
+      const C30 = Math.cos(Math.PI / 6);
+      function iso(p) {
+        const c = Math.cos(st.th), s = Math.sin(st.th);
+        const x = p[0] * c - p[1] * s, y = p[0] * s + p[1] * c, z = p[2];
+        return [st.cx + (x - y) * C30 * st.k, st.cy + (x + y) * 0.5 * st.k - z * st.k];
+      }
+      const RECT = [
+        [[0, -A, -B], [0, A, -B], [0, A, B], [0, -A, B]],
+        [[-B, 0, -A], [B, 0, -A], [B, 0, A], [-B, 0, A]],
+        [[-A, -B, 0], [A, -B, 0], [A, B, 0], [-A, B, 0]],
+      ];
+      // la H en el centro: asta izquierda, asta derecha, travesaño
+      const H = [
+        [[380, 620], [460, 620], [460, 190], [380, 190]],
+        [[620, 620], [700, 620], [700, 190], [620, 190]],
+        [[460, 440], [620, 440], [620, 370], [460, 370]],
+      ];
+      const V = [];
+      for (const s1 of [-1, 1]) for (const s2 of [-1, 1]) V.push([0, s1 * A, s2 * B], [s2 * B, 0, s1 * A], [s1 * A, s2 * B, 0]);
+      const E = [];
+      for (let i = 0; i < 12; i++) for (let j = i + 1; j < 12; j++) {
+        const d = Math.hypot(V[i][0] - V[j][0], V[i][1] - V[j][1], V[i][2] - V[j][2]);
+        if (Math.abs(d - 2 * A) < 0.01) E.push([i, j]);
+      }
+      const NS = "http://www.w3.org/2000/svg";
+      const grupo = document.getElementById("vr-hero-vertices");
+      const puntos = V.map(() => {
+        const c = document.createElementNS(NS, "circle");
+        c.setAttribute("r", "7"); c.setAttribute("fill", "#1f1d1b"); c.setAttribute("opacity", "0");
+        grupo.appendChild(c); return c;
+      });
+      const pol = [0, 1, 2].map((i) => document.getElementById("vr-hero-p" + i));
+      function dibujar() {
+        const m = st.m;
+        pol.forEach((p, i) => {
+          const pts = RECT[i].map((q, j) => { const t = iso(q); return [H[i][j][0] + (t[0] - H[i][j][0]) * m, H[i][j][1] + (t[1] - H[i][j][1]) * m]; });
+          p.setAttribute("points", pts.map((q) => q[0].toFixed(1) + "," + q[1].toFixed(1)).join(" "));
+          p.setAttribute("fill", "#9b3d2e");
+          p.setAttribute("fill-opacity", (1 - m).toFixed(3));
+          p.setAttribute("stroke", "#1f1d1b");
+          p.setAttribute("stroke-width", "2.5");
+          p.setAttribute("stroke-opacity", Math.min(1, m * 1.5).toFixed(3));
+        });
+        let d = "";
+        for (const [i, j] of E) { const a = iso(V[i]), b = iso(V[j]); d += "M" + a[0].toFixed(1) + "," + a[1].toFixed(1) + "L" + b[0].toFixed(1) + "," + b[1].toFixed(1); }
+        document.getElementById("vr-hero-aristas").setAttribute("d", d);
+        V.forEach((v, i) => { const q = iso(v); puntos[i].setAttribute("cx", q[0].toFixed(1)); puntos[i].setAttribute("cy", q[1].toFixed(1)); });
+      }
+      for (const id of ["vr-hero-titulo", "vr-hero-bajada"]) {
+        const el = document.getElementById(id);
+        el.innerHTML = [...el.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+      const tl = gsap.timeline({ paused: true, onUpdate: dibujar });
+      tl.set({}, {}, 10);
+      tl.fromTo(st, { m: 0 }, { m: 1, duration: 2.2, ease: "power3.inOut" }, 0.6);
+      tl.fromTo("#vr-hero-aristas", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 1.5, ease: "power2.inOut" }, 2.6);
+      tl.fromTo(puntos, { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.4, stagger: 0.07, ease: "sine.out" }, 3.0);
+      // en el visor el giro es lento: no marea
+      tl.fromTo(st, { th: 0.35 }, { th: 0.35 + Math.PI / 6, duration: 3.4, ease: "sine.inOut" }, 3.0);
+      tl.fromTo("#vr-hero-titulo .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.067, ease: "none" }, 4.2);
+      tl.fromTo("#vr-hero-bajada .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.035, ease: "none" }, 5.2);
+      tl.to("#vr-hero-titulo .letra, #vr-hero-bajada .letra", { opacity: 0, duration: 0.01, stagger: { each: 0.012, from: "end" }, ease: "none" }, 8.4);
+      tl.to(puntos, { attr: { opacity: 0 }, duration: 0.3, ease: "sine.in" }, 8.7);
+      tl.to("#vr-hero-aristas", { attr: { "stroke-dashoffset": 1 }, duration: 0.6, ease: "power2.inOut" }, 8.7);
+      tl.to(st, { th: 0.35, m: 0, duration: 1.2, ease: "power3.inOut" }, 8.8);
+      dibujar();
+      window.__timelines["vr-hero"] = tl;
+    })();
+  </script>
+</template>

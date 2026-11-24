@@ -1,0 +1,55 @@
+<template>
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #vr-leer-cabeza { position: absolute; left: 90px; right: 90px; top: 56px; text-align: center; font-family: "IBM Plex Mono"; font-size: 34px; color: #1f1d1b; white-space: nowrap; }
+    .vr-leer-foto { position: absolute; left: 180px; top: 120px; width: 720px; height: 405px; }
+    .vr-leer-foto img { display: block; width: 720px; height: 405px; object-fit: cover; border: 3px solid #1f1d1b; box-sizing: border-box; }
+    #vr-leer-svg { position: absolute; left: 0; top: 0; width: 1080px; height: 1080px; }
+    .vr-leer-paso { position: absolute; left: 90px; right: 90px; top: 590px; text-align: center; }
+    .vr-leer-paso b { display: block; font-family: "FabiBlock"; font-weight: 400; font-size: 64px; line-height: 1.1; color: #1f1d1b; white-space: nowrap; }
+    .vr-leer-paso > span { display: block; margin-top: 10px; font-family: "IBM Plex Mono"; font-size: 35px; line-height: 1.4; color: #1f1d1b; white-space: nowrap; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="vr-leer" data-width="1080" data-height="1080">
+    <div id="vr-leer-cabeza" class="clip" data-start="0" data-duration="22">Cómo se lee:</div>
+    <div id="vr-leer-f1" class="vr-leer-foto clip" data-start="0" data-duration="5.5"><img id="vr-leer-i1" src="assets/capturas/escalera.jpg" alt="Una escalera de renglones"></div>
+    <div id="vr-leer-f2" class="vr-leer-foto clip" data-start="5.5" data-duration="5.5"><img id="vr-leer-i2" src="assets/capturas/muro.jpg" alt="Un muro de texto"></div>
+    <div id="vr-leer-f3" class="vr-leer-foto clip" data-start="11" data-duration="5.5"><img id="vr-leer-i3" src="assets/capturas/anamorfosis.jpg" alt="La cita desde el mirador"></div>
+    <svg id="vr-leer-svg" viewBox="0 0 1080 1080">
+      <g id="vr-leer-esfera" opacity="0">
+        <circle cx="540" cy="320" r="120" fill="#e9e3d6" fill-opacity="0.6" stroke="#1f1d1b" stroke-width="3" />
+        <path d="M480,280 a70,70 0 0,1 60,-40" fill="none" stroke="#a8a398" stroke-width="3" />
+        <circle id="vr-leer-aro" cx="540" cy="320" r="120" fill="none" stroke="#9b3d2e" stroke-width="4" />
+        <circle cx="540" cy="320" r="14" fill="none" stroke="#1f1d1b" stroke-width="3" />
+        <circle id="vr-leer-carga" cx="540" cy="320" r="26" fill="none" stroke="#9b3d2e" stroke-width="7" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" transform="rotate(-90 540 320)" />
+      </g>
+    </svg>
+    <div id="vr-leer-p1" class="vr-leer-paso clip" data-start="0" data-duration="5.5"><b>ESCALERAS</b><span>La narración del capítulo:</span><span>se lee subiendo, un renglón</span><span>por escalón.</span></div>
+    <div id="vr-leer-p2" class="vr-leer-paso clip" data-start="5.5" data-duration="5.5"><b>MUROS</b><span>El testimonio de cada</span><span>personaje, en letras de</span><span>piedra.</span></div>
+    <div id="vr-leer-p3" class="vr-leer-paso clip" data-start="11" data-duration="5.5"><b>EL MIRADOR</b><span>La cita está partida en el</span><span>aire: se arma desde un</span><span>único punto.</span></div>
+    <div id="vr-leer-p4" class="vr-leer-paso clip" data-start="16.5" data-duration="5.5"><b>LAS ESFERAS</b><span>Mirala 1,5 s o apretá ✕:</span><span>queda solo el texto.</span><span>✕ de nuevo para salir.</span></div>
+  </div>
+  <script>
+    (function () {
+      for (const el of document.querySelectorAll("#vr-leer-cabeza, .vr-leer-paso b, .vr-leer-paso span")) {
+        el.innerHTML = [...el.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+      const tl = gsap.timeline({ paused: true });
+      tl.set({}, {}, 22);
+      tl.fromTo("#vr-leer-cabeza .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.03, ease: "none" }, 0.1);
+      const T = [0, 5.5, 11, 16.5];
+      for (let i = 0; i < 4; i++) {
+        const p = "#vr-leer-p" + (i + 1);
+        if (i < 3) tl.fromTo("#vr-leer-i" + (i + 1), { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.7, ease: "power2.inOut" }, T[i] + 0.2);
+        tl.fromTo(p + " b .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.04, ease: "none" }, T[i] + 0.3);
+        tl.fromTo(p + " span .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.022, ease: "none" }, T[i] + 0.8);
+      }
+      // la esfera: la retícula se llena mientras se la mira; el aro late una vez
+      tl.fromTo("#vr-leer-esfera", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.4, ease: "sine.out" }, 16.6);
+      tl.fromTo("#vr-leer-carga", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 1.5, ease: "none" }, 17.4);
+      tl.fromTo("#vr-leer-aro", { attr: { r: 120, "stroke-opacity": 1 } }, { attr: { r: 190, "stroke-opacity": 0 }, duration: 0.9, ease: "power2.out" }, 18.9);
+      window.__timelines["vr-leer"] = tl;
+    })();
+  </script>
+</template>

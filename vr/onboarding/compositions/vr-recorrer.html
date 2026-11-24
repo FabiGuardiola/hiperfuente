@@ -1,0 +1,99 @@
+<template>
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #vr-rec-svg { position: absolute; left: 0; top: 0; width: 1080px; height: 1080px; }
+    .vr-rec-voz { font-family: "IBM Plex Mono"; font-size: 30px; fill: #2f4858; text-anchor: middle; }
+    .vr-rec-paso { position: absolute; left: 90px; right: 90px; top: 650px; text-align: center; }
+    .vr-rec-paso b { display: block; font-family: "FabiBlock"; font-weight: 400; font-size: 64px; line-height: 1.1; color: #1f1d1b; white-space: nowrap; }
+    .vr-rec-paso > span { display: block; margin-top: 10px; font-family: "IBM Plex Mono"; font-size: 35px; line-height: 1.4; color: #1f1d1b; white-space: nowrap; }
+    .letra { opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="vr-recorrer" data-width="1080" data-height="1080">
+    <svg id="vr-rec-svg" viewBox="0 0 1080 1080">
+      <polygon id="vr-rec-pz" fill="#a8a398" fill-opacity="0" stroke="#1f1d1b" stroke-width="2.5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <polygon id="vr-rec-px" fill="#a8a398" fill-opacity="0" stroke="#1f1d1b" stroke-width="2.5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <polygon id="vr-rec-py" fill="#a8a398" fill-opacity="0" stroke="#1f1d1b" stroke-width="2.5" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1" />
+      <path id="vr-rec-escalera" fill="none" stroke="#1f1d1b" stroke-width="2.5" opacity="0" />
+      <g id="vr-rec-voces" opacity="0">
+        <text id="vr-rec-vz" class="vr-rec-voz">MADDEN</text>
+        <text id="vr-rec-vx" class="vr-rec-voz">YU TSUN</text>
+        <text id="vr-rec-vy" class="vr-rec-voz">ROBERTO</text>
+      </g>
+      <g id="vr-rec-nucleo" opacity="0">
+        <path id="vr-rec-cubo" fill="#e9e3d6" fill-opacity="0.8" stroke="#1f1d1b" stroke-width="2.5" />
+        <polygon id="vr-rec-salida" fill="#9b3d2e" stroke="#9b3d2e" stroke-width="2" />
+        <polygon id="vr-rec-placa" fill="none" stroke="#9b3d2e" stroke-width="4" />
+      </g>
+      <circle id="vr-rec-lector" r="13" fill="#1f1d1b" opacity="0" />
+    </svg>
+    <div id="vr-rec-p1" class="vr-rec-paso clip" data-start="0" data-duration="6"><b>CAMINAR</b><span>Vas hacia donde mirás y subís</span><span>las escaleras. Los bordes no</span><span>te dejan caer.</span></div>
+    <div id="vr-rec-p2" class="vr-rec-paso clip" data-start="6" data-duration="6"><b>OTRO PISO</b><span>Con △, el piso se vuelve</span><span>pared. Cada piso es la voz</span><span>de un personaje.</span></div>
+    <div id="vr-rec-p3" class="vr-rec-paso clip" data-start="12" data-duration="6"><b>EL NÚCLEO</b><span>El cuadrado rojo de la esquina:</span><span>capítulo siguiente. Los</span><span>rectángulos rojos: otra voz.</span></div>
+  </div>
+  <script>
+    (function () {
+      const $ = (id) => document.getElementById(id);
+      const C30 = Math.cos(Math.PI / 6), K = 250, CX = 540, CY = 330;
+      const iso = (p) => [CX + (p[0] - p[1]) * C30 * K, CY + (p[0] + p[1]) * 0.5 * K - p[2] * K];
+      const pts = (l) => l.map((p) => iso(p).map((c) => c.toFixed(1)).join(",")).join(" ");
+      const linea = (l) => l.map((p, i) => (i ? "L" : "M") + iso(p).map((c) => c.toFixed(1)).join(",")).join("");
+      $("vr-rec-pz").setAttribute("points", pts([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0]]));
+      $("vr-rec-px").setAttribute("points", pts([[0, 0, 0], [0, 1, 0], [0, 1, 1], [0, 0, 1]]));
+      $("vr-rec-py").setAttribute("points", pts([[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]]));
+      // una escalera sobre el piso z, que sube hacia el fondo
+      const esc = [];
+      for (let i = 0; i <= 5; i++) { const y = 0.8 - i * 0.07, z = i * 0.05; esc.push([0.55, y, z], [0.55, y - 0.07, z]); if (i < 5) esc.push([0.55, y - 0.07, z + 0.05]); }
+      $("vr-rec-escalera").setAttribute("d", linea(esc) + linea([[0.7, 0.8, 0], [0.7, 0.38, 0.25], [0.55, 0.38, 0.25]]));
+      const voz = (id, p) => { const q = iso(p); $(id).setAttribute("x", q[0].toFixed(1)); $(id).setAttribute("y", q[1].toFixed(1)); };
+      voz("vr-rec-vz", [0.88, 0.36, 0]); voz("vr-rec-vx", [0, 0.62, 0.62]); voz("vr-rec-vy", [0.62, 0, 0.62]);
+      // el núcleo: un cubo en la esquina, con el cuadrado de salida y una placa (otra voz)
+      const N = 0.24;
+      $("vr-rec-cubo").setAttribute("d", linea([[N, 0, 0], [N, N, 0], [0, N, 0], [0, N, N], [N, N, N], [N, 0, N], [N, 0, 0]]) + "Z" + linea([[N, N, 0], [N, N, N]]) + linea([[0, 0, N], [N, 0, N]]) + linea([[0, 0, N], [0, N, N]]));
+      $("vr-rec-salida").setAttribute("points", pts([[N - 0.08, N - 0.08, N], [N, N - 0.08, N], [N, N, N], [N - 0.08, N, N]]));
+      $("vr-rec-placa").setAttribute("points", pts([[0, 0.42, 0], [0, 0.52, 0], [0, 0.52, 0.09], [0, 0.42, 0.09]]));
+      // el lector: camina por el piso z, sube la escalera; con △ pasa a la pared x; después entra al núcleo
+      const RECORRIDO = [[0.92, 0.85, 0], [0.55, 0.85, 0], [0.55, 0.38, 0.25], [0.4, 0.38, 0.25]];
+      const st = { a: 0, pared: 0, nucleo: 0 };
+      function enRecorrido(a) {
+        const n = RECORRIDO.length - 1, x = Math.min(n - 1e-6, Math.max(0, a * n)), i = Math.floor(x), f = x - i;
+        return RECORRIDO[i].map((c, k) => c + (RECORRIDO[i + 1][k] - c) * f);
+      }
+      function dibujar() {
+        let p = enRecorrido(st.a);
+        if (st.pared > 0) { const q = [0.02, 0.72, 0.5]; p = p.map((c, k) => c + (q[k] - c) * st.pared); }
+        if (st.nucleo > 0) { const q = [N - 0.04, N - 0.04, N]; p = p.map((c, k) => c + (q[k] - c) * st.nucleo); }
+        const s = iso(p);
+        $("vr-rec-lector").setAttribute("cx", s[0].toFixed(1));
+        $("vr-rec-lector").setAttribute("cy", (s[1] - 13).toFixed(1));
+      }
+      for (const el of document.querySelectorAll(".vr-rec-paso b, .vr-rec-paso span")) {
+        el.innerHTML = [...el.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+      const tl = gsap.timeline({ paused: true, onUpdate: dibujar });
+      tl.set({}, {}, 18);
+      tl.fromTo("#vr-rec-pz, #vr-rec-px, #vr-rec-py", { attr: { "stroke-dashoffset": 1 } }, { attr: { "stroke-dashoffset": 0 }, duration: 0.8, stagger: 0.13, ease: "power2.inOut" }, 0.1);
+      tl.fromTo("#vr-rec-pz", { attr: { "fill-opacity": 0 } }, { attr: { "fill-opacity": 0.32 }, duration: 0.4, ease: "sine.out" }, 0.9);
+      tl.fromTo("#vr-rec-px, #vr-rec-py", { attr: { "fill-opacity": 0 } }, { attr: { "fill-opacity": 0.1 }, duration: 0.4, ease: "sine.out" }, 0.9);
+      tl.fromTo("#vr-rec-escalera", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.4, ease: "sine.out" }, 1.0);
+      tl.fromTo("#vr-rec-lector", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.3, ease: "sine.out" }, 1.2);
+      tl.fromTo(st, { a: 0 }, { a: 1, duration: 3.6, ease: "sine.inOut" }, 1.4);
+      tl.fromTo("#vr-rec-p1 b .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.04, ease: "none" }, 0.3);
+      tl.fromTo("#vr-rec-p1 span .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.022, ease: "none" }, 0.8);
+      // △: el piso z se aclara, la pared x pasa a ser el piso; aparecen las voces
+      tl.fromTo("#vr-rec-voces", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.4, ease: "sine.out" }, 6.2);
+      tl.to("#vr-rec-pz", { attr: { "fill-opacity": 0.1 }, duration: 0.6, ease: "sine.inOut" }, 7.2);
+      tl.to("#vr-rec-px", { attr: { "fill-opacity": 0.32 }, duration: 0.6, ease: "sine.inOut" }, 7.2);
+      tl.fromTo(st, { pared: 0 }, { pared: 1, duration: 0.9, ease: "power2.inOut" }, 7.2);
+      tl.fromTo("#vr-rec-p2 b .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.04, ease: "none" }, 6.1);
+      tl.fromTo("#vr-rec-p2 span .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.022, ease: "none" }, 6.6);
+      // el núcleo
+      tl.fromTo("#vr-rec-nucleo", { attr: { opacity: 0 } }, { attr: { opacity: 1 }, duration: 0.5, ease: "sine.out" }, 12.2);
+      tl.fromTo(st, { nucleo: 0 }, { nucleo: 1, duration: 1.4, ease: "power2.inOut" }, 15.6);
+      tl.fromTo("#vr-rec-p3 b .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.04, ease: "none" }, 12.1);
+      tl.fromTo("#vr-rec-p3 span .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.022, ease: "none" }, 12.6);
+      dibujar();
+      window.__timelines["vr-recorrer"] = tl;
+    })();
+  </script>
+</template>

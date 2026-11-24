@@ -1,0 +1,926 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icono-192.png">
+<title>Hiperfuente · prueba VR</title>
+<!--
+  Prueba del visor VR (2026-11-24). Sirve para comprobar, antes de la versión completa:
+    · el visor de celular (pantalla partida en dos, una imagen por ojo) y el giroscopio;
+    · el joystick Bluetooth: muestra todo lo que manda (gamepad, teclas, mouse, toques) y lo usa para caminar;
+    · el rendimiento con la habitación real (+++), la colisión y las texturas.
+  No toca el visor principal: usa sus mismos datos (../escena.json, ../modelo.gltf.json, ../texturas).
+  Parámetros: ?ojos=0.064 (separación en m) · ?fov=90 · ?sep=0.42 (centros de las lentes, fracción del ancho) · ?dist=0..3
+    · ?calidad=1.5 (resolución) · ?texturas=0 · ?vel=1.4 (m/s). sep, fov y dist también se calibran con L2 + cruz/△/X.
+  Control de PS4 (mapeo estándar): palanca izq. camina · palanca der., L1/R1 o cruz giran 30° · R2 acelera ·
+    X elige la esfera que mirás · △ cambia la gravedad (z → x → y) · ○ vuelve a la entrada · □ muestra/oculta el panel ·
+    Options mantenido 1,5 s recarga la página (y vuelve sola al visor). En el menú, X entra al visor.
+  Con el manifiesto, «Agregar a la pantalla principal» la abre a pantalla completa y horizontal (sin barra, aun al recargar).
+-->
+<style>
+  :root { --papel: #e9e3d6; --lacre: #9b3d2e; --carbon: #1f1d1b; --piedra: #a8a398; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #000; color: var(--papel); overflow: hidden;
+               font-family: "DM Mono", ui-monospace, Menlo, Consolas, monospace; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; }
+  #menu { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+          gap: 18px; padding: 24px 16px; background: var(--carbon); text-align: center; z-index: 10; overflow: auto; }
+  #menu h1 { margin: 0; font-weight: 400; font-size: 22px; letter-spacing: .12em; }
+  #menu h1 b { color: var(--lacre); font-weight: 400; }
+  #menu p { margin: 0; max-width: 34em; font-size: 13px; line-height: 1.5; color: var(--piedra); }
+  #menu .botones { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  #menu button { font: inherit; font-size: 15px; padding: 14px 22px; border: 1px solid var(--papel); background: transparent;
+                 color: var(--papel); cursor: pointer; letter-spacing: .06em; }
+  #menu button.principal { background: var(--lacre); border-color: var(--lacre); }
+  #menu button:disabled { opacity: .35; cursor: default; }
+  #barra { width: min(320px, 80vw); height: 3px; background: #3a3734; }
+  #barra i { display: block; height: 100%; width: 0; background: var(--lacre); }
+  #estado { font-size: 12px; color: var(--piedra); min-height: 1.4em; }
+  /* diagnóstico sin visor: todo lo que llega del control, en grande */
+  #diag { position: fixed; inset: 0; z-index: 5; padding: 16px; overflow: auto; background: rgba(15,14,13,.88); display: none; font-size: 14px; line-height: 1.45; }
+  #diag h2 { font-weight: 400; font-size: 15px; letter-spacing: .1em; color: var(--lacre); margin: 14px 0 6px; }
+  #diag pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+  #diag .cerrar { position: fixed; top: 12px; right: 12px; font: inherit; padding: 8px 14px; background: var(--lacre); color: var(--papel); border: 0; }
+  #diag .ejes span { display: inline-block; width: 120px; height: 10px; background: #3a3734; position: relative; vertical-align: middle; margin-right: 8px; }
+  #diag .ejes span i { position: absolute; top: 0; bottom: 0; left: 50%; width: 3px; background: var(--papel); }
+  #diag .bt { display: inline-block; min-width: 34px; padding: 4px 6px; margin: 2px; border: 1px solid #555; text-align: center; }
+  #diag .bt.on { background: var(--lacre); border-color: var(--lacre); }
+  #ayuda { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); font-size: 11px; color: #9a958c; z-index: 4; pointer-events: none; text-align: center; }
+  #girar { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; background: #000; font-size: 18px; text-align: center; padding: 24px; }
+  @media (orientation: portrait) { body.vr #girar { display: flex; } }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/effects/StereoEffect.js"></script>
+</head>
+<body>
+<div id="menu">
+  <h1>HIPERFUENTE · <b>PRUEBA VR</b></h1>
+  <p>Prueba del visor de celular y del joystick, en la habitación del capítulo 1. Poné el celular horizontal y conectá el joystick por Bluetooth antes de entrar.</p>
+  <div id="barra"><i></i></div>
+  <div id="estado">Cargando el espacio…</div>
+  <div class="botones">
+    <button id="bVR" class="principal" disabled>Entrar al visor</button>
+    <button id="bDiag">Probar el control (sin visor)</button>
+    <button id="bMono" disabled>Ver sin partir la pantalla</button>
+  </div>
+  <p>Control de PS4: <b>palanca izquierda</b> camina hacia donde mirás · <b>palanca derecha</b>, <b>L1 / R1</b> o la cruz giran de a 30° ·
+     <b>R2</b> acelera · <b>X</b> elige la esfera que mirás (o mirala 1,5 s) · <b>△</b> cambia la gravedad · <b>○</b> vuelve a la entrada ·
+     <b>□</b> muestra u oculta el panel (mirando hacia abajo) · <b>Options</b> mantenido recarga. En esta pantalla, <b>X</b> entra al visor.</p>
+  <p><b>Calibrar el visor</b> (se guarda en el celular): con <b>L2</b> apretado, <b>cruz ← →</b> junta o separa las dos imágenes ·
+     <b>↑ ↓</b> campo de visión · <b>△</b> deformación de las lentes · <b>□</b> profundidad (real, media, baja, plano) · <b>X</b> vuelve a los valores de fábrica.
+     Si el celular no da giroscopio, la <b>palanca derecha</b> mira.</p>
+  <p>Sin control: mantener <b>tocada la pantalla</b> camina. En la compu: WASD, Q / E, G (gravedad), H (entrada), Enter (elegir).</p>
+</div>
+<div id="diag">
+  <button class="cerrar" id="bCerrarDiag">Volver</button>
+  <h2>CONTROL · lo que llega al navegador</h2>
+  <p style="color:#9a958c;margin:0 0 6px">Apretá cada botón y mové las palancas, en cada modo del control (por ejemplo @+A, @+B, @+C). Sacale una captura a esta pantalla en cada modo.</p>
+  <pre id="dGamepad"></pre>
+  <h2>TECLAS</h2><pre id="dTeclas">—</pre>
+  <h2>MOUSE Y TOQUES</h2><pre id="dMouse">—</pre>
+  <h2>GIROSCOPIO</h2><pre id="dGiro">—</pre>
+</div>
+<div id="ayuda"></div>
+<div id="girar">Girá el celular a horizontal</div>
+
+<script>
+(async function () {
+"use strict";
+const $ = (id) => document.getElementById(id);
+const P = new URLSearchParams(location.search);
+const num = (k, d) => (P.has(k) && isFinite(+P.get(k)) ? +P.get(k) : d);
+const AJ = { ojos: num("ojos", 0.064), fov: num("fov", 85), calidad: num("calidad", Math.min(devicePixelRatio, 1.5)),
+             texturas: P.get("texturas") !== "0", vel: num("vel", 1.4) };
+
+// ---------- Registro de entradas (sirve al diagnóstico y a la caminata) ----------
+const ent = { teclas: new Set(), ultimasTeclas: [], mouse: { dx: 0, dy: 0, clics: 0, ultimo: "—" }, toque: false, toques: 0,
+              giro: null, giroEventos: 0, apretado: false, eventos: [] };
+const anotar = (lista, s, max = 10) => { lista.unshift(s); if (lista.length > max) lista.length = max; };
+addEventListener("keydown", (e) => {
+  ent.teclas.add(e.code || e.key);
+  anotar(ent.ultimasTeclas, `↓ key="${e.key}"  code="${e.code}"  keyCode=${e.keyCode}`);
+  if (!e.repeat && (e.code === "Enter" || e.code === "Space")) accion("tecla " + e.code);
+  if (!e.repeat && e.code === "KeyG" && enRecorrido()) siguienteGravedad();
+  if (!e.repeat && e.code === "KeyH" && enRecorrido()) volverEntrada();
+  const TECLAS_CAL = { BracketLeft: "sep-", BracketRight: "sep+", Equal: "fov+", Minus: "fov-", KeyK: "dist", KeyL: "prof", Digit0: "reset" };
+  if (TECLAS_CAL[e.code] && enRecorrido()) calibrar(TECLAS_CAL[e.code]);
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter"].includes(e.code)) e.preventDefault();
+});
+addEventListener("keyup", (e) => { ent.teclas.delete(e.code || e.key); anotar(ent.ultimasTeclas, `↑ key="${e.key}"  code="${e.code}"`); });
+// El modo mouse de los controles baratos mueve un cursor: se lee el movimiento como si fuera una palanca.
+addEventListener("mousemove", (e) => { ent.mouse.dx += e.movementX || 0; ent.mouse.dy += e.movementY || 0; ent.mouse.ultimo = `mueve ${e.movementX}, ${e.movementY}`; });
+addEventListener("pointerdown", (e) => {
+  if (e.pointerType === "mouse") { ent.mouse.clics++; ent.mouse.ultimo = "clic botón " + e.button; }
+  else { ent.toques++; ent.toque = true; }
+  if (modo !== "menu" && modo !== "diag") accion("toque");
+  // si se abrió solo (al recargar), el primer toque pide la pantalla completa
+  if (modo === "vr" && !document.fullscreenElement && !matchMedia("(display-mode: fullscreen)").matches) pantallaCompleta();
+});
+addEventListener("pointerup", (e) => { if (e.pointerType !== "mouse") ent.toque = false; });
+addEventListener("pointercancel", () => { ent.toque = false; });
+addEventListener("contextmenu", (e) => e.preventDefault());
+
+// ---------- Giroscopio ----------
+// Igual que el viejo DeviceOrientationControls de three.js (lo sacaron en r134): alpha/beta/gamma → cuaternión de la cámara.
+const qGiro = new THREE.Quaternion(), qAux = new THREE.Quaternion();
+const Q_X = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)); // -90° en X: la cámara mira por la espalda del teléfono
+const EJE_Z = new THREE.Vector3(0, 0, 1), eulerG = new THREE.Euler();
+const RAD = Math.PI / 180;
+function anguloPantalla() { return ((screen.orientation && screen.orientation.angle) || window.orientation || 0) * RAD; }
+// Fuentes, en orden de preferencia: deviceorientation (giroscopio, relativo), deviceorientationabsolute (brújula +
+// acelerómetro: anda sin giroscopio, pero tiembla más) y el sensor genérico RelativeOrientationSensor.
+const fuentes = { relativo: "sin eventos", absoluto: "sin eventos", movimiento: "sin eventos", sensor: "no probado", permiso: "?" };
+let tRelativo = 0, qSensor = null;
+function tomarGiro(e, tipo) {
+  if (e.alpha === null && e.beta === null) { fuentes[tipo] = "eventos vacíos (sin sensor o bloqueado)"; return; }
+  fuentes[tipo] = "con datos";
+  if (tipo === "relativo") tRelativo = performance.now();
+  else if (performance.now() - tRelativo < 500) return;   // hay relativo: se usa ese
+  ent.giroEventos++;
+  ent.giro = { a: e.alpha || 0, b: e.beta || 0, g: e.gamma || 0, abs: tipo === "absoluto", fuente: tipo };
+}
+addEventListener("deviceorientation", (e) => tomarGiro(e, e.absolute ? "absoluto" : "relativo"));
+addEventListener("deviceorientationabsolute", (e) => tomarGiro(e, "absoluto"));
+addEventListener("devicemotion", (e) => {
+  const r = e.rotationRate;
+  fuentes.movimiento = r && r.alpha !== null ? "hay giroscopio (rotationRate)" : "sin rotationRate: el celular quizá no tiene giroscopio";
+});
+if (navigator.permissions) for (const n of ["gyroscope", "accelerometer", "magnetometer"])
+  navigator.permissions.query({ name: n }).then((p) => { fuentes["permiso_" + n] = p.state; }).catch(() => {});
+function probarSensor() {
+  if (qSensor || typeof RelativeOrientationSensor === "undefined") { if (!qSensor) fuentes.sensor = "no existe en este navegador"; return; }
+  try {
+    const s = new RelativeOrientationSensor({ frequency: 60, referenceFrame: "screen" });
+    s.addEventListener("reading", () => { qSensor = qSensor || new THREE.Quaternion(); qSensor.fromArray(s.quaternion); fuentes.sensor = "con datos"; });
+    s.addEventListener("error", (ev) => { fuentes.sensor = "error: " + (ev.error && ev.error.name); });
+    s.start(); fuentes.sensor = "iniciado";
+  } catch (err) { fuentes.sensor = "error: " + err.name; }
+}
+async function pedirGiroscopio() {
+  // iPhone: el permiso se pide con un toque. Android: no hace falta, salvo que Chrome tenga bloqueados los sensores.
+  if (typeof DeviceOrientationEvent !== "undefined" && DeviceOrientationEvent.requestPermission) {
+    try { await DeviceOrientationEvent.requestPermission(); } catch (_) {}
+  }
+  setTimeout(() => { if (!ent.giro) probarSensor(); }, 1200);   // si no llegan eventos, se prueba el sensor genérico
+}
+const Q_TIERRA = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);   // Tierra (Z arriba) → Three (Y arriba)
+function leerGiro(q) {
+  if (!ent.giro && qSensor) { q.copy(Q_TIERRA).multiply(qSensor); return true; }
+  if (!ent.giro) return false;
+  eulerG.set(ent.giro.b * RAD, ent.giro.a * RAD, -ent.giro.g * RAD, "YXZ");
+  q.setFromEuler(eulerG).multiply(Q_X).multiply(qAux.setFromAxisAngle(EJE_Z, -anguloPantalla()));
+  return true;
+}
+
+// ---------- Escena ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(AJ.calidad);
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+document.body.prepend(renderer.domElement);
+// ---------- Visor: una imagen por ojo, centrada en su lente y con deformación de barril ----------
+// La pantalla partida a la mitad pone el centro de cada imagen a medio ancho de pantalla (~7,5 cm), pero las lentes
+// están a ~6,3 cm: los ojos no las funden. Acá cada imagen se centra en su lente (sep = distancia entre centros, en
+// fracción del ancho) y se deforma en barril (k1, k2) para compensar el cojín que hacen las lentes.
+// Se calibra con el control (L2 + cruz / △ / X) y queda guardado en el celular.
+const LS = (k, d) => { try { const v = localStorage.getItem("hiperfuente-vr-" + k); return v !== null && isFinite(+v) ? +v : d; } catch (_) { return d; } };
+const guardarLS = (k, v) => { try { localStorage.setItem("hiperfuente-vr-" + k, String(v)); } catch (_) {} };
+// ojos = separación de las dos cámaras (profundidad). Con 6,4 cm (real) cada distancia pide otra convergencia y en un
+// visor barato solo una queda nítida; con menos, todo se funde más fácil (0 = plano, sin profundidad).
+const VIS_BASE = { sep: 0.42, fov: 90, dist: 2, ojos: 0.03 };
+const PROFUNDIDADES = [0.064, 0.03, 0.012, 0];
+const DISTORSIONES = [[0, 0, "sin deformación"], [0.12, 0.04, "deformación suave"], [0.22, 0.12, "deformación media"], [0.34, 0.55, "deformación fuerte (Cardboard)"]];
+const VIS = { sep: num("sep", LS("sep", VIS_BASE.sep)), fov: num("fov", LS("fov", VIS_BASE.fov)), dist: num("dist", LS("dist", VIS_BASE.dist)),
+              ojos: num("ojos", LS("ojos", VIS_BASE.ojos)) };
+const tipoRT = renderer.capabilities.isWebGL2 ? THREE.HalfFloatType : THREE.UnsignedByteType;
+const rtOjo = [0, 1].map(() => new THREE.WebGLRenderTarget(4, 4, { type: tipoRT }));
+const camOjo = [0, 1].map(() => new THREE.PerspectiveCamera(90, 1, 0.05, 3500));
+const lente = new THREE.ShaderMaterial({
+  uniforms: { t: { value: null }, k1: { value: 0 }, k2: { value: 0 }, asp: { value: 1 } },
+  depthTest: false, depthWrite: false,
+  vertexShader: "varying vec2 u; void main(){ u = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+  fragmentShader: `uniform sampler2D t; uniform float k1, k2, asp; varying vec2 u;
+    float f(float r2){ return 1.0 + k1 * r2 + k2 * r2 * r2; }
+    void main(){
+      vec2 p = (u * 2.0 - 1.0) * vec2(1.0, 1.0 / asp);      // medio ancho = 1
+      vec2 s = p * f(dot(p, p)) / f(1.0);                    // el borde lateral sigue siendo el borde
+      vec2 su = s * vec2(1.0, asp) * 0.5 + 0.5;
+      if (su.x < 0.0 || su.x > 1.0 || su.y < 0.0 || su.y > 1.0) gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+      else gl_FragColor = vec4(texture2D(t, su).rgb, 1.0);
+      #include <encodings_fragment>
+    }`,
+});
+const escenaLente = new THREE.Scene(), camLente = new THREE.Camera();
+{ const q = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), lente); q.frustumCulled = false; escenaLente.add(q); }
+const vDerOjo = new THREE.Vector3();
+function renderVR() {
+  const W = innerWidth, H = innerHeight, pr = renderer.getPixelRatio();
+  const sepPx = VIS.sep * W, vw = Math.max(50, Math.min(sepPx, W - sepPx));
+  const centros = [W / 2 - sepPx / 2, W / 2 + sepPx / 2];
+  const [k1, k2] = DISTORSIONES[Math.max(0, Math.min(3, VIS.dist | 0))];
+  vDerOjo.set(1, 0, 0).applyQuaternion(camera.quaternion);
+  renderer.autoClear = true;
+  for (let i = 0; i < 2; i++) {
+    const c = camOjo[i], rt = rtOjo[i];
+    const ancho = Math.round(vw * pr * 1.15), alto = Math.round(H * pr * 1.15);   // un poco más: la deformación agranda el centro
+    if (rt.width !== ancho || rt.height !== alto) rt.setSize(ancho, alto);
+    c.fov = VIS.fov; c.aspect = vw / H; c.updateProjectionMatrix();
+    c.position.copy(camera.position).addScaledVector(vDerOjo, (i ? 0.5 : -0.5) * VIS.ojos);
+    c.quaternion.copy(camera.quaternion); c.updateMatrixWorld();
+    renderer.setRenderTarget(rt); renderer.render(scene, c);
+  }
+  renderer.setRenderTarget(null);
+  renderer.setViewport(0, 0, W, H); renderer.setScissorTest(false);
+  renderer.setClearColor(0x000000, 1); renderer.clear();
+  renderer.autoClear = false;
+  lente.uniforms.k1.value = k1; lente.uniforms.k2.value = k2; lente.uniforms.asp.value = vw / H;
+  for (let i = 0; i < 2; i++) {
+    lente.uniforms.t.value = rtOjo[i].texture;
+    renderer.setViewport(centros[i] - vw / 2, 0, vw, H);
+    renderer.render(escenaLente, camLente);
+  }
+  renderer.autoClear = true;
+  renderer.setViewport(0, 0, W, H);
+}
+function calibrar(e) {
+  if (e === "sep-") VIS.sep = Math.max(0.25, VIS.sep - 0.008);
+  else if (e === "sep+") VIS.sep = Math.min(0.6, VIS.sep + 0.008);
+  else if (e === "fov+") VIS.fov = Math.min(120, VIS.fov + 3);
+  else if (e === "fov-") VIS.fov = Math.max(50, VIS.fov - 3);
+  else if (e === "dist") VIS.dist = (VIS.dist + 1) % 4;
+  else if (e === "prof") { const i = PROFUNDIDADES.indexOf(VIS.ojos); VIS.ojos = PROFUNDIDADES[(i + 1) % PROFUNDIDADES.length]; }
+  else if (e === "reset") Object.assign(VIS, VIS_BASE);
+  for (const k of ["sep", "fov", "dist", "ojos"]) guardarLS(k, VIS[k]);
+  const prof = VIS.ojos === 0 ? "plano" : VIS.ojos >= 0.06 ? "profundidad real" : VIS.ojos >= 0.025 ? "profundidad media" : "profundidad baja";
+  aviso(`sep ${(VIS.sep * 100).toFixed(1)} % · ${VIS.fov}° · ${DISTORSIONES[VIS.dist][2].replace("deformación", "deform.")} · ${prof}`, 3);
+}
+
+const scene = new THREE.Scene();
+const NIEBLA = new THREE.Color(0xd9d6cc);
+scene.fog = new THREE.FogExp2(NIEBLA, 0.0015);
+scene.background = NIEBLA;
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 3500);
+scene.add(camera);
+const raiz = new THREE.Group();
+raiz.rotation.x = -Math.PI / 2;                       // Blender es Z arriba; Three es Y arriba
+scene.add(raiz);
+const deBlender = (v) => new THREE.Vector3(v[0], v[2], -v[1]);
+
+const cielo = new THREE.Mesh(new THREE.SphereGeometry(3000, 32, 16), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false,
+  uniforms: { cenit: { value: new THREE.Color(0x8fa3b3) }, medio: { value: new THREE.Color(0xc4ccd0) },
+              horizonte: { value: new THREE.Color(0xe6e1d6) }, suelo: { value: new THREE.Color(0xb3ada1) } },
+  vertexShader: "varying vec3 d; void main(){ d = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position.z = gl_Position.w; }",
+  fragmentShader: `uniform vec3 cenit, medio, horizonte, suelo; varying vec3 d;
+    void main(){ float h = d.y;
+      vec3 c = h > 0.0 ? mix(mix(horizonte, medio, smoothstep(0.0, 0.18, h)), cenit, smoothstep(0.18, 0.8, h))
+                       : mix(horizonte * 0.6, suelo, smoothstep(0.0, 0.12, -h));
+      gl_FragColor = vec4(c, 1.0); }`,
+}));
+cielo.renderOrder = -1;
+scene.add(cielo);
+scene.add(new THREE.HemisphereLight(0xf2f0ea, 0x6f6a60, 1.35));
+const sol = new THREE.DirectionalLight(0xfff3e0, 1.05); sol.position.set(0.55, 0.8, 0.35).multiplyScalar(300); scene.add(sol);
+const sol2 = new THREE.DirectionalLight(0xdfe6ff, 0.45); sol2.position.set(-0.4, 0.3, 0.9).multiplyScalar(300); scene.add(sol2);
+
+// ---------- Carga (mismo formato que el visor principal) ----------
+const relleno = document.querySelector("#barra i"), estado = $("estado");
+const matriz = (f) => new THREE.Matrix4().set(...f);
+const datos = await fetch("../escena.json", { cache: "no-cache" }).then((r) => r.json());
+async function cargarModelo(url) {
+  const r = await fetch(url, { cache: "no-cache" });
+  if (!r.ok) throw new Error(url + " respondió " + r.status);
+  const total = Number(r.headers.get("content-length")) || 5.3e6;
+  const lector = r.body.getReader(), partes = [];
+  let leido = 0;
+  for (;;) {
+    const { done, value } = await lector.read();
+    if (done) break;
+    partes.push(value); leido += value.length;
+    relleno.style.width = Math.min(100, 100 * leido / total).toFixed(0) + "%";
+    estado.textContent = "Cargando el espacio… " + (leido / 1e6).toFixed(1) + " MB";
+  }
+  estado.textContent = "Armando el espacio…";
+  const crudo = new Uint8Array(leido);
+  let p = 0;
+  for (const parte of partes) { crudo.set(parte, p); p += parte.length; }
+  const gl = JSON.parse(new TextDecoder().decode(crudo));
+  const b64 = atob(gl.buffers[0].uri.slice(gl.buffers[0].uri.indexOf(",") + 1));
+  const bin = new Uint8Array(b64.length);
+  for (let i = 0; i < b64.length; i++) bin[i] = b64.charCodeAt(i);
+  delete gl.buffers[0].uri;
+  gl.buffers[0].byteLength = bin.length;
+  const json = new TextEncoder().encode(JSON.stringify(gl));
+  const lj = Math.ceil(json.length / 4) * 4, lb = Math.ceil(bin.length / 4) * 4;
+  const glb = new Uint8Array(20 + lj + 8 + lb), dv = new DataView(glb.buffer);
+  dv.setUint32(0, 0x46546C67, true); dv.setUint32(4, 2, true); dv.setUint32(8, glb.length, true);
+  dv.setUint32(12, lj, true); dv.setUint32(16, 0x4E4F534A, true);
+  glb.fill(0x20, 20, 20 + lj); glb.set(json, 20);
+  dv.setUint32(20 + lj, lb, true); dv.setUint32(24 + lj, 0x004E4942, true); glb.set(bin, 28 + lj);
+  return new Promise((ok, mal) => new THREE.GLTFLoader().parse(glb.buffer, "", ok, mal));
+}
+let gltf;
+try { gltf = await cargarModelo("../modelo.gltf.json"); }
+catch (e) { estado.textContent = "No se pudo cargar el espacio: " + e.message; return; }
+
+// Materiales: color plano de la paleta y las texturas del grupo (solo color, normales y oclusión, como el visor).
+const TEX = { Tex_suelo: [["suelo"], 6], Tex_baldosas: [["baldosas1", "baldosas2"], 4], Tex_piedra: [["piedra"], 3],
+              Tex_pared: [["pared1", "pared2"], 3.5], Tex_muro: [["muro1", "muro2"], 3] };
+const cargadorT = new THREE.TextureLoader(), mats = {};
+function textura(n, k, metros) {
+  const x = cargadorT.load("../texturas/" + n + "_" + k + ".jpg");
+  x.wrapS = x.wrapT = THREE.RepeatWrapping; x.repeat.setScalar(2.4 / metros); x.anisotropy = 4;
+  if (k === "color") x.encoding = THREE.sRGBEncoding;
+  return x;
+}
+function material(nombre, clave) {
+  const c = datos.materiales[nombre] || [0.5, 0.5, 0.5, 1];
+  if (TEX[nombre] && AJ.texturas) {
+    const [imgs, metros] = TEX[nombre];
+    let h = 0; for (const ch of clave) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const img = imgs[h % imgs.length], k = nombre + img;
+    if (!mats[k]) {
+      const base = new THREE.Color(1, 1, 1).lerp(new THREE.Color().setRGB(c[0], c[1], c[2]), 0.15);
+      if (nombre === "Tex_suelo") base.multiplyScalar(0.68);
+      mats[k] = new THREE.MeshPhongMaterial({ color: base, map: textura(img, "color", metros), normalMap: textura(img, "normal", metros),
+        aoMap: textura(img, "ao", metros), shininess: 3, specular: new THREE.Color(0x0b0b0b), side: THREE.DoubleSide });
+    }
+    return mats[k];
+  }
+  if (!mats[nombre]) {
+    if (nombre.startsWith("Lampara") || nombre === "Color_ffd159")
+      mats[nombre] = new THREE.MeshPhongMaterial({ color: 0xf4f1ea, transparent: true, opacity: 0.2, depthWrite: false, shininess: 140 });
+    else {
+      mats[nombre] = new THREE.MeshLambertMaterial({ color: new THREE.Color().setRGB(c[0], c[1], c[2]), side: THREE.DoubleSide });
+      if (c[3] < 0.99) { mats[nombre].transparent = true; mats[nombre].opacity = 0.35; mats[nombre].depthWrite = false; }
+    }
+  }
+  return mats[nombre];
+}
+const pieza = {}, colNodos = {};
+gltf.scene.traverse((o) => {
+  if (o.isMesh) {
+    o.userData.mat = o.material.name;
+    if (!o.geometry.attributes.normal) {
+      const geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+      geo.computeVertexNormals(); o.geometry = geo;
+    }
+    if (o.geometry.attributes.uv) o.geometry.setAttribute("uv2", o.geometry.attributes.uv);
+  }
+  if (/^(MODULO_Z|ESTRUCTURA|UNICO|PLACAS|TEXTOS)$/.test(o.name)) pieza[o.name] = o;
+  else if (/^COL_(MODULO|ESTRUCTURA|UNICO)$/.test(o.name)) colNodos[o.name] = o;
+});
+// Solo la habitación +++ (capítulo 1): el módulo z y sus dos copias giradas, el núcleo, los textos y los planos.
+const GIROS = [new THREE.Matrix4(), ...datos.modulo.map(matriz)];
+const EJE = ["z", "x", "y"];
+function poner(nombre, m, clave) {
+  if (!pieza[nombre]) return;
+  const c = pieza[nombre].clone();
+  c.matrixAutoUpdate = false; c.matrix.copy(m);
+  c.traverse((o) => { if (o.isMesh) o.material = material(o.userData.mat, clave + o.userData.mat + o.name); });
+  raiz.add(c);
+}
+GIROS.forEach((m, g) => { poner("MODULO_Z", m, EJE[g]); poner("TEXTOS", m, EJE[g]); });
+poner("ESTRUCTURA", new THREE.Matrix4(), "n");
+poner("PLACAS", new THREE.Matrix4(), "p");
+poner("UNICO", new THREE.Matrix4(), "u");
+raiz.updateMatrixWorld(true);
+
+// ---------- Colisión (la misma sopa de triángulos en grilla que el visor, solo para esta habitación) ----------
+const COL = { C: 4, tri: null, n: 0, celdas: new Map() };
+{
+  const tris = [], v = new THREE.Vector3(), R = raiz.matrixWorld;
+  const agregar = (nodo, W) => {
+    if (!nodo) return;
+    nodo.updateMatrixWorld(true);
+    nodo.traverse((o) => {
+      if (!o.isMesh) return;
+      const M = W.clone().multiply(o.matrixWorld), pos = o.geometry.attributes.position, idx = o.geometry.index;
+      const n = idx ? idx.count : pos.count;
+      for (let k = 0; k < n; k++) { v.fromBufferAttribute(pos, idx ? idx.getX(k) : k).applyMatrix4(M); tris.push(v.x, v.y, v.z); }
+    });
+  };
+  for (const M of GIROS) agregar(colNodos.COL_MODULO, R.clone().multiply(M));
+  agregar(colNodos.COL_ESTRUCTURA, R.clone());
+  agregar(colNodos.COL_UNICO, R.clone());
+  COL.tri = new Float32Array(tris); COL.n = COL.tri.length / 9;
+  const t = COL.tri, C = COL.C;
+  for (let i = 0; i < COL.n; i++) {
+    const o = i * 9;
+    const lo = [0, 1, 2].map((k) => Math.floor(Math.min(t[o + k], t[o + 3 + k], t[o + 6 + k]) / C));
+    const hi = [0, 1, 2].map((k) => Math.floor(Math.max(t[o + k], t[o + 3 + k], t[o + 6 + k]) / C));
+    for (let x = lo[0]; x <= hi[0]; x++) for (let y = lo[1]; y <= hi[1]; y++) for (let z = lo[2]; z <= hi[2]; z++) {
+      const key = x + "," + y + "," + z;
+      let l = COL.celdas.get(key);
+      if (!l) COL.celdas.set(key, (l = []));
+      l.push(i);
+    }
+  }
+}
+const sello = new Uint32Array(COL.n);
+let gen = 1;
+function rayoCol(o, d, max) {
+  gen++;
+  const C = COL.C, T = COL.tri;
+  const x0 = Math.floor(Math.min(o.x, o.x + d.x * max) / C), x1 = Math.floor(Math.max(o.x, o.x + d.x * max) / C);
+  const y0 = Math.floor(Math.min(o.y, o.y + d.y * max) / C), y1 = Math.floor(Math.max(o.y, o.y + d.y * max) / C);
+  const z0 = Math.floor(Math.min(o.z, o.z + d.z * max) / C), z1 = Math.floor(Math.max(o.z, o.z + d.z * max) / C);
+  let mejor = max, n = null;
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
+    const l = COL.celdas.get(x + "," + y + "," + z);
+    if (!l) continue;
+    for (const i of l) {
+      if (sello[i] === gen) continue;
+      sello[i] = gen;
+      const k = i * 9, ax = T[k], ay = T[k + 1], az = T[k + 2];
+      const e1x = T[k + 3] - ax, e1y = T[k + 4] - ay, e1z = T[k + 5] - az, e2x = T[k + 6] - ax, e2y = T[k + 7] - ay, e2z = T[k + 8] - az;
+      const px = d.y * e2z - d.z * e2y, py = d.z * e2x - d.x * e2z, pz = d.x * e2y - d.y * e2x;
+      const det = e1x * px + e1y * py + e1z * pz;
+      if (Math.abs(det) < 1e-9) continue;
+      const inv = 1 / det, sx = o.x - ax, sy = o.y - ay, sz = o.z - az;
+      const u = (sx * px + sy * py + sz * pz) * inv;
+      if (u < 0 || u > 1) continue;
+      const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+      const w = (d.x * qx + d.y * qy + d.z * qz) * inv;
+      if (w < 0 || u + w > 1) continue;
+      const tt = (e2x * qx + e2y * qy + e2z * qz) * inv;
+      if (tt > 1e-4 && tt < mejor) { mejor = tt; n = [e1y * e2z - e1z * e2y, e1z * e2x - e1x * e2z, e1x * e2y - e1y * e2x]; }
+    }
+  }
+  if (!n) return null;
+  const nv = new THREE.Vector3(...n).normalize();
+  if (nv.dot(d) > 0) nv.negate();
+  return { t: mejor, n: nv };
+}
+
+// ---------- Gravedades ----------
+// El cuerpo vive en un marco "local" donde arriba es siempre +Y. Cada gravedad es un giro de ese marco:
+// z (Madden) = Y de Three; x (Yu Tsun) = +X; y (Roberto) = −Z de Three (= +y de Blender). Los rayos se giran al mundo.
+const GRAV = {
+  z: new THREE.Quaternion(),
+  x: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2),
+  y: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2),
+};
+const VOZ = { z: "Madden", x: "Yu Tsun", y: "Roberto" }, ORDEN = ["z", "x", "y"];
+let grav = "z";
+const qG = new THREE.Quaternion(), qGi = new THREE.Quaternion(), wO = new THREE.Vector3(), wD = new THREE.Vector3();
+function rayoLocal(o, d, max) {
+  const r = rayoCol(wO.copy(o).applyQuaternion(qG), wD.copy(d).applyQuaternion(qG), max);
+  if (r) r.n.applyQuaternion(qGi);
+  return r;
+}
+
+// ---------- El cuerpo (en el marco local: "arriba" = +Y) ----------
+// Camina hacia donde mira la cabeza (sin inclinar), sube escalones de hasta 55 cm, no atraviesa paredes y no cae por los bordes.
+const OJOS = 1.6, RADIO = 0.3, ESCALON = 0.55, U = new THREE.Vector3(0, 1, 0), ABAJO = new THREE.Vector3(0, -1, 0);
+const pies = new THREE.Vector3();
+let vu = 0, enSuelo = false, lag = 0;
+const vMov = new THREE.Vector3(), vDir = new THREE.Vector3(), vOri = new THREE.Vector3(), vNorm = new THREE.Vector3(), vAntes = new THREE.Vector3(), vP = new THREE.Vector3();
+const pisoBajo = (desde, max) => { const r = rayoLocal(desde, ABAJO, max); return r && r.n.y > 0.3 ? r : null; };
+const hayPiso = (p) => !!pisoBajo(vP.copy(p).addScaledVector(U, ESCALON), ESCALON + 0.6);
+function pasoCuerpo(dt, mx, mz) {                     // mx, mz: desplazamiento horizontal deseado (m)
+  vAntes.copy(pies);
+  vMov.set(mx, 0, mz);
+  for (let it = 0; it < 3 && vMov.lengthSq() > 1e-10; it++) {
+    const L = vMov.length();
+    vDir.copy(vMov).divideScalar(L);
+    let choque = null;
+    for (const h of [0.6, 1.15, 1.7]) {
+      vOri.copy(pies).addScaledVector(U, h);
+      const r = rayoLocal(vOri, vDir, L + RADIO);
+      if (r && Math.abs(r.n.y) < 0.75 && (!choque || r.t < choque.t)) choque = r;
+    }
+    if (!choque) { pies.add(vMov); break; }
+    const avance = Math.max(0, choque.t - RADIO);
+    pies.addScaledVector(vDir, avance);
+    vNorm.copy(choque.n); vNorm.y = 0; vNorm.normalize();
+    if (choque.t < RADIO) pies.addScaledVector(vNorm, (RADIO - choque.t) * 0.5);
+    vMov.copy(vDir).multiplyScalar(L - avance);
+    vMov.addScaledVector(vNorm, -vMov.dot(vNorm));
+  }
+  if (enSuelo && !hayPiso(pies)) {                    // bordes: no se cae caminando, se desliza o se queda
+    const dx = pies.x - vAntes.x, dz = pies.z - vAntes.z;
+    pies.copy(vAntes);
+    pies.x += dx; if (!hayPiso(pies)) pies.x -= dx;
+    pies.z += dz; if (!hayPiso(pies)) pies.z -= dz;
+  }
+  const arriba = vOri.copy(pies).addScaledVector(U, ESCALON);
+  if (enSuelo) {
+    const r = pisoBajo(arriba, ESCALON + 0.6);
+    if (r) { const antes = pies.y; pies.y = arriba.y - r.t; lag -= pies.y - antes; lag = THREE.MathUtils.clamp(lag, -0.6, 0.6); return; }
+    enSuelo = false;
+  }
+  vu = Math.max(vu - 9.8 * dt, -40);
+  const dz = vu * dt, r = pisoBajo(arriba, ESCALON - dz);
+  if (r) { pies.y = arriba.y - r.t; vu = 0; enSuelo = true; return; }
+  pies.y += dz;
+  if (pies.y < -200) irA(INICIO);
+}
+
+// ---------- Mirada: giroscopio + giro del cuerpo ----------
+// La cámara = giro del cuerpo (palanca derecha, de a 30°) × giroscopio. Al entrar o teletransportarse se recentra:
+// lo que uno tiene enfrente pasa a ser el rumbo de llegada.
+let desfase = 0;                                      // giro (en Y) que se suma al giroscopio
+let mouseYaw = 0, mousePitch = 0;                     // sin giroscopio (compu): se mira arrastrando
+const qCabeza = new THREE.Quaternion(), qDesfase = new THREE.Quaternion(), vF = new THREE.Vector3();
+function cabeza(q) {
+  if (!leerGiro(q)) q.setFromEuler(eulerG.set(mousePitch, mouseYaw, 0, "YXZ"));
+  return q;
+}
+const rumboDe = (q) => { vF.set(0, 0, -1).applyQuaternion(q); return Math.atan2(-vF.x, -vF.z); };
+function recentrar(rumbo) { desfase = rumbo - rumboDe(cabeza(qCabeza)); }
+let arrastre = null;
+renderer.domElement.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse" && !ent.giro) arrastre = { x: e.clientX, y: e.clientY }; });
+addEventListener("pointermove", (e) => {
+  if (!arrastre) return;
+  mouseYaw -= (e.clientX - arrastre.x) * 0.004; mousePitch = THREE.MathUtils.clamp(mousePitch - (e.clientY - arrastre.y) * 0.004, -1.4, 1.4);
+  arrastre = { x: e.clientX, y: e.clientY };
+});
+addEventListener("pointerup", () => { arrastre = null; });
+
+// ---------- Destinos: esferas que se eligen con la mirada ----------
+const destinos = [];
+const INICIO = { titulo: "Entrada · la H", pos: datos.inicio.ojo, mira: datos.inicio.mira };
+function etiqueta(texto, alto) {
+  const c = document.createElement("canvas"), x = c.getContext("2d");
+  c.width = 1024; c.height = 128;
+  x.font = "64px DM Mono, ui-monospace, monospace"; x.textAlign = "center"; x.textBaseline = "middle";
+  x.fillStyle = "rgba(31,29,27,.78)"; const w = Math.min(1000, x.measureText(texto).width + 60); x.fillRect(512 - w / 2, 14, w, 100);
+  x.fillStyle = "#e9e3d6"; x.fillText(texto, 512, 66);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
+  // con depthTest: un cartel que se dibuja encima de una pared más cercana contradice la profundidad y no se funde
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, fog: false }));
+  s.scale.set(alto * 8, alto, 1); s.renderOrder = 50;
+  return s;
+}
+function agregarDestino(d, esfera) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(0.35, 24, 16), new THREE.MeshBasicMaterial({ color: 0x9b3d2e, fog: false }));
+  m.position.copy(deBlender(esfera));
+  const e = etiqueta(d.titulo, 0.32); e.position.set(0, 0.75, 0); m.add(e);
+  m.userData.destino = d;
+  scene.add(m); destinos.push(m);
+}
+for (const l of datos.lecturas || []) if (l.tipo === "escalera") agregarDestino({ titulo: "Pie de " + l.titulo.replace("Escalera ", ""), pos: l.pos, mira: [l.mira[0] - l.pos[0], l.mira[1] - l.pos[1], 0] }, l.esfera);
+if (datos.mirador) {
+  const o = datos.mirador.ojo;
+  agregarDestino({ titulo: "Mirador", pos: o, mira: datos.mirador.mira }, [o[0] - datos.mirador.mira[0] * 2.5, o[1] - datos.mirador.mira[1] * 2.5 + 1.2, o[2] + 0.4]);
+}
+{ const o = INICIO.pos; agregarDestino(INICIO, [o[0] + 2.2, o[1] - 2.5, o[2] + 0.2]); }
+
+// Retícula (un anillo en el centro de la vista que se llena mientras se mira una esfera) y fundido a negro.
+const reticula = new THREE.Mesh(new THREE.RingGeometry(0.018, 0.026, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, fog: false, transparent: true, opacity: 0.85 }));
+reticula.position.z = -2; reticula.renderOrder = 100; camera.add(reticula);
+const carga = new THREE.Mesh(new THREE.RingGeometry(0.03, 0.04, 32, 1, Math.PI / 2, 0.001), new THREE.MeshBasicMaterial({ color: 0x9b3d2e, depthTest: false, fog: false }));
+carga.position.z = -2; carga.renderOrder = 101; camera.add(carga);
+const negro = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: 0, depthTest: false, fog: false }));
+negro.position.z = -0.2; negro.renderOrder = 200; camera.add(negro);
+const rayo = new THREE.Raycaster(), CENTRO = new THREE.Vector2(0, 0);
+let mirando = null, mirandoT = 0, viaje = null;
+const DWELL = 1.5;
+
+function ponerGravedad(g) { grav = g; qG.copy(GRAV[g]); qGi.copy(qG).invert(); }
+function irA(d) {
+  ponerGravedad("z");                                 // los destinos son de la gravedad z
+  const p = deBlender(d.pos);
+  pies.copy(p).addScaledVector(U, -OJOS);
+  const r = pisoBajo(vP.copy(pies).addScaledVector(U, 1), 3);
+  if (r) pies.y = pies.y + 1 - r.t;
+  vu = 0; enSuelo = true; lag = 0;
+  const m = deBlender(d.mira);
+  recentrar(Math.atan2(-m.x, -m.z));
+}
+// Teletransporte con fundido: 0,35 s a negro, salta, 0,45 s de vuelta (en VR los viajes de cámara marean).
+function transicion(fn, titulo) { if (!viaje) viaje = { fn, titulo, t: 0, hecho: false }; }
+function viajarA(d) { transicion(() => irA(d), d.titulo); }
+function enRecorrido() { return modo === "vr" || modo === "mono"; }
+function accion(origen) {
+  ultimaAccion = origen;
+  if (mirando && enRecorrido()) viajarA(mirando.userData.destino);
+}
+function volverEntrada() { ultimaAccion = "volver a la entrada"; viajarA(INICIO); }
+let ultimaAccion = "—";
+
+// Cambio de gravedad: fundido a negro, el cuerpo gira para que su "arriba" sea el nuevo eje y aparece apoyado
+// en lo primero que haya debajo (sin caída visible: en VR marea). Conserva hacia dónde se miraba.
+function cambiarGravedad(nueva) {
+  const ojoW = camera.position.clone(), adelW = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  const antes = grav;
+  ponerGravedad(nueva);
+  const ojoL = ojoW.applyQuaternion(qGi);
+  const r = pisoBajo(ojoL, 400);
+  if (!r) { ponerGravedad(antes); aviso("No hay piso hacia " + nueva); return; }
+  pies.copy(ojoL).addScaledVector(ABAJO, r.t);
+  vu = 0; enSuelo = true; lag = 0;
+  const a = adelW.applyQuaternion(qGi); a.y = 0;
+  recentrar(a.lengthSq() > 1e-4 ? Math.atan2(-a.x, -a.z) : 0);
+  aviso("Gravedad " + nueva + " · " + VOZ[nueva]);
+}
+function siguienteGravedad() {
+  const nueva = ORDEN[(ORDEN.indexOf(grav) + 1) % 3];
+  ultimaAccion = "gravedad " + nueva;
+  transicion(() => cambiarGravedad(nueva), "gravedad " + nueva);
+}
+
+// Aviso flotante (adelante de la vista, se desvanece): gravedad, recarga, etc.
+const lienzoAviso = document.createElement("canvas"); lienzoAviso.width = 1024; lienzoAviso.height = 128;
+const texAviso = new THREE.CanvasTexture(lienzoAviso); texAviso.encoding = THREE.sRGBEncoding;
+const avisoS = new THREE.Sprite(new THREE.SpriteMaterial({ map: texAviso, depthTest: false, fog: false, transparent: true, opacity: 0 }));
+avisoS.scale.set(2.4, 0.3, 1); avisoS.position.set(0, -0.35, -3); avisoS.renderOrder = 150; camera.add(avisoS);
+let avisoT = 0;
+function aviso(texto, seg = 2.5) {
+  const x = lienzoAviso.getContext("2d");
+  x.clearRect(0, 0, 1024, 128);
+  x.font = "56px DM Mono, ui-monospace, monospace"; x.textAlign = "center"; x.textBaseline = "middle";
+  const w = Math.min(1000, x.measureText(texto).width + 60);
+  x.fillStyle = "rgba(31,29,27,.82)"; x.fillRect(512 - w / 2, 10, w, 108);
+  x.fillStyle = "#e9e3d6"; x.fillText(texto, 512, 66);
+  texAviso.needsUpdate = true; avisoT = seg;
+}
+
+// ---------- Panel de diagnóstico dentro del visor (mirando hacia abajo) ----------
+// Nombres del mapeo estándar (así llega el control de PS4 a Chrome en Android)
+const NOMBRES = ["X", "○", "□", "△", "L1", "R1", "L2", "R2", "Share", "Options", "L3", "R3", "↑", "↓", "←", "→", "PS", "Panel táctil"];
+function nombreBoton(g, i) { return g.mapping === "standard" && NOMBRES[i] ? i + "·" + NOMBRES[i] : String(i); }
+const lienzo = document.createElement("canvas"); lienzo.width = 1024; lienzo.height = 640;
+const ctx = lienzo.getContext("2d");
+const texPanel = new THREE.CanvasTexture(lienzo); texPanel.encoding = THREE.sRGBEncoding;
+const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.69), new THREE.MeshBasicMaterial({ map: texPanel, fog: false, depthTest: false, transparent: true }));
+panel.renderOrder = 90; scene.add(panel);
+function lineasControl() {
+  const L = [];
+  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+  if (!pads.length) L.push("Gamepad: ninguno (apretá un botón del control)");
+  for (const g of pads) {
+    L.push(`Gamepad ${g.index}: ${g.id.slice(0, 60)}`);
+    L.push(`  mapeo: ${g.mapping || "(sin mapeo estándar)"}`);
+    L.push("  ejes: " + g.axes.map((a, i) => i + "=" + a.toFixed(2)).join("  "));
+    const b = g.buttons.map((x, i) => (x.pressed || x.value > 0.1 ? nombreBoton(g, i) + (x.value < 1 && x.value > 0 ? "(" + x.value.toFixed(1) + ")" : "") : null)).filter((x) => x !== null);
+    L.push(`  botones (${g.buttons.length}): ` + (b.length ? "apretados " + b.join(", ") : "ninguno apretado"));
+  }
+  return L;
+}
+let fps = 0, cuadros = 0, tFps = performance.now();
+function dibujarPanel() {
+  ctx.clearRect(0, 0, 1024, 640);
+  ctx.fillStyle = "rgba(20,19,18,.86)"; ctx.fillRect(0, 0, 1024, 640);
+  ctx.fillStyle = "#9b3d2e"; ctx.fillRect(0, 0, 1024, 6);
+  ctx.font = "26px DM Mono, ui-monospace, monospace"; ctx.fillStyle = "#e9e3d6";
+  const L = [`DIAGNÓSTICO · ${fps} cuadros/s · ${COL.n} triángulos de colisión`, ...lineasControl(),
+    "Teclas: " + (ent.ultimasTeclas[0] || "—"), "Mouse: " + ent.mouse.ultimo + "  · toques: " + ent.toques,
+    "Giroscopio: " + (ent.giro ? `a ${ent.giro.a.toFixed(0)}  b ${ent.giro.b.toFixed(0)}  g ${ent.giro.g.toFixed(0)} (${ent.giro.fuente})` : qSensor ? "sensor genérico" : "SIN DATOS"),
+    "  relativo: " + fuentes.relativo, "  absoluto: " + fuentes.absoluto, "  movimiento: " + fuentes.movimiento,
+    "  sensor: " + fuentes.sensor + " · permiso giroscopio: " + (fuentes.permiso_gyroscope || "?"),
+    `Visor: sep ${(VIS.sep * 100).toFixed(1)} % · campo ${VIS.fov}° · deform. ${VIS.dist} · profundidad ${VIS.ojos} m`,
+    "Última acción: " + ultimaAccion + "  · gravedad " + grav,
+    `Pies: ${pies.x.toFixed(1)}, ${(-pies.z).toFixed(1)}, ${pies.y.toFixed(2)} (Blender x, y, z)`];
+  let y = 52;
+  for (const s of L) { ctx.fillText(s.slice(0, 62), 26, y); y += 36; if (y > 630) break; }
+  texPanel.needsUpdate = true;
+}
+
+// ---------- Diagnóstico sin visor (HTML) ----------
+function pintarDiag() {
+  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+  const div = $("dGamepad");
+  if (!pads.length) div.innerHTML = "Ningún gamepad. Si el control está conectado, apretá cualquier botón: Chrome lo muestra recién después del primer botón.\n(En modo teclado o mouse, mirá más abajo.)";
+  else div.innerHTML = pads.map((g) =>
+    `<b>Gamepad ${g.index}</b>: ${g.id}\nmapeo: ${g.mapping || "(sin mapeo estándar)"}\n` +
+    `<div class="ejes">` + g.axes.map((a, i) => `eje ${i} <span><i style="left:${(50 + a * 50).toFixed(0)}%"></i></span>${a.toFixed(2)}`).join("<br>") + `</div>` +
+    g.buttons.map((b, i) => `<span class="bt ${b.pressed || b.value > 0.1 ? "on" : ""}">${nombreBoton(g, i)}</span>`).join("")).join("\n\n");
+  $("dTeclas").textContent = ent.ultimasTeclas.length ? ent.ultimasTeclas.join("\n") : "Ninguna todavía.";
+  $("dMouse").textContent = `Mouse: ${ent.mouse.ultimo} · clics: ${ent.mouse.clics} · movimiento acumulado ${ent.mouse.dx.toFixed(0)}, ${ent.mouse.dy.toFixed(0)}\nToques en pantalla: ${ent.toques}`;
+  $("dGiro").textContent = (ent.giro ? `alpha ${ent.giro.a.toFixed(1)} · beta ${ent.giro.b.toFixed(1)} · gamma ${ent.giro.g.toFixed(1)} · eventos ${ent.giroEventos} · fuente: ${ent.giro.fuente}`
+      : qSensor ? "Usando el sensor genérico (RelativeOrientationSensor)." : "Sin datos. Mové el celular. Si sigue así: Chrome → ⋮ → Configuración → Configuración de sitios → Sensores de movimiento → Permitido.") +
+    "\n" + Object.entries(fuentes).map(([k, v]) => k + ": " + v).join("\n");
+}
+
+// ---------- Modos ----------
+let modo = "menu";
+async function entrar(m) {
+  modo = m;
+  $("menu").style.display = "none";
+  document.body.classList.toggle("vr", m === "vr");
+  pedirGiroscopio();
+  pantallaCompleta();
+  tEntrada = performance.now(); avisoGiro = false;
+  camera.fov = 70;
+  ajustar();
+  irA(INICIO);
+  setTimeout(() => irA(INICIO), 500);                  // el giroscopio tarda un instante en dar datos: se recentra de nuevo
+  $("ayuda").textContent = m === "vr" ? "" : "Arrastrá para mirar · WASD o flechas caminan (Shift acelera) · Q / E giran · G gravedad · H entrada · Enter elige la esfera · Esc vuelve al menú";
+}
+let wake = null;
+// pantalla completa, horizontal y sin que se apague: se piden sin esperar (algunos navegadores no contestan nunca)
+function pantallaCompleta() {
+  const nada = () => {};
+  const girar = () => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock("landscape").catch(nada); };
+  try {
+    if (document.fullscreenElement || matchMedia("(display-mode: fullscreen)").matches) girar();
+    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen({ navigationUI: "hide" }).then(girar).catch(nada);
+  } catch (_) {}
+  try { if (navigator.wakeLock && !wake) navigator.wakeLock.request("screen").then((w) => { wake = w; w.addEventListener("release", () => { wake = null; }); }).catch(nada); } catch (_) {}
+}
+// recargar (Options mantenido): la página vuelve sola al visor
+function recargar() {
+  try { sessionStorage.setItem("hiperfuente-vr-volver", modo); } catch (_) {}
+  location.reload();
+}
+function salir() {
+  modo = "menu";
+  $("menu").style.display = "flex"; $("diag").style.display = "none"; $("ayuda").textContent = "";
+  document.body.classList.remove("vr");
+  if (wake) { wake.release().catch(() => {}); wake = null; }
+}
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && modo === "vr") salir(); });
+addEventListener("keydown", (e) => { if (e.code === "Escape" && modo !== "menu") { if (document.fullscreenElement) document.exitFullscreen(); salir(); } });
+$("bVR").onclick = () => entrar("vr");
+$("bMono").onclick = () => entrar("mono");
+// (antes no se ocultaba el menú, que quedaba encima: parecía que el botón no hacía nada)
+$("bDiag").onclick = () => { modo = "diag"; $("menu").style.display = "none"; $("diag").style.display = "block"; pedirGiroscopio(); };
+$("bCerrarDiag").onclick = salir;
+$("bVR").disabled = $("bMono").disabled = false;
+estado.textContent = "Listo. Con el control: X entra al visor.";
+relleno.style.width = "100%";
+{ // después de una recarga con Options se vuelve al mismo modo, sin tocar la pantalla
+  let volver = null;
+  try { volver = sessionStorage.getItem("hiperfuente-vr-volver"); sessionStorage.removeItem("hiperfuente-vr-volver"); } catch (_) {}
+  if (volver === "vr" || volver === "mono") setTimeout(() => { entrar(volver); aviso("Recargado"); }, 50);
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && enRecorrido()) pantallaCompleta(); });
+
+function ajustar() {
+  if (!innerWidth || !innerHeight) return;            // pestaña oculta: se ajusta en el próximo cuadro
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", ajustar);
+
+// ---------- Movimiento ----------
+let giroListo = true;
+const ZM = 0.22;                                      // zona muerta de la palanca
+// Mapeo del control de PS4 (mapeo "standard" de Chrome): ver NOMBRES.
+//   0 X elegir · 1 ○ entrada · 2 □ panel · 3 △ gravedad · 4/5 L1/R1 girar · 7 R2 acelerar · 9 Options (mantener) recargar
+//   12/13 cruz ↑↓ caminar · 14/15 cruz ←→ girar. Un control sin mapeo estándar: cualquier botón elige.
+const EVENTOS_BOTON = { 0: "elegir", 1: "entrada", 2: "panel", 3: "gravedad" };
+function sinGiroscopio() { return !ent.giro && !qSensor; }
+let avisoGiro = false, tEntrada = 0;
+// con L2 apretado: ← → separación de las imágenes · ↑ ↓ campo de visión · △ deformación · X valores de fábrica
+//                  □ profundidad (separación de las cámaras: real, media, baja, plano)
+const CALIBRAR = { 14: "sep-", 15: "sep+", 12: "fov+", 13: "fov-", 3: "dist", 2: "prof", 0: "reset" };
+const antesBoton = new Map();                         // "pad:botón" → estaba apretado
+let optionsT = 0;
+function palancas(dt) {
+  let x = 0, y = 0, giro = 0, rapido = 0, options = false, mx = 0, my = 0;
+  const eventos = [];
+  for (const g of navigator.getGamepads ? navigator.getGamepads() : []) {
+    if (!g) continue;
+    const a = g.axes, B = g.buttons, std = g.mapping === "standard";
+    const ap = (i) => !!(B[i] && (B[i].pressed || B[i].value > 0.5));
+    const cal = std && ap(6);                         // L2 apretado: la cruz, △ y X calibran el visor
+    if (Math.hypot(a[0] || 0, a[1] || 0) > ZM) { x += a[0] || 0; y += a[1] || 0; }
+    if (Math.hypot(a[2] || 0, a[3] || 0) > ZM) { mx += a[2] || 0; my += a[3] || 0; }
+    if (Math.abs(a[2] || 0) > 0.6 && !sinGiroscopio()) giro = Math.sign(a[2]);
+    if (ap(4)) giro = -1;
+    if (ap(5)) giro = 1;
+    if (!cal) {
+      if (ap(14)) giro = -1;
+      if (ap(15)) giro = 1;
+      if (ap(12)) y = -1;
+      if (ap(13)) y = 1;
+    }
+    if (std) { rapido = Math.max(rapido, B[7] ? B[7].value : 0); if (ap(9)) options = true; }
+    B.forEach((b, i) => {
+      const k = g.index + ":" + i, on = ap(i);
+      if (on && !antesBoton.get(k)) {
+        if (cal && CALIBRAR[i]) eventos.push(CALIBRAR[i]);
+        else if (cal) {}
+        else if (std && EVENTOS_BOTON[i]) eventos.push(EVENTOS_BOTON[i]);
+        else if (!std && ![12, 13, 14, 15].includes(i)) eventos.push("elegir");
+      }
+      antesBoton.set(k, on);
+    });
+  }
+  optionsT = options ? optionsT + dt : 0;
+  const T = ent.teclas;
+  if (T.has("KeyW") || T.has("ArrowUp")) y -= 1;
+  if (T.has("KeyS") || T.has("ArrowDown")) y += 1;
+  if (T.has("KeyA") || T.has("ArrowLeft")) x -= 1;
+  if (T.has("KeyD") || T.has("ArrowRight")) x += 1;
+  if (T.has("KeyQ")) giro = -1;
+  if (T.has("KeyE")) giro = 1;
+  if (ent.toque) y -= 1;                             // tocar la pantalla (o el botón del visor) camina
+  // modo mouse del control: el movimiento del cursor funciona como palanca
+  if (Math.abs(ent.mouse.dx) + Math.abs(ent.mouse.dy) > 2 && !arrastre && modo === "vr") {
+    x += THREE.MathUtils.clamp(ent.mouse.dx / 25, -1, 1); y += THREE.MathUtils.clamp(ent.mouse.dy / 25, -1, 1);
+  }
+  ent.mouse.dx *= 0.8; ent.mouse.dy *= 0.8;
+  if (T.has("ShiftLeft") || T.has("ShiftRight")) rapido = 1;
+  return { x: THREE.MathUtils.clamp(x, -1, 1), y: THREE.MathUtils.clamp(y, -1, 1), giro, rapido, eventos, mx, my };
+}
+
+// ---------- Bucle ----------
+const reloj = new THREE.Clock();
+const vAdel = new THREE.Vector3(), vDer = new THREE.Vector3();
+let tPanel = 0, rumboPanel = 0;
+function cuadro() {
+  const dt = Math.min(reloj.getDelta(), 0.05);
+  cuadros++;
+  const ahora = performance.now();
+  if (ahora - tFps > 1000) { fps = Math.round(cuadros * 1000 / (ahora - tFps)); cuadros = 0; tFps = ahora; }
+  if (renderer.domElement.width !== Math.floor(innerWidth * renderer.getPixelRatio())) ajustar();
+  if (modo === "diag") { pintarDiag(); return; }
+  if (modo === "menu") {
+    if (palancas(dt).eventos.includes("elegir") && !$("bVR").disabled) entrar("vr");   // X en el menú: entra al visor
+    renderer.render(scene, camera); return;
+  }
+
+  const c = palancas(dt);
+  for (const e of c.eventos) {
+    if (e === "elegir") accion("botón X");
+    else if (e === "entrada") volverEntrada();
+    else if (e === "gravedad") siguienteGravedad();
+    else if (e === "panel") { panel.visible = !panel.visible; ultimaAccion = "panel " + (panel.visible ? "sí" : "no"); }
+    else calibrar(e);
+  }
+  if (optionsT > 0 && optionsT - dt <= 0) aviso("Mantené Options para recargar…", 1.5);
+  if (optionsT > 1.5) { optionsT = -1e9; aviso("Recargando…", 5); setTimeout(recargar, 300); }
+  // sin giroscopio, la palanca derecha mira (girar y subir/bajar la vista, continuo)
+  if (sinGiroscopio()) {
+    mouseYaw -= c.mx * 1.5 * dt;
+    mousePitch = THREE.MathUtils.clamp(mousePitch - c.my * 1.1 * dt, -1.4, 1.4);
+    if (modo === "vr" && !avisoGiro && performance.now() - tEntrada > 2500) { avisoGiro = true; aviso("Sin giroscopio: mirá con la palanca derecha", 5); }
+  }
+  if (c.giro && giroListo) { desfase -= c.giro * Math.PI / 6; giroListo = false; }   // giro de a 30°, sin animar: no marea
+  if (!c.giro) giroListo = true;
+
+  // cabeza (en el marco de la gravedad) = desfase × giroscopio; en el mundo, además, el giro de la gravedad
+  cabeza(qCabeza);
+  qDesfase.setFromAxisAngle(U, desfase).multiply(qCabeza);           // qDesfase queda como la cabeza local
+  camera.quaternion.copy(qG).multiply(qDesfase);
+
+  // caminar hacia donde mira la cabeza, sin la inclinación (en el marco local)
+  if (!viaje) {
+    vAdel.set(0, 0, -1).applyQuaternion(qDesfase); vAdel.y = 0;
+    if (vAdel.lengthSq() < 1e-4) vAdel.set(0, 1, 0).applyQuaternion(qDesfase).negate().setY(0);
+    vAdel.normalize();
+    vDer.set(-vAdel.z, 0, vAdel.x);
+    const v = AJ.vel * (1 + 1.5 * c.rapido) * dt;      // R2 (o Shift) acelera hasta ×2,5
+    pasoCuerpo(dt, (vAdel.x * -c.y + vDer.x * c.x) * v, (vAdel.z * -c.y + vDer.z * c.x) * v);
+  }
+  lag *= Math.exp(-dt * 10);
+  camera.position.copy(pies).addScaledVector(U, OJOS + lag).applyQuaternion(qG);
+  camera.updateMatrixWorld();
+  if (avisoT > 0) { avisoT -= dt; avisoS.material.opacity = Math.min(1, avisoT / 0.6); }
+
+  // mirada sobre las esferas
+  rayo.setFromCamera(CENTRO, camera);
+  rayo.far = 40;
+  const hit = rayo.intersectObjects(destinos, false)[0];
+  const nuevo = hit ? hit.object : null;
+  if (nuevo !== mirando) { mirando = nuevo; mirandoT = 0; }
+  if (mirando && !viaje) {
+    mirandoT += dt;
+    if (mirandoT >= DWELL) { viajarA(mirando.userData.destino); mirandoT = 0; }
+  }
+  const f = mirando && !viaje ? Math.min(1, mirandoT / DWELL) : 0;
+  carga.geometry.dispose();
+  carga.geometry = new THREE.RingGeometry(0.03, 0.04, 32, 1, Math.PI / 2, Math.max(0.001, -f * Math.PI * 2));
+  reticula.material.color.set(mirando ? 0x9b3d2e : 0xffffff);
+  for (const d of destinos) d.scale.setScalar(d === mirando ? 1.25 : 1 + 0.06 * Math.sin(ahora / 400));
+
+  // fundido del teletransporte
+  if (viaje) {
+    viaje.t += dt;
+    if (!viaje.hecho && viaje.t >= 0.35) { viaje.fn(); viaje.hecho = true; ultimaAccion = "fue a: " + viaje.titulo; }
+    negro.material.opacity = viaje.t < 0.35 ? viaje.t / 0.35 : Math.max(0, 1 - (viaje.t - 0.35) / 0.45);
+    if (viaje.t > 0.8) { viaje = null; negro.material.opacity = 0; }
+  }
+
+  // panel de diagnóstico: en el piso, adelante del rumbo del cuerpo (se ve mirando hacia abajo)
+  vF.set(0, 0, -1).applyQuaternion(qDesfase);
+  if (Math.abs(vF.y) < 0.9) rumboPanel = Math.atan2(-vF.x, -vF.z);   // mirando muy abajo, el panel no se mueve
+  const rumbo = rumboPanel;
+  panel.position.set(pies.x - Math.sin(rumbo) * 0.95, pies.y + 0.15, pies.z - Math.cos(rumbo) * 0.95).applyQuaternion(qG);
+  panel.up.copy(U).applyQuaternion(qG);
+  panel.lookAt(camera.position);
+  tPanel -= dt;
+  if (tPanel <= 0) { dibujarPanel(); tPanel = 0.2; }
+
+  if (modo === "vr") renderVR();
+  else renderer.render(scene, camera);
+}
+renderer.setAnimationLoop(cuadro);
+window.pruebaVR = { camera, pies, irA, destinos, datos, ent, siguienteGravedad, get modo() { return modo; }, get estado() { return { desfase, mouseYaw, mousePitch, grav }; },
+  mirarA(obj) {                                         // para probar sin giroscopio: apunta la vista a un objeto
+    const d = obj.position.clone().sub(camera.position).normalize();
+    desfase = 0; mouseYaw = Math.atan2(-d.x, -d.z); mousePitch = Math.asin(d.y);
+  } };
+})().catch((e) => { const s = document.getElementById("estado"); if (s) s.textContent = "Error: " + e.message; console.error(e); });
+</script>
+</body>
+</html>
