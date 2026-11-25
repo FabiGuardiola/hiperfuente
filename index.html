@@ -977,7 +977,8 @@ function rayoCol(o, d, max) {
 // Lo pega herramientas/armar_visor_v3.py dentro del visor, después de la colisión.
 // En vez de bajar la geometría de las letras, el visor baja la fuente (10 KB) y el texto de las 24 capas
 // (datos.capas), y escribe en la habitación donde está el lector, con el texto de su capítulo:
-//   · muros M1 y M3: el testimonio de cada voz (justificado, de muro en muro);
+//   · muros M1 y M3: el testimonio de cada voz, compuesto como una página (de muro en muro);
+//   · muros M4 y M6: las 24 citas, compuestas como un índice (reemplazan a las del modelo);
 //   · escaleras: la narración de cada voz, un renglón por escalón (gira como cartel de aeropuerto);
 //   · anamorfosis: la cita de cada voz, letras sueltas sobre sus rayos desde el mirador.
 // Las otras habitaciones muestran placas lisas en su lugar (pesan casi nada). En las habitaciones reflejo, el texto
@@ -1013,7 +1014,7 @@ function glifo(ch, prof) {
 }
 const ALTO_REF = (() => { const c = glifo("Á", 0.1).caja; return c ? c.max.y - Math.min(0, c.min.y) : 0.8; })();
 const mayus = (t) => t.toUpperCase().replace(/[«»—“”]/g, (m) => (FB.glyphs[m] ? m : m === "—" ? "-" : '"'));
-const ancho = (w, tam, tr) => [...w].reduce((a, ch) => a + glifo(ch, 0).adv * tam * tr, 0);
+const ancho = (w, tam, tr) => [...w].reduce((a, ch) => a + glifo(ch === "" ? " " : ch, 0).adv * tam * tr, 0);
 
 // Junta letras en un BufferGeometry: cada letra es la geometría de su glifo con una matriz (der, arriba, normal, origen).
 class Juntador {
@@ -1047,41 +1048,221 @@ const COD = datos.codigo;
 const codigo = (c, extraR, extraG) => [(c.x - COD.min) / COD.rango * 0.5 + extraR, (c.y - COD.min) / COD.rango * 0.5 + extraG, (c.z - COD.min) / COD.rango, 1];
 const V3 = (a) => new THREE.Vector3(...a);
 
-// Muros de testimonio: llenan su rectángulo, justificados; el texto sigue del M1 al M3 y vuelve a empezar.
-function escribirMuros(texto, espejo) {
-  const j = new Juntador();
-  const pal = (mayus(texto) + " ").repeat(20).split(/\s+/).filter(Boolean);
-  let k = 0;
-  for (const m of datos.muros_voz) {
-    const tam = m.tam, tr = 0.94, linea = tam * 0.92, esp = glifo(" ", 0).adv * tam;
-    let der = V3(m.der), o = V3(m.o);
-    const arriba = V3(m.arriba), n = V3(m.n);
-    if (espejo) { o.addScaledVector(der, m.ancho); der.negate(); }
-    for (let y = -tam * 0.78; -y < m.alto - tam * 0.1; y -= linea) {
+// ---------- Composición de los muros (2026-11-24) ----------
+// Antes: un solo cuerpo, justificado a lo bruto (renglones con huecos enormes) y el texto repetido hasta llenar.
+// Ahora cada muro es una página compuesta: rótulo (azul tinta, espaciado), filete, capitular en lacre de tres
+// renglones, cuerpo justificado con partición en sílabas (si un renglón queda flojo, se abre apenas el espaciado
+// de las letras en vez de agrandar los blancos) y una firma al pie. El cuerpo toma el tamaño justo para que el texto
+// entre una sola vez. Los muros M4 y M6 (las 24 citas) se componen como un índice: capítulo en lacre y cada cita con su voz.
+datos.materiales.Color_2f4858 = datos.materiales.Color_2f4858 || [0.0284, 0.0648, 0.0975, 1];
+const TINTAS = {};
+const tinta = (n) => (TINTAS[n] = TINTAS[n] || material(n, datos.materiales[n] || [0.05, 0.05, 0.05, 1]));
+const VOCAL = "AEIOUÁÉÍÓÚÜ", FUERTE = "AEOÁÉÍÓÚ", GRUPOS = ["BL", "BR", "CL", "CR", "DR", "FL", "FR", "GL", "GR", "KL", "KR", "PL", "PR", "TR", "TL", "CH", "LL", "RR"];
+// Partición en sílabas del castellano (versión simple: diptongos, hiatos y grupos que no se separan).
+function cortes(palabra) {
+  const L = [...palabra], out = [];
+  const vocal = (i) => VOCAL.includes(L[i]);
+  const letra = (i) => /[A-ZÁÉÍÓÚÜÑ]/.test(L[i] || "");
+  const nucleos = [];
+  for (let i = 0; i < L.length; i++) {
+    if (!vocal(i)) continue;
+    const prev = nucleos[nucleos.length - 1];
+    if (prev && prev[1] === i - 1) {
+      if (FUERTE.includes(L[i]) && FUERTE.includes(L[i - 1])) { out.push(i); nucleos.push([i, i]); }   // hiato
+      else prev[1] = i;                                                                                 // diptongo
+    } else nucleos.push([i, i]);
+  }
+  const par = (i) => GRUPOS.includes(L[i] + L[i + 1]);
+  for (let k = 1; k < nucleos.length; k++) {
+    const a = nucleos[k - 1][1] + 1, b = nucleos[k][0], n = b - a;
+    if (n <= 0) continue;
+    if (n === 1) out.push(a);
+    else if (n === 2) out.push(par(a) ? a : a + 1);
+    else if (n === 3) out.push(par(a + 1) ? a + 1 : a + 2);
+    else out.push(a + 2);
+  }
+  return out.filter((i) => i >= 2 && i <= L.length - 2 && letra(i - 1) && letra(i)).sort((x, y) => x - y);
+}
+// Diagramación: arma los renglones (con partición) y devuelve las letras ubicadas, o null si no entra.
+// marcos: [{ancho, alto}]; piezas: [{texto, tam, color, tr, il, alin, antes, capitular, al_pie, renglones, partir}]
+// o {filete: {antes, grosor}, color}. y crece hacia abajo desde el borde de arriba del marco.
+function diagramar(marcos, piezas) {
+  const items = [], filetes = [];
+  let m = 0, y = 0;
+  const esp = (tam, tr) => glifo(" ", 0).adv * tam * tr;
+  for (const P of piezas) {
+    if (P.filete) {
+      y += P.filete.antes;
+      if (y + P.filete.grosor > marcos[m].alto) return null;
+      filetes.push({ m, y, grosor: P.filete.grosor, color: P.color });
+      y += P.filete.grosor;
+      continue;
+    }
+    const tam = P.tam, tr = P.tr || 0.94, lh = tam * (P.il || 1.18), alto = ALTO_REF * tam;
+    if (P.al_pie) {                                     // la firma: al pie del último marco
+      m = marcos.length - 1;
+      const yPie = marcos[m].alto - alto - (P.renglones - 1) * lh;
+      if (yPie < y + (P.antes || 0)) return null;
+      y = yPie;
+    } else if (y > 0) y += P.antes || 0;
+    const pal = P.texto.split(/\s+/).filter(Boolean).map((t, i, a) => ({ t, c: P.acento && i >= a.length - P.acento ? P.colorAcento : P.color }));
+    let cap = null;
+    if (P.capitular && pal.length) {
+      const ch = pal[0].t[0], tamC = (alto + 2 * lh) / ALTO_REF, gl = glifo(ch, 0);
+      cap = { ch, tam: tamC, w: (gl.caja ? gl.caja.max.x : gl.adv) * tamC + tam * 0.4 };
+      pal[0].t = pal[0].t.slice(1);
+      if (!pal[0].t) pal.shift();
+    }
+    let nl = 0;
+    while (pal.length) {
+      if (y + alto > marcos[m].alto + 1e-6) {          // no entra: sigue en el marco siguiente
+        if (P.al_pie || m + 1 >= marcos.length) return null;
+        m++; y = 0;
+      }
+      const W = marcos[m].ancho, x0 = cap && nl < 3 ? cap.w : 0, Wl = W - x0;
+      if (cap && nl === 0) {
+        if (y + alto + 2 * lh > marcos[m].alto) return null;
+        items.push({ m, x: 0, y: y + alto + 2 * lh, ch: cap.ch, tam: cap.tam, color: P.capColor || "Color_9b3d2e", tr: 1 });
+      }
       const fila = [];
       let w = 0;
-      while (fila.length === 0 || w + esp * tr + ancho(pal[k % pal.length], tam, tr) <= m.ancho) {
-        const p = pal[k % pal.length];
-        w += (fila.length ? esp * tr : 0) + ancho(p, tam, tr);
-        fila.push(p); k++;
-        if (w > m.ancho) break;
+      while (pal.length) {
+        const pw = ancho(pal[0].t, tam, tr), sep = fila.length ? esp(tam, tr) : 0;
+        if (w + sep + pw <= Wl) { fila.push(pal.shift()); w += sep + pw; continue; }
+        // partir la palabra en la última sílaba que entre (con guion)
+        const c = P.partir === false ? null : cortes(pal[0].t).reverse().find((i) => w + sep + ancho(pal[0].t.slice(0, i) + "-", tam, tr) <= Wl);
+        if (c) { const pre = { t: pal[0].t.slice(0, c) + "-", c: pal[0].c }; fila.push(pre); pal[0].t = pal[0].t.slice(c); w += sep + ancho(pre.t, tam, tr); }
+        else if (!fila.length) { fila.push(pal.shift()); w += pw; }
+        break;
       }
-      const extra = fila.length > 1 ? (m.ancho - w) / (fila.length - 1) : 0;
-      let x = 0;
-      for (const p of fila) {
-        for (const ch of p) {
-          const gl = glifo(ch, m.espesor / tam);
-          j.letra(gl, mLetra(der, arriba, n, o.clone().addScaledVector(der, x).addScaledVector(arriba, y), tam));
-          x += gl.adv * tam * tr;
-        }
-        x += esp * tr + extra;
-      }
+      const ultima = !pal.length, huecos = fila.length - 1;
+      const letras = fila.reduce((a, p) => a + [...p.t].length, 0) + huecos;
+      let extra = 0, track = 0, x = x0;
+      if (P.alin === "justificar" && !ultima && huecos > 0) {
+        const falta = Wl - w, tope = esp(tam, tr) * 0.9;        // un blanco crece hasta casi el doble; el resto, las letras
+        if (falta / huecos <= tope) extra = falta / huecos;
+        else { extra = tope; track = Math.min((falta - tope * huecos) / Math.max(1, letras - 1), tam * 0.07); }
+      } else if (P.alin === "derecha") x = x0 + (Wl - w);
+      else if (P.alin === "centro") x = x0 + (Wl - w) / 2;
+      fila.forEach((p, k) => {
+        for (const ch0 of p.t) { const ch = ch0 === "" ? " " : ch0; items.push({ m, x, y: y + alto, ch, tam, color: p.c, tr }); x += glifo(ch, 0).adv * tam * tr + track; }
+        if (k < huecos) x += esp(tam, tr) + extra + track;
+      });
+      y += lh; nl++;
     }
+    y += (P.il ? 0 : 0);
   }
-  const malla = j.malla(j.f.concat(j.c), [], material("Color_3d3c39", datos.materiales.Color_3d3c39 || [0.05, 0.05, 0.05, 1]));
-  if (malla) malla.userData.mat = "Color_3d3c39";
-  return malla;
+  return { items, filetes };
 }
+// Las letras ubicadas, sobre el muro. marcos: [{o, der, arriba, n, ancho, alto, espesor}]
+function emitir(marcos, d, espejo) {
+  const js = {};
+  const J = (c) => (js[c] = js[c] || new Juntador());
+  const base = marcos.map((mk) => {
+    const der = V3(mk.der), o = V3(mk.o);
+    if (espejo) { o.addScaledVector(der, mk.ancho); der.negate(); }
+    return { der, o, arriba: V3(mk.arriba), n: V3(mk.n), esp: mk.espesor };
+  });
+  for (const it of d.items) {
+    const b = base[it.m], gl = glifo(it.ch, b.esp / it.tam);
+    if (!gl.frente) continue;
+    J(it.color).letra(gl, mLetra(b.der, b.arriba, b.n, b.o.clone().addScaledVector(b.der, it.x).addScaledVector(b.arriba, -it.y), it.tam));
+  }
+  for (const f of d.filetes) {                          // un filete: una chapa fina del ancho del marco
+    const b = base[f.m], mk = marcos[f.m];
+    const g = new THREE.BoxGeometry(mk.ancho, f.grosor, b.esp).toNonIndexed();
+    g.applyMatrix4(new THREE.Matrix4().makeBasis(b.der, b.arriba, b.n)
+      .setPosition(b.o.clone().addScaledVector(b.der, mk.ancho / 2).addScaledVector(b.arriba, -f.y - f.grosor / 2)));
+    J(f.color).f.push(...g.attributes.position.array);
+  }
+  const grupo = new THREE.Group();
+  for (const [c, j] of Object.entries(js)) {
+    const malla = j.malla(j.f.concat(j.c), [], tinta(c));
+    if (malla) { malla.userData.mat = c; grupo.add(malla); }
+  }
+  return grupo;
+}
+// El tamaño más grande (de a 5 mm) con el que la composición entra.
+function ajustarCuerpo(marcos, armar, desde, hasta) {
+  for (let t = desde; t >= hasta - 1e-6; t -= 0.005) { const d = diagramar(marcos, armar(t)); if (d) return d; }
+  return diagramar(marcos, armar(hasta)) || { items: [], filetes: [] };
+}
+const limpiar = (t) => mayus(t).replace(/\s*\/\s*/g, " ").replace(/\s+/g, " ").trim();
+
+// Muros de testimonio (M1 → M3): rótulo, filete, capitular, cuerpo justificado y la firma de la voz al pie del M3.
+function escribirMuros(texto, espejo, voz, cap) {
+  const marcos = datos.muros_voz;
+  const nombre = mayus(datos.voces[voz] || "");
+  const armar = (t) => [
+    { texto: "TESTIMONIO - " + nombre, tam: Math.max(0.13, t * 0.6), tr: 1.32, color: "Color_2f4858", alin: "izquierda", il: 1.0, partir: false },
+    { filete: { antes: t * 0.45, grosor: 0.035 }, color: "Color_3d3c39" },
+    { texto: limpiar(texto), tam: t, color: "Color_3d3c39", alin: "justificar", antes: t * 0.95, capitular: true, il: 1.22 },
+    { texto: "- " + nombre.replace(/ /g, ""), tam: t * 1.1, color: "Color_3d3c39", alin: "derecha", al_pie: true, antes: t * 1.2, renglones: 2, partir: false, il: 1.5 },
+    { texto: "CAPÍTULO " + cap + ": " + mayus(datos.titulos[cap - 1] || ""), tam: Math.max(0.12, t * 0.52), tr: 1.3, color: "Color_2f4858", alin: "derecha", partir: false },
+  ];
+  return emitir(marcos, ajustarCuerpo(marcos, armar, 0.34, 0.15), espejo);
+}
+
+// Muros de las 24 citas (M4: capítulos 1 a 4; M6: 5 a 8). Sus marcos salen de la caja de la lectura.
+const MARCOS_CITAS = (() => {
+  const out = {};
+  for (const L of datos.lecturas || []) {
+    const id = (L.titulo.match(/^Muro (M[46])$/) || [])[1];
+    if (!id || !L.caja) continue;
+    const k = L.caja, c = V3(k.c), w = V3(k.w), arriba = V3(k.v);
+    const n = w.clone().multiplyScalar(Math.sign(V3(L.pos).sub(c).dot(w)) || 1);
+    const der = arriba.clone().cross(n);
+    const ancho = 2 * k.h[0] * 0.97, alto = 2 * k.h[1] * 0.97;
+    out[id] = { id, o: c.clone().addScaledVector(der, -ancho / 2).addScaledVector(arriba, alto / 2).toArray(), der: der.toArray(),
+                arriba: arriba.toArray(), n: n.toArray(), ancho, alto, espesor: 0.12, caja: k };
+  }
+  return out;
+})();
+function escribirCitas(espejo) {
+  const grupo = new THREE.Group();
+  for (const [id, caps] of [["M4", [1, 2, 3, 4]], ["M6", [5, 6, 7, 8]]]) {
+    const mk = MARCOS_CITAS[id];
+    if (!mk) continue;
+    const armar = (t) => {
+      const P = [{ texto: "LAS CITAS - " + (id === "M4" ? "I" : "II"), tam: Math.max(0.12, t * 0.75), tr: 1.32, color: "Color_2f4858", alin: "izquierda", il: 1.0, partir: false },
+                 { filete: { antes: t * 0.4, grosor: 0.03 }, color: "Color_3d3c39" }];
+      for (const n of caps) {
+        P.push({ texto: n + ". " + mayus(datos.titulos[n - 1] || ""), tam: t * 0.8, tr: 1.18, color: "Color_9b3d2e", alin: "izquierda", antes: t * 0.8, il: 1.2, partir: false });
+        for (const v of "zxy") {
+          const c = datos.capas[String(n)] && datos.capas[String(n)][v];
+          if (!c) continue;
+          const cita = Array.isArray(c.cita) ? c.cita.join(" ") : String(c.cita || "");
+          P.push({ texto: limpiar(cita) + " -" + mayus(datos.voces[v]).replace(/ /g, ""), tam: t, color: "Color_3d3c39", acento: 1, colorAcento: "Color_2f4858", alin: "izquierda", antes: t * 0.15, il: 1.14 });
+        }
+      }
+      return P;
+    };
+    const g = emitir([mk], ajustarCuerpo([mk], armar, 0.42, 0.1), espejo);
+    while (g.children.length) grupo.add(g.children[0]);
+  }
+  return grupo;
+}
+// Las citas viejas (exportadas en el modelo, con «/» entre cita y cita) se ocultan en la habitación escrita:
+// su material descarta lo que cae dentro de las cajas de M4 y M6 (y la sombra, también).
+const sinCitas = new Map();
+function conDescarte(m) {
+  const cajas = Object.values(MARCOS_CITAS).map((x) => x.caja);
+  m.onBeforeCompile = (sh) => {
+    cajas.forEach((k, i) => Object.assign(sh.uniforms, { ["uCc" + i]: { value: V3(k.c) }, ["uCu" + i]: { value: V3(k.u) }, ["uCv" + i]: { value: V3(k.v) },
+                                                         ["uCw" + i]: { value: V3(k.w) }, ["uCh" + i]: { value: V3(k.h).addScalar(0.08) } }));
+    const decl = cajas.map((_, i) => `uniform vec3 uCc${i}, uCu${i}, uCv${i}, uCw${i}, uCh${i};`).join("\n");
+    const prueba = cajas.map((_, i) => `{ vec3 q = vLocC - uCc${i}; if (abs(dot(q, uCu${i})) < uCh${i}.x && abs(dot(q, uCv${i})) < uCh${i}.y && abs(dot(q, uCw${i})) < uCh${i}.z) discard; }`).join("\n");
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vLocC;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvLocC = transformed;");
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nvarying vec3 vLocC;\n" + decl).replace("void main() {", "void main() {\n" + prueba);
+  };
+  m.customProgramCacheKey = () => "sinCitas";
+  return m;
+}
+function materialSinCitas(m) {
+  if (!sinCitas.has(m)) sinCitas.set(m, conDescarte(m.clone()));
+  return sinCitas.get(m);
+}
+const profundidadSinCitas = conDescarte(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
 
 // Escaleras: un renglón por escalón, parado en su contrahuella, de frente al pie; la narración sigue de una escalera
 // a la otra (empieza en E4, la de la H). Devuelve el grupo y las palabras de cada renglón (para la lectura).
@@ -1226,6 +1407,8 @@ function escribirSala(r) {
   if (escrita.r === r) return;
   for (const n of escrita.nodos) { n.parent && n.parent.remove(n); n.traverse((o) => o.geometry && o.geometry.dispose()); }
   if (escrita.r >= 0) for (const h of salasObj[escrita.r].children) if (h.userData.pieza === "SUPLENTE") h.visible = true;
+  if (escrita.r >= 0) for (const h of salasObj[escrita.r].children) if (h.userData.pieza === "TEXTOS")
+    h.traverse((o) => { if (o.isMesh && o.userData.matOriginal) { o.material = o.userData.matOriginal; o.customDepthMaterial = undefined; } });
   escrita.nodos = []; escrita.filas = {}; escrita.r = r;
   const S = salasM[r], espejo = S.determinant() < 0;
   const cap = datos.ciclo.indexOf(SALA_CLAVE[r]) + 1;
@@ -1240,8 +1423,8 @@ function escribirSala(r) {
       salasObj[r].add(c);
       escrita.nodos.push(c);
     };
-    const muros = escribirMuros(t.testimonio, espejo);
-    poner(muros && new THREE.Group().add(muros), "TEXTOS");
+    poner(escribirMuros(t.testimonio, espejo, v, cap), "TEXTOS");
+    poner(escribirCitas(espejo), "CITAS");
     const esc = escribirEscaleras(t.narracion, espejo);
     poner(esc.grupo, "ESCALERAS");
     escrita.filas[g] = esc.filas;
@@ -1249,6 +1432,8 @@ function escribirSala(r) {
     poner(ana && new THREE.Group().add(ana), "ANAMORFOSIS");
   });
   for (const h of salasObj[r].children) if (h.userData.pieza === "SUPLENTE") h.visible = false;
+  for (const h of salasObj[r].children) if (h.userData.pieza === "TEXTOS")
+    h.traverse((o) => { if (o.isMesh) { o.userData.matOriginal = o.userData.matOriginal || o.material; o.material = materialSinCitas(o.userData.matOriginal); o.customDepthMaterial = profundidadSinCitas; } });
   renderer.shadowMap.needsUpdate = true;
 }
 function salaDeCamara() {
@@ -1256,6 +1441,8 @@ function salaDeCamara() {
   return SALA_CLAVE.indexOf(b.map((c) => (c >= 0 ? "+" : "-")).join(""));
 }
 function revisarEscritura() {
+  // durante una lectura la cámara puede quedar fuera de la habitación (de frente al muro, de lejos): no se reescribe
+  try { if (velo || vuelo) return; } catch (_) { /* todavía no existen: es la primera escritura */ }
   const r = salaDeCamara();
   if (r >= 0 && r !== escrita.r) escribirSala(r);
 }
@@ -1295,7 +1482,7 @@ function ponerModo(m) {
   mirarPalanca.hidden = m !== "caminar";
   vertical.hidden = m !== "orbitar";
   ayuda.textContent = m === "orbitar"
-    ? "Cámara libre: arrastrá para girar, pellizcá para acercarte. La palanca y ▲▼ vuelan y atraviesan todo. En compu: WASD, Q/E y Shift."
+    ? "Cámara libre: arrastrá para girar alrededor de lo que está en el centro, pellizcá o usá la rueda para acercarte. Doble clic (o doble toque) sobre algo: te acercás ahí. La palanca y ▲▼ vuelan y atraviesan todo. En compu: WASD, Q/E y Shift."
     : "Palanca izquierda: caminar · derecha: mirar. X Y Z cambian la gravedad: caés sobre ese piso. En el núcleo, el cuadrado rojo de la esquina lleva al capítulo siguiente; los rectángulos rojos de las paredes, a la voz de ese personaje. En compu: WASD para caminar, clic para mirar con el mouse (Esc suelta), Shift corre, Espacio salta.";
   if (m === "orbitar") {
     if (document.pointerLockElement) document.exitPointerLock();
@@ -1471,6 +1658,43 @@ function recorrer(forzarEntrada) {
 }
 btnOrbitar.onclick = () => { if (!vuelo) ponerModo("orbitar"); };
 btnCaminar.onclick = () => recorrer();
+const vRl = new THREE.Vector3(), vRd = new THREE.Vector3();
+function rayoLargo(o, d, max) {                    // la grilla de colisión es para rayos cortos: se avanza de a tramos
+  for (let t = 0; t < max; t += 6) { const r = rayoCol(vRl.copy(o).addScaledVector(d, t), d, 6.2); if (r) return t + r.t; }
+  return null;
+}
+function pivoteAlCentro() {
+  if (modo !== "orbitar" || vuelo || velo) return;
+  vRd.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  const t = rayoLargo(camera.position, vRd, 900);
+  if (t !== null) { orbita.target.copy(camera.position).addScaledVector(vRd, Math.max(t, 4)); }
+}
+lienzo.addEventListener("pointerdown", (e) => { if (e.isPrimary) pivoteAlCentro(); }, true);
+let ruedaReloj = 0;
+lienzo.addEventListener("wheel", () => { if (performance.now() - ruedaReloj > 400) pivoteAlCentro(); ruedaReloj = performance.now(); }, { capture: true, passive: true });
+function acercarA(x, y) {
+  if (modo !== "orbitar" || vuelo || velo) return;
+  const ndc = new THREE.Vector2((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
+  const r = new THREE.Raycaster(); r.setFromCamera(ndc, camera);
+  const t = rayoLargo(camera.position, r.ray.direction, 900);
+  if (t === null) return;
+  const P = camera.position.clone().addScaledVector(r.ray.direction, t);
+  const dist = Math.min(22, Math.max(6, t * 0.6));
+  const destino = P.clone().addScaledVector(r.ray.direction, -dist);
+  const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(destino, P, new THREE.Vector3(0, 1, 0)));
+  vuelo = { t0: performance.now(), dur: Math.min(2200, 900 + t * 6), p0: camera.position.clone(), c: camera.position.clone().add(destino).multiplyScalar(0.5),
+            q0: camera.quaternion.clone(), f0: camera.fov, d: { p: destino, q, f: camera.fov },
+            alTerminar: () => { orbita.target.copy(P); ponerModo("orbitar"); } };
+  orbita.enabled = false;
+}
+lienzo.addEventListener("dblclick", (e) => acercarA(e.clientX, e.clientY));
+let ultimoToque = null;
+lienzo.addEventListener("pointerup", (e) => {
+  if (e.pointerType === "mouse") return;
+  const ahora = performance.now();
+  if (ultimoToque && ahora - ultimoToque.t < 320 && Math.hypot(e.clientX - ultimoToque.x, e.clientY - ultimoToque.y) < 30) { acercarA(e.clientX, e.clientY); ultimoToque = null; }
+  else ultimoToque = { t: ahora, x: e.clientX, y: e.clientY };
+});
 document.getElementById("rapido").onclick = (e) => { rapido = !rapido; e.currentTarget.setAttribute("aria-pressed", rapido); };
 
 function fovVertical(lente) {
@@ -1950,7 +2174,7 @@ const disparadores = [];
         Object.defineProperty(e, "palabras", { get: () => (escrita.r === r && escrita.filas[g] && escrita.filas[g][L0.escalera.id]) || [] });
         L = { ...L0, escalera: e };
       }
-      const nombre = L.pieza.replace(/_V$/, "_" + VOZ_G[g]);
+      const nombre = /^Muro M[46]$/.test(L.titulo) ? "CITAS_" + VOZ_G[g] : L.pieza.replace(/_V$/, "_" + VOZ_G[g]);
       const ojo = aMundo(W, L.pos), blanco = aMundo(W, L.mira);
       const arriba = aMundo(W, [L.pos[0], L.pos[1], L.pos[2] + 1]).sub(ojo).normalize();
       const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(ojo, blanco, arriba));
@@ -2108,6 +2332,43 @@ function materialVelo(color, L, fondo) {
 // texto no salta cuando entra el velo. El lector arranca en el piso, antes del primer escalón; se lee palabra por
 // palabra, de izquierda a derecha, y al terminar un renglón la cámara sube un escalón (huella y contrahuella).
 // Al final, el lector queda parado en la bandeja de arriba, mirando hacia adelante, para seguir caminando.
+const uEsc = { fila: { value: 0 }, asienta: { value: 0 }, prev: { value: -9 }, arranca: { value: 0 } };
+function materialLecturaEscalera(nombre, L) {
+  const m = new THREE.MeshBasicMaterial({ color: colorDe(nombre), side: THREE.DoubleSide, vertexColors: true });
+  const k = L.caja, e = L.escalera;
+  m.onBeforeCompile = (sh) => {
+    const v3 = (a) => ({ value: new THREE.Vector3(...a) });
+    Object.assign(sh.uniforms, {
+      uTiempo, uCod: { value: new THREE.Vector2(datos.codigo.min, datos.codigo.rango) },
+      uC: v3(k.c), uU: v3(k.u), uV: v3(k.v), uW: v3(k.w), uH: v3(k.h), uZ0: { value: e.c0[2] - e.alza / 2 }, uAlza: { value: e.alza },
+      uFila: uEsc.fila, uAsienta: uEsc.asienta, uPrev: uEsc.prev, uArranca: uEsc.arranca,
+    });
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", `#include <common>
+        uniform float uTiempo, uZ0, uAlza, uFila, uAsienta, uPrev, uArranca; uniform vec2 uCod;
+        varying vec3 vLoc;
+        mat3 giroY(float a){ float c = cos(a), s = sin(a); return mat3(c, 0., -s, 0., 1., 0., s, 0., c); }
+        mat3 giroX(float a){ float c = cos(a), s = sin(a); return mat3(1., 0., 0., 0., c, s, 0., -s, c); }`)
+      .replace("#include <begin_vertex>", `#include <begin_vertex>
+        vLoc = transformed;
+        float aeEjeY = color.g >= 0.5 ? 1.0 : 0.0;
+        vec3 aeCtr = vec3((color.r - (color.r >= 0.5 ? 0.5 : 0.0)) * 2.0, (color.g - aeEjeY * 0.5) * 2.0, color.b) * uCod.y + uCod.x;
+        float aeAzar = fract(sin(dot(aeCtr, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+        float aeFase = fract(uTiempo * 0.4 - aeCtr.z * 0.11 + aeAzar * 0.6);   // en la lectura giran más seguido
+        float aeFila = floor((aeCtr.z - uZ0) / uAlza);
+        float aeGira = abs(aeFila - uFila) < 0.5 ? 1.0 - uAsienta : (abs(aeFila - uPrev) < 0.5 ? uArranca : 1.0);
+        float aeAng = 6.28318 * smoothstep(0.0, 0.55, aeFase) * aeGira;
+        mat3 aeR = aeEjeY > 0.5 ? giroX(aeAng) : giroY(aeAng);
+        transformed = aeCtr + aeR * (transformed - aeCtr);`);
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
+        varying vec3 vLoc; uniform vec3 uC, uU, uV, uW, uH;`)
+      .replace("void main() {", `void main() {
+        vec3 dd = vLoc - uC;
+        if (abs(dot(dd, uU)) > uH.x || abs(dot(dd, uV)) > uH.y || abs(dot(dd, uW)) > uH.z) discard;`)
+      .replace("#include <color_fragment>", "");
+  };
+  m.customProgramCacheKey = () => "lecturaEscalera";
+  return m;
+}
 function poseEscalera(e, W, kc) {
   // La cámara baja a la altura de la letra (a 3,4 m del renglón) y mira apenas hacia arriba: el renglón que se lee
   // queda en el tercio de abajo de la pantalla y los de arriba suben por la escalera.
@@ -2173,6 +2434,14 @@ function pasoLecturaEscalera() {
     if (tt > a.t1 && sig && sig.k > a.k) kc = a.k + THREE.MathUtils.smoothstep(tt - a.t1, 0.05, sig.t0 - a.t1);
     if (tt > a.t1 && !sig) uLect.pal.value.set(a.a, a.b);
   }
+  {                                                 // el renglón que se lee se asienta; el anterior vuelve a girar
+    const k = i < 0 ? 0 : ev[i].k;
+    let ini = i < 0 ? Infinity : ev[i].t0;
+    for (let q = i; q >= 0 && ev[q].k === k; q--) ini = ev[q].t0;
+    const sv = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+    uEsc.fila.value = k; uEsc.asienta.value = i < 0 ? 0 : sv((tt - ini) / 0.7);
+    uEsc.prev.value = k - 1; uEsc.arranca.value = i < 0 ? 1 : sv((tt - ini) / 0.9);
+  }
   const pose = poseEscalera(v.e, v.W, kc);
   camera.position.copy(pose.p);
   camera.quaternion.copy(pose.q);
@@ -2188,7 +2457,7 @@ function iniciarVelo(d, regreso) {
   const ocultos = [], materiales = [];
   scene.traverse((o) => {
     if (!(o.isMesh || o.isLine || o.isSprite || o.isPoints) || !o.visible) return;
-    if (mostrar.has(o)) { if (d.L.tipo !== "cartel") { materiales.push([o, o.material]); o.material = materialVelo(mostrar.get(o), d.L, fondo); } }
+    if (mostrar.has(o)) { if (d.L.tipo !== "cartel") { materiales.push([o, o.material]); o.material = d.L.escalera ? materialLecturaEscalera(o.userData.mat, d.L) : materialVelo(mostrar.get(o), d.L, fondo); } }
     else { ocultos.push(o); o.visible = false; }
   });
   velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + (d.L.tipo === "texto" ? Math.max(d.L.segundos, 90) : d.L.segundos) * 1000, regreso };
