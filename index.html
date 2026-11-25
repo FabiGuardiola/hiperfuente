@@ -110,6 +110,11 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 #legibCaja div { height: 3px; background: rgba(233, 227, 214, .2); }
 #legibCaja i { display: block; height: 100%; width: 0; background: var(--papel); }
 @media (max-width: 1100px) { .ayuda { display: none; } }
+body.leyendo .barra, body.leyendo #mapa, body.leyendo #palanca, body.leyendo #mirarPalanca, body.leyendo .vertical,
+body.leyendo .ayuda { opacity: 0 !important; pointer-events: none !important; transition: opacity .3s; }
+body.leyendo #nota { top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important; padding: 6px 12px !important; }
+body.leyendo #nota strong { display: inline; font-size: 14px; margin-right: 8px; }
+body.leyendo #nota span { font-size: 12px; }
 @media (max-width: 900px) { #nota { left: 16px; right: 16px; transform: none; width: auto; bottom: calc(168px + env(safe-area-inset-bottom, 0px)); } }
 @media (max-width: 560px) { h1 { font-size: 17px; } }
 </style>
@@ -1964,11 +1969,25 @@ const disparadores = [];
   im.renderOrder = 14;
   scene.add(im);
 }
+let FOV_LECTURA = null;
+const FOV_TELE = 14;
+function poseCaja(L, W) {
+  const k = L.caja, V3 = (a) => new THREE.Vector3(...a);
+  const c = V3(k.c), v = V3(k.v), w = V3(k.w);
+  const lado = Math.sign(V3(L.pos).sub(c).dot(w)) || 1;
+  const o = FOV_LECTURA ? FOV_LECTURA() : { f: FOV_TELE, a: isFinite(camera.aspect) && camera.aspect > 0 ? camera.aspect : 1.5, m: 1.18 };
+  const t = Math.tan(THREE.MathUtils.degToRad(o.f) / 2);
+  const dist = Math.max(k.h[1] * o.m / t, k.h[0] * o.m / (t * o.a)) + k.h[2];
+  const aM = (p) => blenderAThree(p.clone().applyMatrix4(W).toArray());
+  const O = aM(c.clone().addScaledVector(w, lado * dist)), C = aM(c), arriba = aM(c.clone().add(v)).sub(C).normalize();
+  return { p: O, q: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(O, C, arriba)), f: o.f };
+}
 function irALectura(d) {
+  if (d.L.caja && !d.L.escalera && d.L.tipo === "texto") d.pose = poseCaja(d.L, d.W);
   actual = -1;
   botonesInst.forEach((b) => b.setAttribute("aria-pressed", false));
   notaTitulo.textContent = "Lectura · " + d.L.titulo;
-  notaTexto.textContent = d.L.nota;
+  notaTexto.textContent = d.L.nota + (d.L.tipo === "texto" ? " Tocá la pantalla para volver." : "");
   legibCaja.hidden = true;
   nota.hidden = false;
   if (document.pointerLockElement) document.exitPointerLock();
@@ -2060,15 +2079,16 @@ function materialVelo(color, L, fondo) {
       uFila: uLect.fila, uPal: uLect.pal, uBrillo: uLect.brillo, uSigno: uLect.signo,
       uFila2: uLect.fila2, uPal2: uLect.pal2, uBrillo2: uLect.brillo2,
     });
-    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vLoc;")
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLoc = transformed;");
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vLoc; varying vec3 vNorL;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLoc = transformed; vNorL = normal;");
     sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
-        varying vec3 vLoc; uniform vec3 uC, uU, uV, uW, uH, uFondo, uC0, uDer, uSube;
+        varying vec3 vLoc; varying vec3 vNorL; uniform vec3 uC, uU, uV, uW, uH, uFondo, uC0, uDer, uSube;
         uniform float uLeer, uZ0, uAlza, uFila, uBrillo, uSigno, uFila2, uBrillo2; uniform vec2 uPal, uPal2;`)
       .replace("void main() {", `void main() {
         vec3 dd = vLoc - uC;
         if (abs(dot(dd, uU)) > uH.x || abs(dot(dd, uV)) > uH.y || abs(dot(dd, uW)) > uH.z) discard;`)
       .replace("#include <output_fragment>", `
+        if (uLeer < 0.5 && dot(vNorL, vNorL) > 0.25 && abs(dot(normalize(vNorL), uW)) < 0.6) outgoingLight = uFondo;   // cantos: del color del fondo
         if (uLeer > 0.5) {
           float fila = floor((vLoc.z - uZ0) / uAlza);
           float r = dot(vLoc - (uC0 + uSube * fila), uDer) * uSigno;
@@ -2171,7 +2191,7 @@ function iniciarVelo(d, regreso) {
     if (mostrar.has(o)) { if (d.L.tipo !== "cartel") { materiales.push([o, o.material]); o.material = materialVelo(mostrar.get(o), d.L, fondo); } }
     else { ocultos.push(o); o.visible = false; }
   });
-  velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + d.L.segundos * 1000, regreso };
+  velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + (d.L.tipo === "texto" ? Math.max(d.L.segundos, 90) : d.L.segundos) * 1000, regreso };
   if (d.L.escalera) {
     const espejo = d.W.determinant() < 0;
     const guion = guionEscalera(d.L.escalera, espejo);
@@ -2185,6 +2205,7 @@ function iniciarVelo(d, regreso) {
   scene.background = fondo;
   capaVelo.style.background = "#" + fondo.getHexString();
   capaVelo.style.transition = "none";
+  document.body.classList.add("leyendo");
   capaVelo.style.opacity = 1;                      // se entra desde el plano de color…
   requestAnimationFrame(() => { capaVelo.style.transition = "opacity .5s"; capaVelo.style.opacity = 0; });   // …y aparece el texto
 }
@@ -2199,6 +2220,7 @@ function terminarVelo() {
     for (const [o, m] of v.materiales) { o.material.dispose(); o.material = m; }
     scene.fog = v.niebla;
     scene.background = null;
+    document.body.classList.remove("leyendo");
     capaVelo.style.opacity = 0;                    // se levanta el velo y el lector queda suelto
     const r = v.regreso;
     if (!r) { ponerModo("orbitar"); return; }

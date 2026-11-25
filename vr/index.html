@@ -114,6 +114,11 @@ button:focus-visible { outline: 2px solid var(--papel); outline-offset: 2px; }
 #legibCaja div { height: 3px; background: rgba(233, 227, 214, .2); }
 #legibCaja i { display: block; height: 100%; width: 0; background: var(--papel); }
 @media (max-width: 1100px) { .ayuda { display: none; } }
+body.leyendo .barra, body.leyendo #mapa, body.leyendo #palanca, body.leyendo #mirarPalanca, body.leyendo .vertical,
+body.leyendo .ayuda { opacity: 0 !important; pointer-events: none !important; transition: opacity .3s; }
+body.leyendo #nota { top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important; padding: 6px 12px !important; }
+body.leyendo #nota strong { display: inline; font-size: 14px; margin-right: 8px; }
+body.leyendo #nota span { font-size: 12px; }
 @media (max-width: 900px) { #nota { left: 16px; right: 16px; transform: none; width: auto; bottom: calc(168px + env(safe-area-inset-bottom, 0px)); } }
 @media (max-width: 560px) { h1 { font-size: 17px; } }
 </style>
@@ -1857,7 +1862,7 @@ botonSonido.onclick = async () => {
     const encendido = botonSonido.getAttribute("aria-pressed") === "true";
     if (!audio) {
       const Contexto = window.AudioContext || window.webkitAudioContext;
-      const ctx = new Contexto();
+      const ctx = window.__ctxVR || new Contexto();
       const bus = window.Audio24.makeBus(ctx, ctx.destination);
       const motores = [0, 1, 2].map((q) => window.Audio24.makeEngine(ctx, bus.in, window.Audio24.TIMBRES[q]));
       motores.forEach((m) => m.fadeIn(ctx.currentTime));
@@ -1972,11 +1977,25 @@ const disparadores = [];
   im.renderOrder = 14;
   scene.add(im);
 }
+let FOV_LECTURA = null;
+const FOV_TELE = 14;
+function poseCaja(L, W) {
+  const k = L.caja, V3 = (a) => new THREE.Vector3(...a);
+  const c = V3(k.c), v = V3(k.v), w = V3(k.w);
+  const lado = Math.sign(V3(L.pos).sub(c).dot(w)) || 1;
+  const o = FOV_LECTURA ? FOV_LECTURA() : { f: FOV_TELE, a: isFinite(camera.aspect) && camera.aspect > 0 ? camera.aspect : 1.5, m: 1.18 };
+  const t = Math.tan(THREE.MathUtils.degToRad(o.f) / 2);
+  const dist = Math.max(k.h[1] * o.m / t, k.h[0] * o.m / (t * o.a)) + k.h[2];
+  const aM = (p) => blenderAThree(p.clone().applyMatrix4(W).toArray());
+  const O = aM(c.clone().addScaledVector(w, lado * dist)), C = aM(c), arriba = aM(c.clone().add(v)).sub(C).normalize();
+  return { p: O, q: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(O, C, arriba)), f: o.f };
+}
 function irALectura(d) {
+  if (d.L.caja && !d.L.escalera && d.L.tipo === "texto") d.pose = poseCaja(d.L, d.W);
   actual = -1;
   botonesInst.forEach((b) => b.setAttribute("aria-pressed", false));
   notaTitulo.textContent = "Lectura · " + d.L.titulo;
-  notaTexto.textContent = d.L.nota;
+  notaTexto.textContent = d.L.nota + (d.L.tipo === "texto" ? " Tocá la pantalla para volver." : "");
   legibCaja.hidden = true;
   nota.hidden = false;
   if (document.pointerLockElement) document.exitPointerLock();
@@ -2068,15 +2087,16 @@ function materialVelo(color, L, fondo) {
       uFila: uLect.fila, uPal: uLect.pal, uBrillo: uLect.brillo, uSigno: uLect.signo,
       uFila2: uLect.fila2, uPal2: uLect.pal2, uBrillo2: uLect.brillo2,
     });
-    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vLoc;")
-      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLoc = transformed;");
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vLoc; varying vec3 vNorL;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvLoc = transformed; vNorL = normal;");
     sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>
-        varying vec3 vLoc; uniform vec3 uC, uU, uV, uW, uH, uFondo, uC0, uDer, uSube;
+        varying vec3 vLoc; varying vec3 vNorL; uniform vec3 uC, uU, uV, uW, uH, uFondo, uC0, uDer, uSube;
         uniform float uLeer, uZ0, uAlza, uFila, uBrillo, uSigno, uFila2, uBrillo2; uniform vec2 uPal, uPal2;`)
       .replace("void main() {", `void main() {
         vec3 dd = vLoc - uC;
         if (abs(dot(dd, uU)) > uH.x || abs(dot(dd, uV)) > uH.y || abs(dot(dd, uW)) > uH.z) discard;`)
       .replace("#include <output_fragment>", `
+        if (uLeer < 0.5 && dot(vNorL, vNorL) > 0.25 && abs(dot(normalize(vNorL), uW)) < 0.6) outgoingLight = uFondo;   // cantos: del color del fondo
         if (uLeer > 0.5) {
           float fila = floor((vLoc.z - uZ0) / uAlza);
           float r = dot(vLoc - (uC0 + uSube * fila), uDer) * uSigno;
@@ -2179,7 +2199,7 @@ function iniciarVelo(d, regreso) {
     if (mostrar.has(o)) { if (d.L.tipo !== "cartel") { materiales.push([o, o.material]); o.material = materialVelo(mostrar.get(o), d.L, fondo); } }
     else { ocultos.push(o); o.visible = false; }
   });
-  velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + d.L.segundos * 1000, regreso };
+  velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + (d.L.tipo === "texto" ? Math.max(d.L.segundos, 90) : d.L.segundos) * 1000, regreso };
   if (d.L.escalera) {
     const espejo = d.W.determinant() < 0;
     const guion = guionEscalera(d.L.escalera, espejo);
@@ -2193,6 +2213,7 @@ function iniciarVelo(d, regreso) {
   scene.background = fondo;
   capaVelo.style.background = "#" + fondo.getHexString();
   capaVelo.style.transition = "none";
+  document.body.classList.add("leyendo");
   capaVelo.style.opacity = 1;                      // se entra desde el plano de color…
   requestAnimationFrame(() => { capaVelo.style.transition = "opacity .5s"; capaVelo.style.opacity = 0; });   // …y aparece el texto
 }
@@ -2207,6 +2228,7 @@ function terminarVelo() {
     for (const [o, m] of v.materiales) { o.material.dispose(); o.material = m; }
     scene.fog = v.niebla;
     scene.background = null;
+    document.body.classList.remove("leyendo");
     capaVelo.style.opacity = 0;                    // se levanta el velo y el lector queda suelto
     const r = v.regreso;
     if (!r) { ponerModo("orbitar"); return; }
@@ -2336,6 +2358,11 @@ const VR = (() => {
   const VIS = { sep: num("sep", LS("sep", VIS_BASE.sep)), fov: num("fov", LS("fov", VIS_BASE.fov)), dist: num("dist", LS("dist", VIS_BASE.dist)),
                 ojos: num("ojos", LS("ojos", VIS_BASE.ojos)) };
   window.__visVR = VIS;                                  // el onboarding usa la misma separación
+  // los muros se leen con el campo de visión del visor y más margen (los bordes de las lentes se ven borrosos)
+  FOV_LECTURA = () => {
+    const W = innerWidth, H = innerHeight, sepPx = VIS.sep * W, vw = Math.max(50, Math.min(sepPx, W - sepPx));
+    return { f: VIS.fov, a: vw / H, m: 1.45 };
+  };
 
   // ---------- Una imagen por ojo, centrada en su lente y con deformación de barril ----------
   const tipoRT = renderer.capabilities.isWebGL2 ? THREE.HalfFloatType : THREE.UnsignedByteType;
@@ -2504,7 +2531,7 @@ const VR = (() => {
       if (ap(4)) gira = -1;
       if (ap(5)) gira = 1;
       if (!cal) { if (ap(14)) gira = -1; if (ap(15)) gira = 1; if (ap(12)) y = -1; if (ap(13)) y = 1; }
-      if (std) { rapido = Math.max(rapido, B[7] ? B[7].value : 0); if (ap(9)) options = true; }
+      if (std) { rapido = Math.max(rapido, B[7] ? B[7].value : 0); if (ap(9)) options = ap(8) ? "recargar" : true; }
       B.forEach((b, i) => {
         const k = g.index + ":" + i, on = ap(i);
         if (on && !antes.get(k)) {
@@ -2524,7 +2551,7 @@ const VR = (() => {
     if (teclas.has("ShiftLeft") || teclas.has("ShiftRight")) rapido = 1;
     if (tocando && performance.now() - tocando.t > 350) y -= 1;   // mantener tocada la pantalla camina
     optionsT = options ? optionsT + dt : 0;
-    return { x: THREE.MathUtils.clamp(x, -1, 1), y: THREE.MathUtils.clamp(y, -1, 1), gira, rapido, eventos, mx, my };
+    return { x: THREE.MathUtils.clamp(x, -1, 1), y: THREE.MathUtils.clamp(y, -1, 1), gira, rapido, eventos, mx, my, options };
   }
   const colaEventos = [];
   addEventListener("keydown", (e) => {
@@ -2546,8 +2573,23 @@ const VR = (() => {
     try { if (navigator.wakeLock && !window.__wakeVR) navigator.wakeLock.request("screen").then((w) => { window.__wakeVR = w; w.addEventListener("release", () => { window.__wakeVR = null; }); }).catch(nada); } catch (_) {}
   }
   window.__pantallaCompletaVR = pantallaCompleta;
+  // Sonido: el navegador solo deja arrancar el audio con un toque en la pantalla (el control no cuenta). Con el primer
+  // toque se crea el contexto, y el sonido del sitio (botón «Sonido», oculto) suena desde que se entra al espacio.
+  function despertarAudio() {
+    try {
+      if (!window.__ctxVR) window.__ctxVR = new (window.AudioContext || window.webkitAudioContext)();
+      if (window.__ctxVR.state !== "running") window.__ctxVR.resume().catch(() => {});
+    } catch (_) {}
+  }
+  window.__despertarAudioVR = despertarAudio;
+  function sonido(prender) {
+    const encendido = botonSonido.getAttribute("aria-pressed") === "true";
+    if (prender && !encendido && window.__ctxVR) botonSonido.onclick();
+    else if (!prender && encendido) botonSonido.onclick();
+  }
   addEventListener("pointerdown", (e) => {
     pantallaCompleta();
+    despertarAudio();
     if (onb()) return;
     e.stopPropagation();
     if (e.pointerType === "mouse" && sinGiro()) arrastreVR = { x: e.clientX, y: e.clientY, mov: 0 };
@@ -2618,7 +2660,11 @@ const VR = (() => {
     if (ahora - tFps > 1000) { fps = Math.round(cuadros * 1000 / (ahora - tFps)); cuadros = 0; tFps = ahora; }
     const c = leerControl(dt);
     if (optionsT > 0 && optionsT - dt <= 0) aviso("Mantené Options para volver al principio…", 1.6);
-    if (optionsT > 1.5) { optionsT = -1e9; aviso("Volviendo al principio…", 5); setTimeout(() => location.reload(), 250); }
+    if (optionsT > 1.5) {
+      optionsT = -1e9;
+      if (c.options === "recargar") { aviso("Recargando…", 5); setTimeout(() => location.reload(), 250); }
+      else if (window.__onbVR && window.__onbVR.reabrir) { sonido(false); window.__onbVR.reabrir(); }
+    }
     if (onb()) { colaEventos.length = 0; return; }
     for (const e of [...c.eventos, ...colaEventos.splice(0)]) evento(e);
 
@@ -2646,6 +2692,7 @@ const VR = (() => {
         camera.position.copy(v.d.p);
         marcoDePose(v.d.q);
         if (v.alTerminar) v.alTerminar();
+        if (velo && !velo.esc) aviso("✕ para volver", 3);
         if (modo === "caminar" && !velo) { ponerMarco(cuerpo.U, cuerpo.H); ultimoPies.copy(cuerpo.pies); }
       });
       orientar();
@@ -2694,6 +2741,7 @@ const VR = (() => {
     irAEntrada("+++", "z");
     aparecer = 0.45; negro.material.opacity = 1;
     aviso(dondeEstoy(), 4);
+    sonido(true);
   }
   function empezar() {
     irAEntrada("+++", "z");
@@ -2794,7 +2842,7 @@ addEventListener("resize", ajustarTamano);
 (function () {
   "use strict";
   const ESCENAS = [
-    { id: "vr-hero", loop: true, pie: "<b>✕</b> empezar · o tocá la pantalla" },
+    { id: "vr-hero", loop: true, pie: "Tocá la pantalla · después <b>✕</b> empezar" },
     { id: "vr-proyecto" }, { id: "vr-instancia" }, { id: "vr-control" }, { id: "vr-recorrer" }, { id: "vr-leer" },
     { id: "vr-entrar", loop: true, entrar: true },
   ];
@@ -2955,11 +3003,19 @@ addEventListener("resize", ajustarTamano);
     else if (e.key === "Escape") ir(ESCENAS.length - 1);
   }, true);
   capa.addEventListener("pointerup", () => {
+    // el primer toque: pantalla completa y el audio (el control no cuenta como gesto para el navegador)
+    try {
+      if (!window.__ctxVR) window.__ctxVR = new (window.AudioContext || window.webkitAudioContext)();
+      if (window.__ctxVR.state !== "running") window.__ctxVR.resume().catch(() => {});
+    } catch (_) {}
     if (window.__pantallaCompletaVR) window.__pantallaCompletaVR();
     else if (!document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
     seguir();
   });
 
+  estado.reabrir = abrir;                         // Options mantenido: vuelve al principio sin recargar
+  // instalable (Agregar a la pantalla principal → Instalar): se abre a pantalla completa, sin la barra del navegador
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("vr/sw.js", { scope: "vr/" }).catch(() => {});
   if (!/[?&]sinintro/.test(location.search)) abrir();
   else { estado.abierto = false; capa.hidden = true; const esperar = () => (window.VRvisor && window.__vrListo ? window.VRvisor.entrar() : setTimeout(esperar, 300)); esperar(); }
 })();
