@@ -2794,11 +2794,11 @@ function iniciarVelo(d, regreso) {
   }
   velo.mostrados = aVelo; velo.fondo = fondo; velo.cartel = d.L.tipo === "cartel";
   document.body.classList.add("leyendo");
-  if (!window.VRvisor) {
+  {
     const DUR = 1600;
     velo.fin += DUR;
     if (velo.esc) velo.esc.t0 += DUR;
-    empezarFundidoVelo(true, aVelo, fondo, velo.cartel, DUR, () => { if (velo && velo.lectura === d) aplicarVelo(); });
+    empezarFundidoVelo(true, aVelo, fondo, velo.cartel, DUR, null);     // queda puesta mientras dure la lectura
     return;
   }
   aplicarVelo();
@@ -2830,36 +2830,38 @@ function terminarFundidoVelo() {
   fundidoVelo = null;
   if (f.alFin) f.alFin();
 }
-function dibujarFundidoVelo() {
+const OPACIDAD_VELO = 0.6;
+function dibujarFundidoVelo(cam) {
+  if (window.VRvisor && !cam) return;               // en el VR se dibuja en cada ojo (vr_visor.js)
   const f = fundidoVelo;
   if (!f) return;
   let u = Math.min(1, (performance.now() - f.t0) / f.dur);
   u = u * u * (3 - 2 * u);
   const a = f.entra ? u : 1 - u;
   cortina.material.color.copy(f.fondo);
-  cortina.material.opacity = a;
+  cortina.material.opacity = OPACIDAD_VELO * a;
   if (!f.cartel) for (const [, m] of f.pares) m.opacity = a;
   renderer.autoClear = false;
   renderer.render(escenaCortina, camCortina);
   renderer.clearDepth();
-  renderer.render(f.escena, camera);
+  renderer.render(f.escena, cam || camera);
   renderer.autoClear = true;
-  if (performance.now() - f.t0 >= f.dur) terminarFundidoVelo();
+  if (!f.entra && performance.now() - f.t0 >= f.dur) terminarFundidoVelo();
 }
 function terminarVelo() {
   if (!velo) return;
   const v = velo;
   velo = null;
-  if (!window.VRvisor) {
-    const entrando = fundidoVelo && fundidoVelo.entra;
-    if (entrando) fundidoVelo = null;                 // se cortó mientras entraba: no llegó a aplicarse
+  if (true) {
     for (const o of v.ocultos) o.visible = true;
     for (const [o, m] of v.materiales) o.material = m;
     scene.fog = v.niebla;
     scene.background = null;
     const tirar = () => { if (!v.cartel) for (const [, m] of v.mostrados) m.dispose(); };
-    if (entrando) tirar();
-    else empezarFundidoVelo(false, v.mostrados, v.fondo, v.cartel, 1100, tirar);
+    // sale desde donde estaba (si se cortó mientras entraba, más corto)
+    const f0 = fundidoVelo, a0 = f0 && f0.entra ? Math.min(1, (performance.now() - f0.t0) / f0.dur) : 1;
+    fundidoVelo = null;
+    empezarFundidoVelo(false, v.mostrados, v.fondo, v.cartel, 1100 * Math.max(0.25, a0), tirar);
   } else {
     capaVelo.style.transition = "opacity .35s";
     capaVelo.style.opacity = 1;
@@ -3243,6 +3245,7 @@ canvas { cursor: default; }`;
         camera.position.copy(d.pose.p).addScaledVector(dir, -p.cerca).addScaledVector(up, p.cerca * 0.25);
         camera.quaternion.copy(q); camera.up.copy(up); camera.fov = d.pose.f; camera.updateProjectionMatrix();
       }
+      escribirSala(d.r);                              // la habitación de la lectura, escrita antes del viaje (si no, el texto aparecía recién en el velo)
       irALectura(d);
       rep.lectura = d;
       rep.llego = 0; rep.finLect = 0;
