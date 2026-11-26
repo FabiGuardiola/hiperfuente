@@ -1467,6 +1467,174 @@ function revisarEscritura() {
 }
 revisarEscritura();
 
+// ---------- Los retratos del mausoleo (2026-11-26) ----------
+// El paño «Los retratos» tiene seis marcos («de Beatriz Viterbo, según el bolso»): de frente, de perfil, con antifaz,
+// la primera comunión, Quilmes con el pequinés y la de la boda, que falta (marco en trazos, sin imagen). Los cinco
+// retratos se dibujan acá, a mano alzada en carbón con algún toque de lacre sobre papel envejecido, y van en los
+// marcos de las 24 estructuras. La posición sale de la caja de la lectura del paño (la medida del 17) y de la
+// composición de _retratos() en entrelazado_plan.py: marcos de (W - 0,3) / 2 × 0,9 m, desde y = 1,0, cada 1,35 m.
+{
+  const L = (datos.lecturas || []).find((l) => l.titulo === "Mausoleo · Los retratos");
+  if (L && L.caja) {
+    const k = L.caja, V = (a) => new THREE.Vector3(...a);
+    const c = V(k.c), u = V(k.u), v = V(k.v), w = V(k.w), hx = k.h[0] - 0.1, hy = k.h[1] - 0.1;   // la caja de la lectura tiene 10 cm de margen
+    const W = 2 * hx, ancho = (W - 0.3) / 2, g = 0.025;
+    const Y_ABAJO = 4.94;              // en el paño, el borde de abajo de la caja (la nota de la última fila)
+
+    // ---- dibujo: trazos suaves (Catmull-Rom) repasados dos veces con un temblor fijo ----
+    const PX = 400, PY = 600, ALTO_LZ = 760;     // el dibujo es de 400 × 600; el lienzo, del alto del marco
+    let semilla = 7;
+    const azar = () => { semilla = (semilla * 16807) % 2147483647; return semilla / 2147483647 - 0.5; };
+    const CARBON = "#2a2724", LACRE = "#9B3D2E", PAPEL = "#ddd4c2";
+    function trazo(g2, pts, color = CARBON, ancho_ = 3, cerrado = false) {
+      for (let pasada = 0; pasada < 2; pasada++) {
+        const P = pts.map(([x, y]) => [x * PX + azar() * 3, y * PY + azar() * 3]);
+        if (cerrado) P.push(P[0], P[1]);
+        g2.beginPath();
+        g2.moveTo(...P[0]);
+        for (let i = 0; i < P.length - 1; i++) {
+          const a = P[Math.max(0, i - 1)], b = P[i], c2 = P[i + 1], d = P[Math.min(P.length - 1, i + 2)];
+          g2.bezierCurveTo(b[0] + (c2[0] - a[0]) / 6, b[1] + (c2[1] - a[1]) / 6, c2[0] - (d[0] - b[0]) / 6, c2[1] - (d[1] - b[1]) / 6, c2[0], c2[1]);
+        }
+        g2.strokeStyle = color; g2.globalAlpha = pasada ? 0.55 : 0.9; g2.lineWidth = pasada ? ancho_ * 0.6 : ancho_;
+        g2.lineCap = "round"; g2.lineJoin = "round";
+        g2.stroke();
+      }
+      g2.globalAlpha = 1;
+    }
+    function relleno(g2, pts, color) {
+      g2.beginPath(); g2.moveTo(pts[0][0] * PX, pts[0][1] * PY);
+      for (const [x, y] of pts.slice(1)) g2.lineTo(x * PX, y * PY);
+      g2.closePath(); g2.fillStyle = color; g2.fill();
+    }
+    const punto = (g2, x, y, r, color = CARBON) => { g2.beginPath(); g2.arc(x * PX, y * PY, r, 0, 7); g2.fillStyle = color; g2.fill(); };
+    function papel(g2) {
+      g2.fillStyle = PAPEL; g2.fillRect(0, 0, PX, PY);
+      for (let i = 0; i < 2600; i++) {                     // grano de fotocopia
+        g2.fillStyle = `rgba(60,50,40,${(0.04 + (azar() + 0.5) * 0.08).toFixed(3)})`;
+        g2.fillRect((azar() + 0.5) * PX, (azar() + 0.5) * PY, 1.5, 1.5);
+      }
+      const v = g2.createRadialGradient(PX / 2, PY / 2, PY * 0.25, PX / 2, PY / 2, PY * 0.7);
+      v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(70,55,40,0.28)");
+      g2.fillStyle = v; g2.fillRect(0, 0, PX, PY);
+    }
+    // la cara de frente (para «de frente» y «con antifaz»)
+    function caraFrente(g2, antifaz) {
+      trazo(g2, [[0.335, 0.40], [0.35, 0.50], [0.40, 0.58], [0.50, 0.62], [0.60, 0.58], [0.65, 0.50], [0.665, 0.40]]);
+      trazo(g2, [[0.36, 0.52], [0.31, 0.50], [0.30, 0.42], [0.32, 0.22], [0.42, 0.13], [0.50, 0.12], [0.60, 0.13], [0.68, 0.22], [0.70, 0.42], [0.69, 0.50], [0.64, 0.52]], CARBON, 3.5);
+      trazo(g2, [[0.34, 0.28], [0.45, 0.31], [0.56, 0.29], [0.66, 0.30]]);
+      if (antifaz) {
+        const m = [[0.35, 0.37], [0.42, 0.335], [0.5, 0.365], [0.58, 0.335], [0.65, 0.37], [0.63, 0.425], [0.55, 0.435], [0.5, 0.405], [0.45, 0.435], [0.37, 0.425]];
+        relleno(g2, m, LACRE);
+        g2.fillStyle = PAPEL;
+        for (const x of [0.44, 0.56]) { g2.beginPath(); g2.ellipse(x * PX, 0.388 * PY, 0.028 * PX, 0.011 * PY, 0, 0, 7); g2.fill(); }
+        trazo(g2, [[0.65, 0.375], [0.74, 0.35], [0.80, 0.40], [0.78, 0.47]], LACRE, 3);
+        trazo(g2, [[0.65, 0.39], [0.72, 0.42], [0.73, 0.50]], LACRE, 2.5);
+      } else {
+        trazo(g2, [[0.40, 0.35], [0.44, 0.34], [0.47, 0.35]], CARBON, 2.5);
+        trazo(g2, [[0.53, 0.35], [0.56, 0.34], [0.60, 0.35]], CARBON, 2.5);
+        trazo(g2, [[0.41, 0.385], [0.44, 0.375], [0.47, 0.385]], CARBON, 2.5);
+        trazo(g2, [[0.53, 0.385], [0.56, 0.375], [0.59, 0.385]], CARBON, 2.5);
+        punto(g2, 0.44, 0.383, 3); punto(g2, 0.56, 0.383, 3);
+      }
+      trazo(g2, [[0.50, 0.40], [0.495, 0.46], [0.51, 0.47]], CARBON, 2.5);
+      trazo(g2, [[0.46, 0.53], [0.50, 0.52], [0.54, 0.53], [0.50, 0.545], [0.46, 0.53]], LACRE, 3);
+      trazo(g2, [[0.45, 0.61], [0.45, 0.70]]); trazo(g2, [[0.55, 0.61], [0.55, 0.70]]);
+      trazo(g2, [[0.45, 0.70], [0.30, 0.74], [0.18, 0.82], [0.12, 0.98]]);
+      trazo(g2, [[0.55, 0.70], [0.70, 0.74], [0.82, 0.82], [0.88, 0.98]]);
+      trazo(g2, [[0.40, 0.72], [0.50, 0.85], [0.60, 0.72]]);
+    }
+    const DIBUJOS = [
+      (g2) => caraFrente(g2, false),                                         // de frente
+      (g2) => {                                                               // de perfil (mira a la izquierda)
+        trazo(g2, [[0.47, 0.19], [0.43, 0.27], [0.42, 0.34], [0.40, 0.39], [0.37, 0.44], [0.41, 0.46], [0.40, 0.49], [0.42, 0.505],
+                   [0.405, 0.52], [0.43, 0.55], [0.43, 0.58], [0.48, 0.61], [0.57, 0.585]]);
+        trazo(g2, [[0.47, 0.19], [0.55, 0.12], [0.66, 0.14], [0.73, 0.24], [0.74, 0.38], [0.72, 0.50], [0.65, 0.54], [0.58, 0.52]], CARBON, 3.5);
+        trazo(g2, [[0.47, 0.20], [0.56, 0.23], [0.62, 0.30]], CARBON, 2);
+        trazo(g2, [[0.60, 0.40], [0.635, 0.42], [0.625, 0.47], [0.595, 0.47]], CARBON, 2.5);
+        trazo(g2, [[0.425, 0.37], [0.45, 0.372]], CARBON, 2.5);
+        trazo(g2, [[0.42, 0.35], [0.46, 0.345]], CARBON, 2);
+        punto(g2, 0.615, 0.50, 5, LACRE);
+        trazo(g2, [[0.48, 0.61], [0.47, 0.72]]); trazo(g2, [[0.64, 0.55], [0.64, 0.70]]);
+        trazo(g2, [[0.47, 0.72], [0.36, 0.80], [0.30, 0.98]]);
+        trazo(g2, [[0.64, 0.70], [0.78, 0.76], [0.88, 0.98]]);
+      },
+      (g2) => caraFrente(g2, true),                                          // con antifaz
+      (g2) => {                                                               // la primera comunión, de blanco
+        trazo(g2, [[0.15, 0.93], [0.85, 0.93]], CARBON, 2);
+        trazo(g2, [[0.50, 0.145], [0.565, 0.17], [0.575, 0.23], [0.54, 0.285], [0.50, 0.295], [0.46, 0.285], [0.425, 0.23], [0.435, 0.17], [0.50, 0.145]]);
+        for (let i = 0; i < 6; i++) punto(g2, 0.43 + i * 0.028, 0.155 - Math.sin(i / 5 * Math.PI) * 0.01, 4, LACRE);   // la corona
+        trazo(g2, [[0.44, 0.16], [0.36, 0.30], [0.30, 0.50], [0.27, 0.66]], CARBON, 2);                              // el velo
+        trazo(g2, [[0.56, 0.16], [0.64, 0.30], [0.70, 0.50], [0.73, 0.66]], CARBON, 2);
+        punto(g2, 0.475, 0.22, 2.5); punto(g2, 0.525, 0.22, 2.5);
+        trazo(g2, [[0.485, 0.255], [0.50, 0.26], [0.515, 0.255]], LACRE, 2.5);
+        trazo(g2, [[0.47, 0.30], [0.42, 0.33], [0.40, 0.45], [0.34, 0.88], [0.66, 0.88], [0.60, 0.45], [0.58, 0.33], [0.53, 0.30]]);
+        trazo(g2, [[0.37, 0.70], [0.50, 0.72], [0.63, 0.70]], CARBON, 1.8);
+        trazo(g2, [[0.36, 0.80], [0.50, 0.82], [0.64, 0.80]], CARBON, 1.8);
+        trazo(g2, [[0.42, 0.36], [0.47, 0.48], [0.52, 0.50]], CARBON, 2.5);                                            // los brazos
+        trazo(g2, [[0.58, 0.36], [0.56, 0.47], [0.52, 0.50]], CARBON, 2.5);
+        trazo(g2, [[0.52, 0.36], [0.52, 0.58]], CARBON, 3);                                                             // la vela
+        trazo(g2, [[0.52, 0.355], [0.507, 0.33], [0.52, 0.30], [0.533, 0.33], [0.52, 0.355]], LACRE, 3);
+        trazo(g2, [[0.45, 0.88], [0.45, 0.92]], CARBON, 2.5); trazo(g2, [[0.55, 0.88], [0.55, 0.92]], CARBON, 2.5);
+      },
+      (g2) => {                                                               // Quilmes, con el pequinés
+        trazo(g2, [[0.03, 0.50], [0.97, 0.49]], CARBON, 1.6);
+        for (let i = 0; i < 5; i++) trazo(g2, [[0.06 + i * 0.18, 0.54 + (i % 2) * 0.03], [0.11 + i * 0.18, 0.53 + (i % 2) * 0.03], [0.16 + i * 0.18, 0.54 + (i % 2) * 0.03]], CARBON, 1.2);
+        // la figura tapa el horizonte
+        relleno(g2, [[0.47, 0.40], [0.47, 0.46], [0.32, 0.52], [0.24, 0.70], [0.20, 1.0], [0.82, 1.0], [0.78, 0.70], [0.69, 0.52], [0.54, 0.46], [0.54, 0.40]], PAPEL);
+        trazo(g2, [[0.33, 0.25], [0.40, 0.21], [0.44, 0.12], [0.56, 0.10], [0.62, 0.17], [0.66, 0.22], [0.71, 0.25]], CARBON, 3.5);   // el sombrero
+        trazo(g2, [[0.33, 0.25], [0.52, 0.27], [0.71, 0.25]], CARBON, 3);
+        trazo(g2, [[0.42, 0.28], [0.43, 0.35], [0.50, 0.40], [0.57, 0.35], [0.59, 0.28]]);
+        trazo(g2, [[0.445, 0.31], [0.475, 0.305]], CARBON, 2.5); trazo(g2, [[0.525, 0.305], [0.555, 0.31]], CARBON, 2.5);
+        trazo(g2, [[0.48, 0.352], [0.50, 0.362], [0.52, 0.352]], LACRE, 3);
+        trazo(g2, [[0.47, 0.40], [0.47, 0.46]]); trazo(g2, [[0.54, 0.40], [0.54, 0.46]]);
+        trazo(g2, [[0.47, 0.46], [0.32, 0.52], [0.24, 0.70], [0.20, 0.98]]);
+        trazo(g2, [[0.54, 0.46], [0.69, 0.52], [0.78, 0.70], [0.82, 0.98]]);
+        const perro = [];                                                     // el pequinés: un ovillo de pelo
+        for (let i = 0; i <= 16; i++) { const a = i / 16 * Math.PI * 2, r = 0.11 + (i % 2 ? 0.018 : 0); perro.push([0.52 + Math.cos(a) * r, 0.70 + Math.sin(a) * r * 0.75]); }
+        trazo(g2, perro, CARBON, 2.5);
+        trazo(g2, [[0.43, 0.64], [0.40, 0.70], [0.42, 0.76]], CARBON, 2.5); trazo(g2, [[0.61, 0.64], [0.64, 0.70], [0.62, 0.76]], CARBON, 2.5);
+        punto(g2, 0.49, 0.69, 3.5); punto(g2, 0.55, 0.69, 3.5); punto(g2, 0.52, 0.725, 4.5, LACRE);
+        trazo(g2, [[0.30, 0.80], [0.48, 0.86], [0.72, 0.79]], CARBON, 3);                                               // el brazo
+      },
+    ];
+
+    // ---- texturas y planos ----
+    const mats = DIBUJOS.map((dibujar, i) => {
+      semilla = 11 + i * 101;
+      const lz = document.createElement("canvas");
+      lz.width = PX; lz.height = ALTO_LZ;
+      const g2 = lz.getContext("2d");
+      g2.save(); g2.scale(1, ALTO_LZ / PY); papel(g2); g2.restore();
+      g2.translate(0, (ALTO_LZ - PY) / 2);
+      dibujar(g2);
+      const t = new THREE.CanvasTexture(lz);
+      t.encoding = THREE.sRGBEncoding;
+      t.anisotropy = 4;
+      return new THREE.MeshLambertMaterial({ map: t });
+    });
+    const geo = new THREE.PlaneGeometry(ancho - 2 * g, 0.9 - 2 * g);
+    const grupo = new THREE.Group();
+    for (let i = 0; i < 5; i++) {
+      const x0 = (i % 2) * (ancho + 0.3), y0 = 1.0 + Math.floor(i / 2) * 1.35;
+      const cx = x0 + ancho / 2, cy = y0 + 0.45;                      // centro del marco, en el paño (y hacia abajo)
+      const centro = c.clone().addScaledVector(u, cx - hx).addScaledVector(v, -hy + Y_ABAJO - cy).addScaledVector(w, -0.01);
+      const m = new THREE.Mesh(geo, mats[i]);
+      m.matrixAutoUpdate = false;
+      m.matrix.makeBasis(u, v, w).setPosition(centro);
+      m.receiveShadow = true;
+      grupo.add(m);
+    }
+    // en las 24 estructuras (las 8 habitaciones × 3 gravedades)
+    salasObj.forEach((sala) => GIROS.forEach((M, gi) => {
+      const copia = fijar(new THREE.Group(), M);
+      for (const m of grupo.children) { const n = m.clone(); copia.add(n); }
+      copia.userData.pieza = "RETRATOS"; copia.userData.g = gi;
+      sala.add(copia);
+    }));
+  }
+}
+
 document.getElementById("carga").hidden = true;
 window.__espacioAbierto = true;
 
@@ -2559,6 +2727,8 @@ function iniciarVelo(d, regreso) {
   const ocultos = [], materiales = [], aVelo = [];
   scene.traverse((o) => {
     if (!(o.isMesh || o.isLine || o.isSprite || o.isPoints) || !o.visible) return;
+    if (/retratos/i.test(d.L.titulo) && o.parent && o.parent.userData.pieza === "RETRATOS" && o.parent.parent === salasObj[d.r] &&
+        o.parent.userData.g === d.g) { aVelo.push([o, o.material.clone()]); return; }
     if (mostrar.has(o)) aVelo.push([o, d.L.tipo === "cartel" ? o.material : d.L.escalera ? materialLecturaEscalera(o.userData.mat, d.L) : materialVelo(mostrar.get(o), d.L, fondo)]);
     else ocultos.push(o);
   });
