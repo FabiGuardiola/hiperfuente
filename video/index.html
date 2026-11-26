@@ -3119,7 +3119,7 @@ canvas { cursor: default; }`;
     if (velo) { velo.regreso = null; terminarVelo(); }
     ponerModo("orbitar");
     orbita.enabled = false;
-    rep = { pasos, i: -1, nombre, abre: tomas[0].abre ?? 1.0, cierra: tomas[tomas.length - 1].cierra ?? 1.0 };
+    rep = { pasos, i: -1, nombre, abre: tomas[0].abre ?? 0, cierra: tomas[tomas.length - 1].cierra ?? 0 };   // sin negro al empezar ni al terminar (2026-11-26)
     quedaNegro = false;
     avisoE.style.opacity = 0;
     siguiente();
@@ -3159,7 +3159,7 @@ canvas { cursor: default; }`;
     const final = rep;
     rep = null;
     negroN = 0;
-    quedaNegro = !!(final && final.cierra);               // queda en negro hasta la próxima instancia (o hasta que se mueva la cámara)
+    quedaNegro = false;                                   // queda quieta en su último cuadro hasta la próxima instancia
     const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     orbita.target.copy(camera.position).addScaledVector(delante, 30);
     camera.up.set(0, 1, 0);
@@ -3185,8 +3185,6 @@ canvas { cursor: default; }`;
     else negroM.color.set("#000");
     if (rep.i === 0 && rep.abre) n = Math.max(n, 1 - s / rep.abre);
     if (rep.i === rep.pasos.length - 1 && rep.cierra && !p.lectura) n = Math.max(n, 1 - (dur - s) / rep.cierra);
-    if (p.lectura && rep.llego) n = Math.max(n, 1 - ((p.seg || 10) - (performance.now() - rep.llego) / 1000) / 0.8);
-    if (rep.trasLectura) n = Math.max(n, 1 - s / 0.8);
     if (p.cartel) n = Math.max(n, p.sobreNegro === false ? 0 : 1);
     negroN = n;
     cartelC = 0;
@@ -3651,7 +3649,7 @@ window.TOMAS_VIDEO = (() => {
     { nombre: "06 · Otra escalera, más rápido", pasos: [
       { lectura: "Escalera E1", seg: 9, vel: 1.7 },
     ] },
-    { nombre: "07 · Paneo caótico hacia arriba", cierra: 0.5, pasos: [
+    { nombre: "07 · Paneo caótico hacia arriba", pasos: [
       { vel: 1.2, camino: [
         { p: [28, 30, ojo], m: [28, 46, 8], u: [0, 0, 1], lente: 18, t: 0 },
         { p: [29, 31, ojo + 0.5], m: [30, 40, 30], u: [0.3, 0, 0.95], lente: 18, t: 2.2 },
