@@ -2555,12 +2555,18 @@ function iniciarVelo(d, regreso) {
   const colores = [...mostrar.values()];
   const claro = colores.filter((c) => c.r + c.g + c.b > 0.9 || (c.r > 0.25 && c.g < 0.1)).length > colores.length / 2;
   const fondo = claro || d.L.escalera || d.L.tipo === "cartel" ? NEGRO : PAPEL;
-  const ocultos = [], materiales = [];
+  const ocultos = [], materiales = [], aVelo = [];
   scene.traverse((o) => {
     if (!(o.isMesh || o.isLine || o.isSprite || o.isPoints) || !o.visible) return;
-    if (mostrar.has(o)) { if (d.L.tipo !== "cartel") { materiales.push([o, o.material]); o.material = d.L.escalera ? materialLecturaEscalera(o.userData.mat, d.L) : materialVelo(mostrar.get(o), d.L, fondo); } }
-    else { ocultos.push(o); o.visible = false; }
+    if (mostrar.has(o)) aVelo.push([o, d.L.tipo === "cartel" ? o.material : d.L.escalera ? materialLecturaEscalera(o.userData.mat, d.L) : materialVelo(mostrar.get(o), d.L, fondo)]);
+    else ocultos.push(o);
   });
+  const aplicarVelo = () => {
+    for (const o of ocultos) o.visible = false;
+    if (d.L.tipo !== "cartel") for (const [o, m] of aVelo) { materiales.push([o, o.material]); m.opacity = 1; o.material = m; }
+    scene.fog = null;
+    scene.background = fondo;
+  };
   velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + (d.L.tipo === "texto" ? Math.max(d.L.segundos, 90) : d.L.segundos) * 1000, regreso, lectura: d };
   if (d.L.escalera) {
     const espejo = d.W.determinant() < 0;
@@ -2571,25 +2577,85 @@ function iniciarVelo(d, regreso) {
     uLect.signo.value = espejo ? -1 : 1;
     uLect.fila.value = 0; uLect.pal.value.set(-99, -99); uLect.brillo.value = 0;
   }
-  scene.fog = null;
-  scene.background = fondo;
+  velo.mostrados = aVelo; velo.fondo = fondo; velo.cartel = d.L.tipo === "cartel";
+  document.body.classList.add("leyendo");
+  if (!window.VRvisor) {
+    const DUR = 1600;
+    velo.fin += DUR;
+    if (velo.esc) velo.esc.t0 += DUR;
+    empezarFundidoVelo(true, aVelo, fondo, velo.cartel, DUR, () => { if (velo && velo.lectura === d) aplicarVelo(); });
+    return;
+  }
+  aplicarVelo();
   capaVelo.style.background = "#" + fondo.getHexString();
   capaVelo.style.transition = "none";
-  document.body.classList.add("leyendo");
   capaVelo.style.opacity = 1;                      // se entra desde el plano de color…
   requestAnimationFrame(() => { capaVelo.style.transition = "opacity .5s"; capaVelo.style.opacity = 0; });   // …y aparece el texto
+}
+// La cortina: un plano del color del fondo delante de todo, y encima, el texto (con el material del velo).
+const cortina = new THREE.Mesh(new THREE.PlaneGeometry(2, 2),
+  new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false, toneMapped: false }));
+const escenaCortina = new THREE.Scene().add(cortina), camCortina = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+let fundidoVelo = null;
+function empezarFundidoVelo(entra, pares, fondo, cartel, dur, alFin) {
+  if (fundidoVelo) terminarFundidoVelo();
+  const escena = new THREE.Scene();
+  for (const [o, m] of pares) {
+    if (!o.isMesh) continue;
+    if (!cartel) m.transparent = true;
+    const c = new THREE.Mesh(o.geometry, m);
+    c.matrixAutoUpdate = false;
+    c.matrix.copy(o.matrixWorld);
+    escena.add(c);
+  }
+  fundidoVelo = { entra, t0: performance.now(), dur, escena, pares, fondo, cartel, alFin };
+}
+function terminarFundidoVelo() {
+  const f = fundidoVelo;
+  fundidoVelo = null;
+  if (f.alFin) f.alFin();
+}
+function dibujarFundidoVelo() {
+  const f = fundidoVelo;
+  if (!f) return;
+  let u = Math.min(1, (performance.now() - f.t0) / f.dur);
+  u = u * u * (3 - 2 * u);
+  const a = f.entra ? u : 1 - u;
+  cortina.material.color.copy(f.fondo);
+  cortina.material.opacity = a;
+  if (!f.cartel) for (const [, m] of f.pares) m.opacity = a;
+  renderer.autoClear = false;
+  renderer.render(escenaCortina, camCortina);
+  renderer.clearDepth();
+  renderer.render(f.escena, camera);
+  renderer.autoClear = true;
+  if (performance.now() - f.t0 >= f.dur) terminarFundidoVelo();
 }
 function terminarVelo() {
   if (!velo) return;
   const v = velo;
   velo = null;
-  capaVelo.style.transition = "opacity .35s";
-  capaVelo.style.opacity = 1;
-  setTimeout(() => {
+  if (!window.VRvisor) {
+    const entrando = fundidoVelo && fundidoVelo.entra;
+    if (entrando) fundidoVelo = null;                 // se cortó mientras entraba: no llegó a aplicarse
     for (const o of v.ocultos) o.visible = true;
-    for (const [o, m] of v.materiales) { o.material.dispose(); o.material = m; }
+    for (const [o, m] of v.materiales) o.material = m;
     scene.fog = v.niebla;
     scene.background = null;
+    const tirar = () => { if (!v.cartel) for (const [, m] of v.mostrados) m.dispose(); };
+    if (entrando) tirar();
+    else empezarFundidoVelo(false, v.mostrados, v.fondo, v.cartel, 1100, tirar);
+  } else {
+    capaVelo.style.transition = "opacity .35s";
+    capaVelo.style.opacity = 1;
+  }
+  setTimeout(() => {
+    if (window.VRvisor) {
+      for (const o of v.ocultos) o.visible = true;
+      for (const [o, m] of v.materiales) { o.material.dispose(); o.material = m; }
+      scene.fog = v.niebla;
+      scene.background = null;
+    }
     document.body.classList.remove("leyendo");
     capaVelo.style.opacity = 0;                    // se levanta el velo y el lector queda suelto
     if (v.lectura) { const c = caratulaDe(v.lectura); if (c.sigue) { notaTitulo.textContent = "Sigue · " + c.voz; notaTexto.textContent = c.sigue; nota.hidden = false; } }
@@ -3169,6 +3235,7 @@ function cuadro() {
   if (velo && performance.now() > velo.fin) terminarVelo();
   cielo.position.copy(camera.position);
   VR.dibujar();
+  dibujarFundidoVelo();
 }
 function bucle() { cuadro(); requestAnimationFrame(bucle); }
 VR.empezar();

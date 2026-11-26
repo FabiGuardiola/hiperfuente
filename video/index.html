@@ -2142,7 +2142,7 @@ botonSonido.onclick = async () => {
     if (!audio) {
       const Contexto = window.AudioContext || window.webkitAudioContext;
       const ctx = new Contexto();
-      const bus = window.Audio24.makeBus(ctx, ctx.destination);
+      const bus = window.Audio24.makeBus(ctx, VID.salidaAudio(ctx));
       const motores = [0, 1, 2].map((q) => window.Audio24.makeEngine(ctx, bus.in, window.Audio24.TIMBRES[q]));
       motores.forEach((m) => m.fadeIn(ctx.currentTime));
       audio = { ctx, bus, motores, sp: null, plagal: false, frase: 0, prox: 0 };
@@ -2552,12 +2552,18 @@ function iniciarVelo(d, regreso) {
   const colores = [...mostrar.values()];
   const claro = colores.filter((c) => c.r + c.g + c.b > 0.9 || (c.r > 0.25 && c.g < 0.1)).length > colores.length / 2;
   const fondo = claro || d.L.escalera || d.L.tipo === "cartel" ? NEGRO : PAPEL;
-  const ocultos = [], materiales = [];
+  const ocultos = [], materiales = [], aVelo = [];
   scene.traverse((o) => {
     if (!(o.isMesh || o.isLine || o.isSprite || o.isPoints) || !o.visible) return;
-    if (mostrar.has(o)) { if (d.L.tipo !== "cartel") { materiales.push([o, o.material]); o.material = d.L.escalera ? materialLecturaEscalera(o.userData.mat, d.L) : materialVelo(mostrar.get(o), d.L, fondo); } }
-    else { ocultos.push(o); o.visible = false; }
+    if (mostrar.has(o)) aVelo.push([o, d.L.tipo === "cartel" ? o.material : d.L.escalera ? materialLecturaEscalera(o.userData.mat, d.L) : materialVelo(mostrar.get(o), d.L, fondo)]);
+    else ocultos.push(o);
   });
+  const aplicarVelo = () => {
+    for (const o of ocultos) o.visible = false;
+    if (d.L.tipo !== "cartel") for (const [o, m] of aVelo) { materiales.push([o, o.material]); m.opacity = 1; o.material = m; }
+    scene.fog = null;
+    scene.background = fondo;
+  };
   velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + (d.L.tipo === "texto" ? Math.max(d.L.segundos, 90) : d.L.segundos) * 1000, regreso, lectura: d };
   if (d.L.escalera) {
     const espejo = d.W.determinant() < 0;
@@ -2568,25 +2574,85 @@ function iniciarVelo(d, regreso) {
     uLect.signo.value = espejo ? -1 : 1;
     uLect.fila.value = 0; uLect.pal.value.set(-99, -99); uLect.brillo.value = 0;
   }
-  scene.fog = null;
-  scene.background = fondo;
+  velo.mostrados = aVelo; velo.fondo = fondo; velo.cartel = d.L.tipo === "cartel";
+  document.body.classList.add("leyendo");
+  if (!window.VRvisor) {
+    const DUR = 1600;
+    velo.fin += DUR;
+    if (velo.esc) velo.esc.t0 += DUR;
+    empezarFundidoVelo(true, aVelo, fondo, velo.cartel, DUR, () => { if (velo && velo.lectura === d) aplicarVelo(); });
+    return;
+  }
+  aplicarVelo();
   capaVelo.style.background = "#" + fondo.getHexString();
   capaVelo.style.transition = "none";
-  document.body.classList.add("leyendo");
   capaVelo.style.opacity = 1;                      // se entra desde el plano de color…
   requestAnimationFrame(() => { capaVelo.style.transition = "opacity .5s"; capaVelo.style.opacity = 0; });   // …y aparece el texto
+}
+// La cortina: un plano del color del fondo delante de todo, y encima, el texto (con el material del velo).
+const cortina = new THREE.Mesh(new THREE.PlaneGeometry(2, 2),
+  new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false, toneMapped: false }));
+const escenaCortina = new THREE.Scene().add(cortina), camCortina = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+let fundidoVelo = null;
+function empezarFundidoVelo(entra, pares, fondo, cartel, dur, alFin) {
+  if (fundidoVelo) terminarFundidoVelo();
+  const escena = new THREE.Scene();
+  for (const [o, m] of pares) {
+    if (!o.isMesh) continue;
+    if (!cartel) m.transparent = true;
+    const c = new THREE.Mesh(o.geometry, m);
+    c.matrixAutoUpdate = false;
+    c.matrix.copy(o.matrixWorld);
+    escena.add(c);
+  }
+  fundidoVelo = { entra, t0: performance.now(), dur, escena, pares, fondo, cartel, alFin };
+}
+function terminarFundidoVelo() {
+  const f = fundidoVelo;
+  fundidoVelo = null;
+  if (f.alFin) f.alFin();
+}
+function dibujarFundidoVelo() {
+  const f = fundidoVelo;
+  if (!f) return;
+  let u = Math.min(1, (performance.now() - f.t0) / f.dur);
+  u = u * u * (3 - 2 * u);
+  const a = f.entra ? u : 1 - u;
+  cortina.material.color.copy(f.fondo);
+  cortina.material.opacity = a;
+  if (!f.cartel) for (const [, m] of f.pares) m.opacity = a;
+  renderer.autoClear = false;
+  renderer.render(escenaCortina, camCortina);
+  renderer.clearDepth();
+  renderer.render(f.escena, camera);
+  renderer.autoClear = true;
+  if (performance.now() - f.t0 >= f.dur) terminarFundidoVelo();
 }
 function terminarVelo() {
   if (!velo) return;
   const v = velo;
   velo = null;
-  capaVelo.style.transition = "opacity .35s";
-  capaVelo.style.opacity = 1;
-  setTimeout(() => {
+  if (!window.VRvisor) {
+    const entrando = fundidoVelo && fundidoVelo.entra;
+    if (entrando) fundidoVelo = null;                 // se cortó mientras entraba: no llegó a aplicarse
     for (const o of v.ocultos) o.visible = true;
-    for (const [o, m] of v.materiales) { o.material.dispose(); o.material = m; }
+    for (const [o, m] of v.materiales) o.material = m;
     scene.fog = v.niebla;
     scene.background = null;
+    const tirar = () => { if (!v.cartel) for (const [, m] of v.mostrados) m.dispose(); };
+    if (entrando) tirar();
+    else empezarFundidoVelo(false, v.mostrados, v.fondo, v.cartel, 1100, tirar);
+  } else {
+    capaVelo.style.transition = "opacity .35s";
+    capaVelo.style.opacity = 1;
+  }
+  setTimeout(() => {
+    if (window.VRvisor) {
+      for (const o of v.ocultos) o.visible = true;
+      for (const [o, m] of v.materiales) { o.material.dispose(); o.material = m; }
+      scene.fog = v.niebla;
+      scene.background = null;
+    }
     document.body.classList.remove("leyendo");
     capaVelo.style.opacity = 0;                    // se levanta el velo y el lector queda suelto
     if (v.lectura) { const c = caratulaDe(v.lectura); if (c.sigue) { notaTitulo.textContent = "Sigue · " + c.voz; notaTexto.textContent = c.sigue; nota.hidden = false; } }
@@ -2916,14 +2982,18 @@ canvas { cursor: default; }`;
   function empezarGrabacion() {
     grabarProxima = false;
     const canal = renderer.domElement.captureStream(fps ? 0 : 60);
-    const tipo = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((t) => MediaRecorder.isTypeSupported(t));
-    const mr = new MediaRecorder(canal, { mimeType: tipo, videoBitsPerSecond: 24e6 });
+    if (audioGrab && !fps) for (const t of audioGrab.stream.getAudioTracks()) canal.addTrack(t);   // el sonido, si está prendido
+    // Safari (iPad) graba .mp4; Chrome, .webm
+    const tipo = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
+      .find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+    const ext = tipo && tipo.startsWith("video/mp4") ? "mp4" : "webm";
+    const mr = new MediaRecorder(canal, { mimeType: tipo, videoBitsPerSecond: 24e6, audioBitsPerSecond: 192000 });
     const partes = [];
     mr.ondataavailable = (e) => e.data.size && partes.push(e.data);
     mr.onstop = () => {
       const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob(partes, { type: "video/webm" }));
-      a.download = "hiperfuente_" + ultimoNombre.replace(/\W+/g, "_") + "_" + Date.now() + ".webm";
+      a.href = URL.createObjectURL(new Blob(partes, { type: tipo.split(";")[0] }));
+      a.download = "hiperfuente_" + ultimoNombre.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\W+/g, "_") + "_" + Date.now() + "." + ext;
       a.click();
       aviso("Grabación guardada" + (fps ? ` · pasala a ${fps} cuadros con ffmpeg (setpts=N/${fps}/TB)` : ""), 8);
     };
@@ -2932,6 +3002,14 @@ canvas { cursor: default; }`;
     rec.style.display = "block";
   }
   let ultimoNombre = "toma";
+  // El sonido del sitio: además de los parlantes, va a una pista que se suma a la grabación.
+  let audioGrab = null;
+  function salidaAudio(ctx) {
+    const g = ctx.createGain();
+    g.connect(ctx.destination);
+    try { audioGrab = ctx.createMediaStreamDestination(); g.connect(audioGrab); } catch (_) {}
+    return g;
+  }
   function pararGrabacion() { if (!grabando) return; ultimoNombre = grabando.nombre; grabando.mr.stop(); grabando = null; rec.style.display = "none"; }
   function cuadroHecho() { if (grabando && fps && grabando.pista.requestFrame) grabando.pista.requestFrame(); }
 
@@ -2966,6 +3044,7 @@ canvas { cursor: default; }`;
 <h3>Borrador (${borrador.length} poses)</h3>
 <button data-p>P · anotar pose</button><button data-b>B · reproducir</button><button data-k>K · copiar JSON</button><button data-x>⌫ última</button><button data-n>N · vaciar</button>
 <pre>${borrador.map((k, i) => `${i + 1}. t ${k.t}s · lente ${k.lente} · p ${k.p.map((x) => x.toFixed(1)).join(", ")}`).join("\n")}</pre>
+<h3>Pantalla</h3><button data-f>F · pantalla completa</button><button data-s>♪ sonido</button><button data-e>E · etiquetas</button><button data-o>O · cámara libre</button><button data-c>C · caminar</button>
 <h3>Navegar</h3><pre>Arrastrar: girar · rueda: acercar · WASD/QE: volar (Shift rápido)
 C: caminar · O: cámara libre · E: etiquetas · F: pantalla completa
 Tiempo: vel ${vel}${fps ? " · cuadro a cuadro a " + fps : ""}${tam ? " · lienzo " + tam.join("×") : ""}</pre>`;
@@ -2974,6 +3053,11 @@ Tiempo: vel ${vel}${fps ? " · cuadro a cuadro a " + fps : ""}${tam ? " · lienz
     on("[data-todo]", () => { panel.hidden = true; reproducir(T, "Guion"); });
     on("[data-grabar]", () => { grabarProxima = !grabarProxima; pintarPanel(); });
     on("[data-p]", anotar); on("[data-b]", () => { panel.hidden = true; reproducir([tomaBorrador()], "Borrador"); });
+    on("[data-f]", pantallaCompleta);
+    on("[data-s]", () => { document.getElementById("sonido").click(); });
+    on("[data-e]", () => { etiquetas = !etiquetas; etiquetasClave = ""; });
+    on("[data-o]", () => { if (!rep) ponerModo("orbitar"); });
+    on("[data-c]", () => { if (!rep) recorrer(); });
     on("[data-k]", copiar); on("[data-x]", () => { borrador.pop(); guardar(); }); on("[data-n]", () => { borrador = []; guardar(); });
   }
   function tocarToma(i) { const T = window.TOMAS_VIDEO || []; if (T[i]) { panel.hidden = true; reproducir([T[i]], T[i].nombre); } }
@@ -2984,6 +3068,18 @@ Tiempo: vel ${vel}${fps ? " · cuadro a cuadro a " + fps : ""}${tam ? " · lienz
   }
 
   let etiquetas = false;
+  function pantallaCompleta() {
+    const d = document.documentElement, pedir = d.requestFullscreen || d.webkitRequestFullscreen;
+    if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else if (pedir) try { const x = pedir.call(d); if (x && x.catch) x.catch(() => {}); } catch (_) {}
+  }
+  // En el iPad (sin teclado): dos toques seguidos en la esquina de arriba a la izquierda abren o cierran el panel.
+  let toqueEsquina = 0;
+  addEventListener("pointerdown", (e) => {
+    if (e.clientX > 90 || e.clientY > 90) return;
+    const t = ahoraReal();
+    if (t - toqueEsquina < 450) { panel.hidden = !panel.hidden; pintarPanel(); toqueEsquina = 0; } else toqueEsquina = t;
+  }, true);
   addEventListener("keydown", (e) => {
     if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
     const k = e.code;
@@ -2991,7 +3087,7 @@ Tiempo: vel ${vel}${fps ? " · cuadro a cuadro a " + fps : ""}${tam ? " · lienz
     else if (k === "Space" && modo !== "caminar") { e.preventDefault(); rep ? terminar() : reproducir(window.TOMAS_VIDEO || [], "Guion"); }
     else if (/^Digit[1-9]$/.test(k)) tocarToma(+k.slice(5) - 1);
     else if (k === "Escape" && rep) terminar();
-    else if (k === "KeyF") (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+    else if (k === "KeyF") pantallaCompleta();
     else if (k === "KeyP") anotar();
     else if (k === "Backspace") { borrador.pop(); guardar(); aviso("Quedan " + borrador.length); }
     else if (k === "KeyB") reproducir([tomaBorrador()], "Borrador");
@@ -3007,9 +3103,9 @@ Tiempo: vel ${vel}${fps ? " · cuadro a cuadro a " + fps : ""}${tam ? " · lienz
     pintarPanel();
     const t = parseInt(P.get("toma"));
     if (t) setTimeout(() => tocarToma(t - 1), 600);
-    else aviso("H: panel · Espacio: guion completo · 1–9: tomas", 6);
+    else aviso("H (o dos toques en la esquina): panel · Espacio: guion · 1–9: tomas", 6);
   }
-  return { tic, paso, fijo, cuadroHecho, empezar, deInstancia, arco, poseActual, ponerPose, reproducir,
+  return { salidaAudio, tic, paso, fijo, cuadroHecho, empezar, deInstancia, arco, poseActual, ponerPose, reproducir,
            get activo() { return !!rep; }, get etiquetas() { return etiquetas; } };
 })();
 window.VID = VID;
@@ -3126,6 +3222,7 @@ function cuadro() {
   if (velo && performance.now() > velo.fin) terminarVelo();
   cielo.position.copy(camera.position);
   renderer.render(scene, camera);
+  dibujarFundidoVelo();
 }
 function bucle() { VID.tic(); cuadro(); VID.cuadroHecho(); requestAnimationFrame(bucle); }
 irAInstancia(0, true);
