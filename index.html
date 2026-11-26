@@ -161,6 +161,16 @@ body.leyendo #nota span { font-size: 12px; }
 <p class="ayuda" id="ayuda">Arrastrá para girar · pellizcá para acercarte · dos dedos para desplazar.</p>
 <div id="destello"></div>
 <div id="velo"></div>
+<style>
+#caratula { position: fixed; z-index: 30; left: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); max-width: min(420px, calc(100vw - 32px));
+            padding: 10px 14px 11px; border-left: 4px solid var(--lacre); background: rgba(22, 25, 28, .86); color: var(--papel);
+            font-family: "DM Mono", monospace; display: none; }
+body.leyendo #caratula { display: grid; gap: 2px; }
+#caratula small { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #cfc9bb; }
+#caratula b { font-family: var(--hyper); font-weight: 400; font-size: 22px; letter-spacing: .02em; }
+#caratula span { font-size: 14px; color: #e6a08f; }
+#caratula .sigue { margin-top: 4px; color: #9fb4c2; text-transform: none; letter-spacing: .02em; font-size: 12px; }
+</style>
 <aside id="mapa" aria-label="Mapa: dónde estás en el icosaedro">
   <button id="sonido" aria-pressed="false" title="Prende o apaga el sonido: suena el espacio donde estás">♪ Sonido · OFF</button>
   <div id="aviso" aria-live="polite"></div>
@@ -1130,7 +1140,7 @@ function diagramar(marcos, piezas) {
         const pw = ancho(pal[0].t, tam, tr), sep = fila.length ? esp(tam, tr) : 0;
         if (w + sep + pw <= Wl) { fila.push(pal.shift()); w += sep + pw; continue; }
         // partir la palabra en la última sílaba que entre (con guion)
-        const c = P.partir === false ? null : cortes(pal[0].t).reverse().find((i) => w + sep + ancho(pal[0].t.slice(0, i) + "-", tam, tr) <= Wl);
+        const c = P.partir === false || pal[0].c !== P.color ? null : cortes(pal[0].t).reverse().find((i) => w + sep + ancho(pal[0].t.slice(0, i) + "-", tam, tr) <= Wl);
         if (c) { const pre = { t: pal[0].t.slice(0, c) + "-", c: pal[0].c }; fila.push(pre); pal[0].t = pal[0].t.slice(c); w += sep + ancho(pre.t, tam, tr); }
         else if (!fila.length) { fila.push(pal.shift()); w += pw; }
         break;
@@ -1658,6 +1668,24 @@ function recorrer(forzarEntrada) {
 }
 btnOrbitar.onclick = () => { if (!vuelo) ponerModo("orbitar"); };
 btnCaminar.onclick = () => recorrer();
+const camAntes = new THREE.Vector3();
+let hayCamAntes = false;
+function atravesarPlanos() {
+  const b = aBlender(camera.position);
+  if (hayCamAntes) {
+    const a = aBlender(camAntes);
+    for (let k = 0; k < 3; k++) {
+      if (Math.abs(b[k]) >= MEDIO_PLANO) continue;
+      if (![0, 1, 2].every((i) => i === k || Math.abs(b[i]) < 69.6 + 0.3)) continue;    // fuera del plano: no hay muro
+      const lado = Math.abs(a[k]) >= MEDIO_PLANO ? -Math.sign(a[k]) : Math.sign(b[k]) || 1;   // venía de afuera: al otro lado
+      const nb = b.slice(); nb[k] = lado * (MEDIO_PLANO + 0.05);
+      const delta = deBlender(nb).sub(camera.position);
+      camera.position.add(delta); orbita.target.add(delta);
+      break;
+    }
+  }
+  camAntes.copy(camera.position); hayCamAntes = true;
+}
 const vRl = new THREE.Vector3(), vRd = new THREE.Vector3();
 function rayoLargo(o, d, max) {                    // la grilla de colisión es para rayos cortos: se avanza de a tramos
   for (let t = 0; t < max; t += 6) { const r = rayoCol(vRl.copy(o).addScaledVector(d, t), d, 6.2); if (r) return t + r.t; }
@@ -1742,7 +1770,37 @@ function llegar(i) {
   }
 }
 
+const ORDEN_LECTURA = [["Escalera E4", "Narración I"], ["Escalera E1", "Narración II"], ["Escalera E3", "Narración III"],
+  ["Escalera E5", "Narración IV"], ["Escalera E7", "Narración V"], ["Muro M1", "Testimonio I"], ["Muro M3", "Testimonio II"],
+  ["Mirador", "La cita"], ["Folio de la empleada", "El folio de la empleada"]];
+const ANEXOS = { "Muro M4": "Las citas I", "Muro M6": "Las citas II" };
+function lugarDe(L) {
+  const i = ORDEN_LECTURA.findIndex(([t]) => t === L.titulo);
+  if (i >= 0) return { n: i + 1, nombre: ORDEN_LECTURA[i][1], sigue: ORDEN_LECTURA[i + 1] ? (i + 2) + " · " + ORDEN_LECTURA[i + 1][1] : "el cuadrado del núcleo: capítulo siguiente" };
+  const anexo = ANEXOS[L.titulo] || (L.titulo.startsWith("Mausoleo") ? "Mausoleo: " + L.titulo.replace(/^Mausoleo\W+/, "") : L.titulo);
+  return { n: 0, nombre: anexo, sigue: "" };
+}
+function caratulaDe(d) {
+  const cap = datos.ciclo.indexOf(SALA_CLAVE[d.r]) + 1, voz = "zxy"[d.g], l = lugarDe(d.L);
+  return { cap, titulo: datos.titulos[cap - 1] || "", voz: datos.voces[voz], cuento: datos.cuentos[voz], ...l,
+           corto: l.n ? l.n + "/" + ORDEN_LECTURA.length + " · " + l.nombre : "Expediente · " + l.nombre };
+}
+// La carátula de la lectura (en el sitio; en el VR va como aviso).
+const caratula = document.createElement("div");
+caratula.id = "caratula";
+document.body.appendChild(caratula);
+function pintarCaratula(d) {
+  const c = caratulaDe(d);
+  caratula.innerHTML = (c.n ? `<small>Capítulo ${c.cap} · ${c.titulo}</small><b>${c.voz}</b><span>${c.corto}</span>`
+                           : `<small>Capítulo ${c.cap} · ${c.titulo} · ${c.voz}</small><b>Expediente</b><span>${c.nombre}</span>`) +
+    (c.sigue ? `<small class="sigue">Sigue: ${c.sigue}</small>` : "");
+  return c;
+}
+// La instancia «Muro de texto» abre la lectura del muro (con su velo), igual que la esfera.
 function irAInstancia(i, instantaneo) {
+  { const ins = instancias[i], lect = !instantaneo && disparadores.find((d) => d.r === 0 && d.g === 0 && d.L.tipo === "texto" &&
+      Math.hypot(d.L.pos[0] - ins.pos[0], d.L.pos[1] - ins.pos[1], d.L.pos[2] - ins.pos[2]) < 0.05);
+    if (lect) { actual = i; botonesInst.forEach((b, k) => b.setAttribute("aria-pressed", k === i)); irALectura(lect); return; } }
   const ins = instancias[i], d = poseDe(ins);
   actual = i;
   botonesInst.forEach((b, k) => b.setAttribute("aria-pressed", k === i));
@@ -2178,7 +2236,7 @@ const disparadores = [];
       const ojo = aMundo(W, L.pos), blanco = aMundo(W, L.mira);
       const arriba = aMundo(W, [L.pos[0], L.pos[1], L.pos[2] + 1]).sub(ojo).normalize();
       const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(ojo, blanco, arriba));
-      disparadores.push({ L, W, r, get nodo() { return L.pieza === "CARTEL" ? carteles[r * 3 + g].m : salasObj[r].children.find((h) => h.userData.g === g && h.userData.pieza === nombre); }, centro: aMundo(W, L.esfera), pose: L.escalera ? poseEscalera(L.escalera, W, 0) : { p: ojo, q, f: fovVertical(L.tipo === "texto" ? 16 : L.tipo === "cartel" ? 20 : 24) } });
+      disparadores.push({ L, W, r, g, get nodo() { return L.pieza === "CARTEL" ? carteles[r * 3 + g].m : salasObj[r].children.find((h) => h.userData.g === g && h.userData.pieza === nombre); }, centro: aMundo(W, L.esfera), pose: L.escalera ? poseEscalera(L.escalera, W, 0) : { p: ojo, q, f: fovVertical(L.tipo === "texto" ? 16 : L.tipo === "cartel" ? 20 : 24) } });
     }
   }));
 }
@@ -2207,6 +2265,7 @@ function poseCaja(L, W) {
   return { p: O, q: new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(O, C, arriba)), f: o.f };
 }
 function irALectura(d) {
+  pintarCaratula(d);
   if (d.L.caja && !d.L.escalera && d.L.tipo === "texto") d.pose = poseCaja(d.L, d.W);
   actual = -1;
   botonesInst.forEach((b) => b.setAttribute("aria-pressed", false));
@@ -2256,6 +2315,40 @@ const halos = [];
     scene.add(s);
     halos.push(s);
   }
+}
+// Las etiquetas de las esferas: número y nombre, arriba de cada esfera (habitación del lector, su gravedad).
+const etiquetasEsfera = [];
+{
+  const texturas = {};
+  const textura = (txt, anexo) => {
+    if (texturas[txt]) return texturas[txt];
+    const c = document.createElement("canvas"); c.width = 512; c.height = 96;
+    const x = c.getContext("2d");
+    x.font = "500 40px 'DM Mono', ui-monospace, monospace"; x.textAlign = "center"; x.textBaseline = "middle";
+    const w = Math.min(500, x.measureText(txt).width + 36);
+    x.fillStyle = anexo ? "rgba(47,72,88,.88)" : "rgba(155,61,46,.9)"; x.fillRect(256 - w / 2, 14, w, 68);
+    x.fillStyle = "#e9e3d6"; x.fillText(txt, 256, 50);
+    const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
+    return (texturas[txt] = t);
+  };
+  for (const d of disparadores) {
+    const l = lugarDe(d.L);
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: textura(l.n ? l.n + " · " + l.nombre.toUpperCase() : l.nombre.toUpperCase(), !l.n), fog: false }));
+    s.scale.set(2.0, 0.375, 1);
+    const arriba = blenderAThree(new THREE.Vector3(0, 0, 1).applyMatrix4(d.W).sub(new THREE.Vector3(0, 0, 0).applyMatrix4(d.W)).toArray()).normalize();
+    s.position.copy(d.centro).addScaledVector(arriba, 0.62);
+    s.visible = false; s.renderOrder = 16;
+    scene.add(s);
+    etiquetasEsfera.push({ s, d });
+  }
+}
+let etiquetasClave = "";
+function mostrarEtiquetas() {
+  const clave = escrita.r + ":" + ejeActivo + ":" + (velo ? 1 : 0);
+  if (clave === etiquetasClave) return;
+  etiquetasClave = clave;
+  const g = "zxy".indexOf(ejeActivo);
+  for (const { s, d } of etiquetasEsfera) s.visible = !velo && d.r === escrita.r && d.g === g;
 }
 function latirHalos(t) {
   const k = 1.1 + 0.25 * (0.5 + 0.5 * Math.sin(t * 2.2));
@@ -2460,7 +2553,7 @@ function iniciarVelo(d, regreso) {
     if (mostrar.has(o)) { if (d.L.tipo !== "cartel") { materiales.push([o, o.material]); o.material = d.L.escalera ? materialLecturaEscalera(o.userData.mat, d.L) : materialVelo(mostrar.get(o), d.L, fondo); } }
     else { ocultos.push(o); o.visible = false; }
   });
-  velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + (d.L.tipo === "texto" ? Math.max(d.L.segundos, 90) : d.L.segundos) * 1000, regreso };
+  velo = { ocultos, materiales, niebla: scene.fog, fin: performance.now() + (d.L.tipo === "texto" ? Math.max(d.L.segundos, 90) : d.L.segundos) * 1000, regreso, lectura: d };
   if (d.L.escalera) {
     const espejo = d.W.determinant() < 0;
     const guion = guionEscalera(d.L.escalera, espejo);
@@ -2491,6 +2584,7 @@ function terminarVelo() {
     scene.background = null;
     document.body.classList.remove("leyendo");
     capaVelo.style.opacity = 0;                    // se levanta el velo y el lector queda suelto
+    if (v.lectura) { const c = caratulaDe(v.lectura); if (c.sigue) { notaTitulo.textContent = "Sigue · " + c.voz; notaTexto.textContent = c.sigue; nota.hidden = false; } }
     const r = v.regreso;
     if (!r) { ponerModo("orbitar"); return; }
     const dist = camera.position.distanceTo(r.p);
@@ -2637,11 +2731,13 @@ function cuadro() {
         orbita.target.add(vMov);
       }
       orbita.update();
+      atravesarPlanos();
     }
   }
   legibilidad();
   revisarPortales();
   latirHalos(reloj.elapsedTime);
+  mostrarEtiquetas();
   if (velo && performance.now() > velo.fin) terminarVelo();
   cielo.position.copy(camera.position);
   renderer.render(scene, camera);
