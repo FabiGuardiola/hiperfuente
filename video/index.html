@@ -3438,7 +3438,7 @@ Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?a
     (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => aviso("Borrador copiado"), () => { console.log(txt); aviso("Está en la consola"); });
   }
 
-  let etiquetas = !P.has("sinetiquetas"), conCaratula = !P.has("sincaratula");
+  let etiquetas = !P.has("sinetiquetas"), conCaratula = P.has("caratula");    // la carátula, solo con ?caratula (2026-11-26)
   function pantallaCompleta() {
     const d = document.documentElement, pedir = d.requestFullscreen || d.webkitRequestFullscreen;
     if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
