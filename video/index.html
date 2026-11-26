@@ -3402,21 +3402,24 @@ canvas { cursor: default; }`;
   let carpeta = null;
   (async () => {
     try { carpeta = await navigator.storage.getDirectory(); if (navigator.storage.persist) navigator.storage.persist(); } catch (_) { carpeta = null; return; }
-    // las partes que quedaron de antes (si Safari se cerró o se recargó la página) vuelven a la lista
+    // (2026-11-26) al abrir la página se borran las grabaciones de antes: en el panel solo está el video de esta sesión
     try {
-      for await (const [nombre, h] of carpeta.entries()) {
-        if (h.kind !== "file" || !/^hiperfuente_.*_parte\d+\.(mp4|webm)$/.test(nombre) || grabaciones.some((x) => x.nombre === nombre)) continue;
-        const archivo = await h.getFile();
-        if (archivo.size) grabaciones.push({ nombre, url: URL.createObjectURL(archivo), archivo, mb: archivo.size / 1e6, disco: true, recuperada: true });
-      }
-      grabaciones.sort((x, y) => (x.nombre < y.nombre ? -1 : 1));
-      if (grabaciones.length) { pintarPanel(); aviso("Hay " + grabaciones.length + " partes grabadas sin borrar: están en el panel", 6); }
+      const viejos = [];
+      for await (const [nombre, h] of carpeta.entries()) if (h.kind === "file" && /^hiperfuente_/.test(nombre)) viejos.push(nombre);
+      for (const n of viejos) await carpeta.removeEntry(n).catch(() => {});
     } catch (_) {}
   })();
   const grabaciones = [];                              // { nombre, url, archivo, mb }
   function alternarGrabacion() { grabando ? pararGrabacion() : empezarGrabacion(); }
+  function borrarVideo() {
+    for (const x of grabaciones) { URL.revokeObjectURL(x.url); if (x.disco && carpeta) carpeta.removeEntry(x.nombre).catch(() => {}); }
+    grabaciones.length = 0;
+    guardado = false;
+  }
   function empezarGrabacion() {
     if (!window.MediaRecorder || !renderer.domElement.captureStream) { aviso("Este navegador no puede grabar el lienzo", 5); return; }
+    if (grabaciones.length && !guardado && !confirm("El video anterior no está guardado. ¿Borrarlo y grabar uno nuevo?")) return;
+    borrarVideo();
     const canal = renderer.domElement.captureStream(fps ? 0 : 60);
     if (audioGrab && !fps) for (const t of audioGrab.stream.getAudioTracks()) canal.addTrack(t);   // el sonido, si está prendido
     const tipo = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
@@ -3466,18 +3469,23 @@ canvas { cursor: default; }`;
     g.corte = setTimeout(() => { if (grabando === g) { mr.stop(); nuevoTramo(); } }, TRAMO);   // la parte siguiente empieza enseguida
   }
   // si quedan partes sin guardar, el navegador pregunta antes de cerrar o recargar
-  addEventListener("beforeunload", (e) => { if (grabando || grabaciones.some((x) => !x.guardada)) { e.preventDefault(); e.returnValue = ""; } });
-  function guardarGrabacion(k, compartir) {
-    const x = grabaciones[k];
-    if (!x) return;
-    x.guardada = true;
-    if (compartir && navigator.canShare) {
-      const f = new File([x.archivo], x.nombre, { type: x.archivo.type });
-      if (navigator.canShare({ files: [f] })) { navigator.share({ files: [f] }).catch(() => {}); return; }
-    }
-    const a = document.createElement("a");
-    a.href = x.url; a.download = x.nombre;
-    document.body.appendChild(a); a.click(); a.remove();
+  addEventListener("beforeunload", (e) => { if (grabando || (grabaciones.length && !guardado)) { e.preventDefault(); e.returnValue = ""; } });
+  let guardado = false;
+  async function guardarTodo() {
+    if (!grabaciones.length) return;
+    const archivos = grabaciones.map((x) => new File([x.archivo], x.nombre, { type: x.archivo.type }));
+    try {
+      if (window.showDirectoryPicker) {                // compu (Chrome): se elige la carpeta y se escriben todas
+        const dir = await window.showDirectoryPicker({ mode: "readwrite" });
+        for (const f of archivos) { const w = await (await dir.getFileHandle(f.name, { create: true })).createWritable(); await w.write(f); await w.close(); }
+      } else if (navigator.canShare && navigator.canShare({ files: archivos })) {   // iPad: menú de compartir → «Guardar en Archivos» → carpeta
+        await navigator.share({ files: archivos, title: "Hiperfuente" });
+      } else {                                          // otros: se descargan una por una
+        for (const x of grabaciones) { const a = document.createElement("a"); a.href = x.url; a.download = x.nombre; document.body.appendChild(a); a.click(); a.remove(); await new Promise((ok) => setTimeout(ok, 800)); }
+      }
+      guardado = true;
+    } catch (_) { /* se canceló */ }
+    pintarPanel(); pintarEstado();
   }
   // El sonido del sitio: además de los parlantes, va a una pista que se suma a la grabación.
   let audioGrab = null;
@@ -3506,7 +3514,7 @@ canvas { cursor: default; }`;
       estadoE.textContent = "● REC " + String(Math.floor(seg / 60)).padStart(2, "0") + ":" + String(seg % 60).padStart(2, "0") + " · parte " + grabando.n;
     } else if (terminadaEn && ahoraReal() - terminadaEn < 60000) {
       estadoE.className = "listo";
-      estadoE.textContent = pendientes > 0 ? "■ Terminada · procesando la última parte…" : "■ Terminada · " + grabaciones.length + (grabaciones.length === 1 ? " parte" : " partes") + " · H para guardarlas";
+      estadoE.textContent = pendientes > 0 ? "■ Terminada · procesando la última parte…" : (guardado ? "■ Video guardado ✓" : "■ Terminada · H para guardar el video");
     } else estadoE.className = "";
   }
   setInterval(pintarEstado, 500);
@@ -3538,11 +3546,12 @@ canvas { cursor: default; }`;
   function pintarPanel() {
     const T = lista();
     panel.innerHTML = `<b>Hiperfuente · video</b> <small>(H o dos toques en la esquina cierran)</small>
+${grabando ? `<h3>Video</h3><div>Grabando · parte ${grabando.n}</div>` : pendientes > 0 ? `<h3>Video</h3><div>Procesando la última parte…</div>` :
+  grabaciones.length ? `<h3>Video</h3><div>${grabaciones.length} ${grabaciones.length === 1 ? "parte" : "partes"} · ${(grabaciones.reduce((a, x) => a + x.mb, 0) / 1000).toFixed(2).replace(".", ",")} GB${guardado ? " · guardado ✓" : ""}</div>
+<button data-guardar class="rojo">Guardar en una carpeta</button>` : ""}
 <h3>Instancias</h3>${T.map((t, i) => `<button data-t="${i}" class="${i === idx ? "act" : ""}">${i + 1} · ${t.nombre}</button>`).join("")}
 <br><button data-todo>Todas seguidas</button> <button data-grabar class="rojo">${grabando ? "■ Terminar grabación" : "● Grabar (G)"}</button>
-${grabaciones.length || grabando || pendientes ? `<h3>Grabaciones (${grabando ? "grabando parte " + grabando.n + " · " : pendientes > 0 ? "procesando · " : "terminada · "}${MBPS} Mbps, partes de ${TRAMO / 60000} min)</h3>` +
-  grabaciones.map((x, k) => `<div>${x.nombre.replace(/^hiperfuente_/, "")} · ${x.mb.toFixed(0)} MB${x.disco ? "" : " (en memoria)"} <button data-gc="${k}" class="rojo">Guardar en Archivos</button><button data-gd="${k}">Descargar</button>${x.guardada ? " ✓" : ""}</div>`).join("") +
-  (grabaciones.length ? `<button data-gb>Borrar las grabaciones (libera memoria)</button>` : "") : ""}
+
 <h3>Pantalla</h3><button data-f>Pantalla completa (F)</button><button data-s>♪ Sonido</button><button data-nav>Flechas sí/no</button>
 <button data-e>Etiquetas (E)</button><button data-o>Cámara libre (O)</button><button data-c>Caminar (C)</button>
 <h3>Borrador (${borrador.length} poses)</h3>
@@ -3554,11 +3563,7 @@ Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?a
     const on = (sel, f) => { const b = panel.querySelector(sel); if (b) b.onclick = f; };
     on("[data-todo]", () => { panel.hidden = true; idx = 0; reproducir(T, "Todas"); });
     on("[data-grabar]", alternarGrabacion);
-    panel.querySelectorAll("[data-gc]").forEach((b) => (b.onclick = () => guardarGrabacion(+b.dataset.gc, true)));
-    panel.querySelectorAll("[data-gd]").forEach((b) => (b.onclick = () => guardarGrabacion(+b.dataset.gd, false)));
-    on("[data-gb]", () => { if (!confirm("¿Borrar las grabaciones de la memoria? Las que no guardaste se pierden.")) return;
-      for (const x of grabaciones) { URL.revokeObjectURL(x.url); if (x.disco && carpeta) carpeta.removeEntry(x.nombre).catch(() => {}); }
-      grabaciones.length = 0; pintarPanel(); });
+    on("[data-guardar]", guardarTodo);
     on("[data-p]", anotar); on("[data-b]", () => { panel.hidden = true; reproducir([tomaBorrador()], "Borrador"); });
     on("[data-f]", pantallaCompleta);
     on("[data-s]", () => { document.getElementById("sonido").click(); });
