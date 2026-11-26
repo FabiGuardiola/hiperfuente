@@ -3389,6 +3389,11 @@ canvas { cursor: default; }`;
 
   // --- grabación directa del lienzo: G o REC empiezan y terminan ---
   let grabando = null;
+  // Grabación (2026-11-26, segunda versión): a 10 Mbps (?mbps=) y en partes de 3 minutos (?tramo=minutos). Una sola
+  // grabación larga pasaba el gigabyte y Safari no la terminaba de descargar. Nada se descarga solo: al terminar, el panel
+  // muestra las partes y cada una se guarda con su botón («Guardar en Archivos» usa el menú de compartir del iPad).
+  const MBPS = parseFloat(P.get("mbps")) || 10, TRAMO = (parseFloat(P.get("tramo")) || 3) * 60000;
+  const grabaciones = [];                              // { nombre, url, archivo, mb }
   function alternarGrabacion() { grabando ? pararGrabacion() : empezarGrabacion(); }
   function empezarGrabacion() {
     if (!window.MediaRecorder || !renderer.domElement.captureStream) { aviso("Este navegador no puede grabar el lienzo", 5); return; }
@@ -3397,21 +3402,45 @@ canvas { cursor: default; }`;
     const tipo = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
       .find((t) => MediaRecorder.isTypeSupported(t));
     const ext = tipo && tipo.startsWith("video/mp4") ? "mp4" : "webm";
-    const mr = new MediaRecorder(canal, { mimeType: tipo, videoBitsPerSecond: 24e6, audioBitsPerSecond: 192000 });
-    const partes = [], nombre = "hiperfuente_" + new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    mr.ondataavailable = (e) => e.data.size && partes.push(e.data);
-    mr.onstop = () => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob(partes, { type: (tipo || "video/webm").split(";")[0] }));
-      a.download = nombre + "." + ext;
-      document.body.appendChild(a); a.click(); a.remove();
-      aviso("Grabación guardada: " + a.download + (fps ? ` · pasala a ${fps} cuadros con ffmpeg (setpts=N/${fps}/TB)` : ""), 8);
-    };
-    mr.start(1000);
-    grabando = { mr, pista: canal.getVideoTracks()[0] };
+    const base = "hiperfuente_" + new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    grabando = { canal, pista: canal.getVideoTracks()[0], tipo, ext, base, n: 0, mr: null, corte: null };
+    nuevoTramo();
     btnRec.classList.add("on"); btnRec.textContent = "■";
     aviso("Grabando", 1.5);
     pintarPanel();
+  }
+  function nuevoTramo() {
+    const g = grabando;
+    if (!g) return;
+    g.n++;
+    const n = g.n, partes = [];
+    const mr = new MediaRecorder(g.canal, { mimeType: g.tipo, videoBitsPerSecond: MBPS * 1e6, audioBitsPerSecond: 160000 });
+    mr.ondataavailable = (e) => e.data.size && partes.push(e.data);
+    mr.onstop = () => {
+      const archivo = new Blob(partes, { type: (g.tipo || "video/webm").split(";")[0] });
+      partes.length = 0;
+      const nombre = g.base + "_parte" + String(n).padStart(2, "0") + "." + g.ext;
+      grabaciones.push({ nombre, url: URL.createObjectURL(archivo), archivo, mb: archivo.size / 1e6 });
+      pintarPanel();
+    };
+    mr.start(1000);
+    g.mr = mr;
+    clearTimeout(g.corte);
+    g.corte = setTimeout(() => { if (grabando === g) { mr.stop(); nuevoTramo(); } }, TRAMO);   // la parte siguiente empieza enseguida
+  }
+  // si quedan partes sin guardar, el navegador pregunta antes de cerrar o recargar
+  addEventListener("beforeunload", (e) => { if (grabando || grabaciones.some((x) => !x.guardada)) { e.preventDefault(); e.returnValue = ""; } });
+  function guardarGrabacion(k, compartir) {
+    const x = grabaciones[k];
+    if (!x) return;
+    x.guardada = true;
+    if (compartir && navigator.canShare) {
+      const f = new File([x.archivo], x.nombre, { type: x.archivo.type });
+      if (navigator.canShare({ files: [f] })) { navigator.share({ files: [f] }).catch(() => {}); return; }
+    }
+    const a = document.createElement("a");
+    a.href = x.url; a.download = x.nombre;
+    document.body.appendChild(a); a.click(); a.remove();
   }
   // El sonido del sitio: además de los parlantes, va a una pista que se suma a la grabación.
   let audioGrab = null;
@@ -3423,8 +3452,12 @@ canvas { cursor: default; }`;
   }
   function pararGrabacion() {
     if (!grabando) return;
-    grabando.mr.stop(); grabando = null;
+    const g = grabando;
+    grabando = null;
+    clearTimeout(g.corte);
+    g.mr.stop();
     btnRec.classList.remove("on"); btnRec.textContent = "REC";
+    panel.hidden = false;                               // al terminar, el panel muestra las partes para guardarlas
     pintarPanel();
   }
   function cuadroHecho() { if (grabando && fps && grabando.pista.requestFrame) grabando.pista.requestFrame(); }
@@ -3457,6 +3490,9 @@ canvas { cursor: default; }`;
     panel.innerHTML = `<b>Hiperfuente · video</b> <small>(H o dos toques en la esquina cierran)</small>
 <h3>Instancias</h3>${T.map((t, i) => `<button data-t="${i}" class="${i === idx ? "act" : ""}">${i + 1} · ${t.nombre}</button>`).join("")}
 <br><button data-todo>Todas seguidas</button> <button data-grabar class="rojo">${grabando ? "■ Terminar grabación" : "● Grabar (G)"}</button>
+${grabaciones.length || grabando ? `<h3>Grabaciones (${grabando ? "grabando parte " + grabando.n + " · " : ""}${MBPS} Mbps, partes de ${TRAMO / 60000} min)</h3>` +
+  grabaciones.map((x, k) => `<div>${x.nombre.replace(/^hiperfuente_/, "")} · ${x.mb.toFixed(0)} MB <button data-gc="${k}" class="rojo">Guardar en Archivos</button><button data-gd="${k}">Descargar</button>${x.guardada ? " ✓" : ""}</div>`).join("") +
+  (grabaciones.length ? `<button data-gb>Borrar las grabaciones (libera memoria)</button>` : "") : ""}
 <h3>Pantalla</h3><button data-f>Pantalla completa (F)</button><button data-s>♪ Sonido</button><button data-nav>Flechas sí/no</button>
 <button data-e>Etiquetas (E)</button><button data-o>Cámara libre (O)</button><button data-c>Caminar (C)</button>
 <h3>Borrador (${borrador.length} poses)</h3>
@@ -3468,6 +3504,10 @@ Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?a
     const on = (sel, f) => { const b = panel.querySelector(sel); if (b) b.onclick = f; };
     on("[data-todo]", () => { panel.hidden = true; idx = 0; reproducir(T, "Todas"); });
     on("[data-grabar]", alternarGrabacion);
+    panel.querySelectorAll("[data-gc]").forEach((b) => (b.onclick = () => guardarGrabacion(+b.dataset.gc, true)));
+    panel.querySelectorAll("[data-gd]").forEach((b) => (b.onclick = () => guardarGrabacion(+b.dataset.gd, false)));
+    on("[data-gb]", () => { if (!confirm("¿Borrar las grabaciones de la memoria? Las que no guardaste se pierden.")) return;
+      for (const x of grabaciones) URL.revokeObjectURL(x.url); grabaciones.length = 0; pintarPanel(); });
     on("[data-p]", anotar); on("[data-b]", () => { panel.hidden = true; reproducir([tomaBorrador()], "Borrador"); });
     on("[data-f]", pantallaCompleta);
     on("[data-s]", () => { document.getElementById("sonido").click(); });
