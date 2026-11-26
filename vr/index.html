@@ -2361,6 +2361,19 @@ botonSonido.onclick = async () => {
   }
 };
 pintarBotonSonido(false);
+function cortarSonido(cerrar) {
+  if (!audio) return;
+  try { audio.motores.forEach((m) => m.releaseAll(audio.ctx.currentTime)); } catch (_) {}
+  try { cerrar ? audio.ctx.close() : audio.ctx.suspend(); } catch (_) {}
+}
+addEventListener("pagehide", () => cortarSonido(true));
+addEventListener("beforeunload", () => cortarSonido(true));
+document.addEventListener("visibilitychange", () => {
+  if (!audio) return;
+  const prendido = botonSonido.getAttribute("aria-pressed") === "true";
+  if (document.hidden) cortarSonido(false);
+  else if (prendido && audio.ctx.state === "suspended") audio.ctx.resume().catch(() => {});
+});
 
 // ---------- Portales: la contraforma de cada H ----------
 // Al atravesar la H caminando se pasa al otro lado del mismo piso: la habitación espejada a través de ese plano,
