@@ -3077,10 +3077,52 @@ canvas { cursor: default; }`;
     }
     texCartel.needsUpdate = true;
   }
+  // La carátula de la lectura (capítulo, voz, n/9 y tipo, y cuál sigue): en el sitio es HTML; acá se dibuja en el
+  // lienzo con el mismo diseño, para que salga en la grabación.
+  const lienzoCar = document.createElement("canvas"), texCar = new THREE.CanvasTexture(lienzoCar);
+  texCar.encoding = THREE.sRGBEncoding;
+  const carM = new THREE.MeshBasicMaterial({ map: texCar, transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false });
+  const quadCar = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), carM);
+  quadCar.renderOrder = 2;
+  escEncima.add(quadCar);
+  let carClave = "", carA = 0;
+  function pintarCaratulaLienzo() {
+    const el = document.getElementById("caratula");
+    const filas = el ? [...el.children].map((c) => [c.tagName, c.className, c.textContent]) : [];
+    const b = new THREE.Vector2();
+    renderer.getDrawingBufferSize(b);
+    const clave = JSON.stringify(filas) + b.x + "x" + b.y;
+    if (clave === carClave) return;
+    carClave = clave;
+    lienzoCar.width = b.x; lienzoCar.height = b.y;
+    const g = lienzoCar.getContext("2d"), k = b.y / 620;          // a escala: en 1080 p, como el sitio en una pantalla de 620 px
+    g.clearRect(0, 0, b.x, b.y);
+    if (!filas.length) { texCar.needsUpdate = true; return; }
+    const estilo = (tag, cls) => tag === "B" ? [`${22 * k}px FabiBlock`, "#E9E3D6", 0.02] : cls === "sigue" ? [`${12 * k}px "DM Mono", monospace`, "#9fb4c2", 0.02]
+      : tag === "SPAN" ? [`${14 * k}px "DM Mono", monospace`, "#e6a08f", 0] : [`${11 * k}px "DM Mono", monospace`, "#cfc9bb", 0.1];
+    const lineas = filas.map(([tag, cls, t]) => { const [f, c, tr] = estilo(tag, cls); return { f, c, tr, t: tag === "SMALL" && cls !== "sigue" ? t.toUpperCase() : t, alto: parseFloat(f) * 1.32 }; });
+    let ancho = 0;
+    for (const l of lineas) { g.font = l.f; if ("letterSpacing" in g) g.letterSpacing = (l.tr * parseFloat(l.f)) + "px"; ancho = Math.max(ancho, g.measureText(l.t).width); }
+    const x0 = 16 * k, y0 = 16 * k, pad = 12 * k, alto = lineas.reduce((a, l) => a + l.alto, 0) + 2 * pad;
+    g.fillStyle = "rgba(22,25,28,0.86)"; g.fillRect(x0, y0, ancho + 2 * pad + 4 * k, alto);
+    g.fillStyle = "#9B3D2E"; g.fillRect(x0, y0, 4 * k, alto);
+    let y = y0 + pad;
+    g.textBaseline = "top";
+    for (const l of lineas) {
+      g.font = l.f; g.fillStyle = l.c; if ("letterSpacing" in g) g.letterSpacing = (l.tr * parseFloat(l.f)) + "px";
+      g.fillText(l.t, x0 + 4 * k + pad, y + l.alto * 0.12);
+      y += l.alto;
+    }
+    texCar.needsUpdate = true;
+  }
   function encima() {
     negroM.opacity = Math.min(1, Math.max(0, quedaNegro && !rep ? 1 : negroN));
     cartelM.opacity = Math.min(1, Math.max(0, rep ? cartelC : 0));
-    if (negroM.opacity <= 0 && cartelM.opacity <= 0) return;
+    const leyendo = document.body.classList.contains("leyendo") && conCaratula;
+    carA = Math.max(0, Math.min(1, carA + (leyendo ? 0.06 : -0.08)));
+    if (carA > 0) pintarCaratulaLienzo();
+    carM.opacity = carA;
+    if (negroM.opacity <= 0 && cartelM.opacity <= 0 && carA <= 0) return;
     renderer.autoClear = false;
     renderer.clearDepth();
     renderer.render(escEncima, camEncima);
@@ -3166,6 +3208,7 @@ canvas { cursor: default; }`;
     if (velo) { velo.regreso = null; terminarVelo(); }
     ponerModo("orbitar");
     orbita.enabled = false;
+    congelado = false;
     rep = { pasos, i: -1, nombre, abre: tomas[0].abre ?? 0, cierra: tomas[tomas.length - 1].cierra ?? 0 };   // sin negro al empezar ni al terminar (2026-11-26)
     quedaNegro = false;
     avisoE.style.opacity = 0;
@@ -3195,9 +3238,14 @@ canvas { cursor: default; }`;
       const d = disparadores.find((x) => x.r === (p.r || 0) && x.g === (p.g || 0) && x.L.titulo === p.lectura);
       if (!d) { aviso("No hay lectura " + p.lectura); return siguiente(); }
       if (p.desde) ponerPose(p.desde);
+      if (p.cerca) {                                  // empezar cerca de la lectura (sin cruzar todo el objeto)
+        const q = d.pose.q, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(q), up = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+        camera.position.copy(d.pose.p).addScaledVector(dir, -p.cerca).addScaledVector(up, p.cerca * 0.25);
+        camera.quaternion.copy(q); camera.up.copy(up); camera.fov = d.pose.f; camera.updateProjectionMatrix();
+      }
       irALectura(d);
       rep.lectura = d;
-      rep.llego = 0;
+      rep.llego = 0; rep.finLect = 0;
     }
     if (p.cartel) pintarCartelTexto(p);
     if (p.especial) ESPECIALES.entrar(p);
@@ -3206,7 +3254,18 @@ canvas { cursor: default; }`;
     const final = rep;
     rep = null;
     negroN = 0;
-    quedaNegro = false;                                   // queda quieta en su último cuadro hasta la próxima instancia
+    quedaNegro = false;
+    congelado = true;                                     // queda quieta en su último cuadro hasta la próxima instancia
+  }
+  // La cámara libre vuelve recién cuando se toca el lienzo (o con C / O): si no, la órbita la enderezaba al terminar.
+  let congelado = false;
+  // Mientras corre una instancia (o queda congelada), cambiar de modo no toca la cámara: el fin de una lectura
+  // pasaba a la cámara libre y la enderezaba (se perdía el «arriba» de las otras gravedades).
+  const ponerModoSitio = ponerModo;
+  ponerModo = (m) => { if (rep || congelado) { modo = m; orbita.enabled = false; return; } ponerModoSitio(m); };
+  function soltar() {
+    if (!congelado) return;
+    congelado = false;
     const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     orbita.target.copy(camera.position).addScaledVector(delante, 30);
     camera.up.set(0, 1, 0);
@@ -3224,7 +3283,7 @@ canvas { cursor: default; }`;
   // devuelve true si la toma maneja la cámara en este cuadro (si no, sigue el visor: viajes y velos de las lecturas)
   function paso() {
     if (avisoHasta && ahoraReal() > avisoHasta) { avisoE.style.opacity = 0; avisoHasta = 0; }
-    if (!rep) { negroN = 0; return false; }
+    if (!rep) { negroN = 0; return congelado; }
     const p = rep.paso, s = (performance.now() - rep.t0) / 1000, dur = durPaso(p);
     // negro: al abrir, al cerrar, en los fundidos entre tomas y alrededor de las lecturas
     let n = 0;
@@ -3243,7 +3302,12 @@ canvas { cursor: default; }`;
     if (p.especial) ESPECIALES.paso(s, dur);
     if (p.lectura) {
       // la lectura la hace el visor (viaje, velo, subida por la escalera); se corta a los «seg» segundos del velo
-      if (velo && !rep.llego) rep.llego = performance.now();
+      if (velo && !rep.llego) { rep.llego = performance.now(); velo.regreso = null; }
+      // las escaleras, sin «seg», se leen enteras: termina cuando termina su velo (y un segundo y medio más)
+      if (p.seg === undefined && rep.lectura.L.escalera) {
+        if (rep.llego && !velo) { rep.finLect = rep.finLect || performance.now(); if (performance.now() - rep.finLect > 1500) { siguiente(); return true; } }
+        return !(vuelo || velo);
+      }
       if (rep.llego && (performance.now() - rep.llego) / 1000 >= (p.seg || 10)) {
         if (velo) { velo.regreso = null; terminarVelo(); }
         vuelo = null; siguiente(); return true;
@@ -3356,8 +3420,8 @@ Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?a
     on("[data-s]", () => { document.getElementById("sonido").click(); });
     on("[data-nav]", () => document.body.classList.toggle("vSinNav"));
     on("[data-e]", () => { etiquetas = !etiquetas; etiquetasClave = ""; });
-    on("[data-o]", () => { cortar(); quedaNegro = false; ponerModo("orbitar"); });
-    on("[data-c]", () => { cortar(); quedaNegro = false; recorrer(); });
+    on("[data-o]", () => { cortar(); quedaNegro = false; soltar(); ponerModo("orbitar"); });
+    on("[data-c]", () => { cortar(); quedaNegro = false; soltar(); recorrer(); });
     on("[data-k]", copiar); on("[data-x]", () => { borrador.pop(); guardar(); }); on("[data-n]", () => { borrador = []; guardar(); });
   }
   function tocarToma(i) {
@@ -3374,7 +3438,7 @@ Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?a
     (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => aviso("Borrador copiado"), () => { console.log(txt); aviso("Está en la consola"); });
   }
 
-  let etiquetas = false;
+  let etiquetas = !P.has("sinetiquetas"), conCaratula = !P.has("sincaratula");
   function pantallaCompleta() {
     const d = document.documentElement, pedir = d.requestFullscreen || d.webkitRequestFullscreen;
     if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
@@ -3384,7 +3448,7 @@ Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?a
   let toqueEsquina = 0;
   addEventListener("pointerdown", (e) => {
     if (e.clientX > 90 || e.clientY > 90) {
-      if (!rep && e.target === renderer.domElement) quedaNegro = false;     // al mover la cámara a mano se ve el espacio
+      if (!rep && e.target === renderer.domElement) { quedaNegro = false; soltar(); }     // al mover la cámara a mano
       return;
     }
     const t = ahoraReal();
@@ -3408,9 +3472,10 @@ Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?a
     else if (k === "KeyB") reproducir([tomaBorrador()], "Borrador");
     else if (k === "KeyK") copiar();
     else if (k === "KeyN") { borrador = []; guardar(); aviso("Borrador vacío"); }
-    else if (k === "KeyC" && !rep) { quedaNegro = false; recorrer(); }
-    else if (k === "KeyO" && !rep) { quedaNegro = false; ponerModo("orbitar"); }
+    else if (k === "KeyC" && !rep) { quedaNegro = false; soltar(); recorrer(); }
+    else if (k === "KeyO" && !rep) { quedaNegro = false; soltar(); ponerModo("orbitar"); }
     else if (k === "KeyE") { etiquetas = !etiquetas; etiquetasClave = ""; }
+    else if (k === "KeyT") { conCaratula = !conCaratula; aviso(conCaratula ? "Carátula: sí" : "Carátula: no"); }
   }, true);
 
   function empezar() {
@@ -3677,7 +3742,7 @@ window.TOMAS_VIDEO = (() => {
       ] },
     ] },
     { nombre: "03 · Lectura de la escalera", pasos: [
-      { lectura: "Escalera E4", seg: 14 },
+      { lectura: "Escalera E4" },
     ] },
     { nombre: "04 · Portal de voz", pasos: [
       // el rectángulo rojo de YU TSUN en la pared x = 0: se entra y se aparece al pie de la H de su gravedad
@@ -3694,7 +3759,7 @@ window.TOMAS_VIDEO = (() => {
       ] },
     ] },
     { nombre: "06 · Otra escalera, más rápido", pasos: [
-      { lectura: "Escalera E1", seg: 9, vel: 1.7 },
+      { lectura: "Escalera E1", vel: 1.7 },
     ] },
     { nombre: "07 · Paneo caótico hacia arriba", pasos: [
       { vel: 1.2, camino: [
@@ -3740,7 +3805,63 @@ window.TOMAS_VIDEO = (() => {
     { nombre: "Especial · Muro de escaleras", pasos: [{ especial: "escaleras", seg: 22 }] },
     { nombre: "Especial · Cartel del Aleph", pasos: [{ especial: "cartel", seg: 20 }] },
   ];
-  return [...story, ...sitio, ...especiales];
+  // ---------- más puntos de vista (2026-11-26) ----------
+  const G = { z: 0, x: 1, y: 2 }, VOZ = datos.voces;
+  const R = (cap) => Math.max(0, SALA_CLAVE.indexOf(datos.ciclo[cap - 1]));      // la habitación de cada capítulo
+  const lect = (titulo, eje, cap, nombre, extra = {}) =>
+    ({ nombre: nombre + " · " + VOZ[eje] + " · cap. " + cap, pasos: [{ lectura: titulo, g: G[eje], r: R(cap), cerca: 12, ...extra }] });
+  // Las escaleras (la narración), enteras
+  const escaleras = [
+    lect("Escalera E4", "x", 1, "Narración I"), lect("Escalera E4", "y", 1, "Narración I"),
+    lect("Escalera E1", "z", 1, "Narración II"), lect("Escalera E3", "x", 1, "Narración III"),
+    lect("Escalera E5", "y", 1, "Narración IV"), lect("Escalera E7", "z", 1, "Narración V"),
+    lect("Escalera E4", "z", 2, "Narración I"), lect("Escalera E3", "y", 4, "Narración III"),
+  ];
+  // Los muros (el testimonio y las citas)
+  const muros = [
+    lect("Muro M1", "x", 1, "Testimonio I"), lect("Muro M3", "x", 1, "Testimonio II"),
+    lect("Muro M1", "y", 1, "Testimonio I"), lect("Muro M3", "z", 1, "Testimonio II"),
+    lect("Muro M1", "z", 3, "Testimonio I"), lect("Muro M1", "y", 6, "Testimonio I"),
+    lect("Muro M6", "z", 1, "Las citas II"), lect("Muro M4", "x", 2, "Las citas I"),
+  ].map((t) => (t.pasos[0].seg = 9, t));
+  // Las citas (anamorfosis): desde el mirador de cada voz
+  const citas = [["z", 2], ["x", 1], ["y", 1], ["x", 3], ["y", 5], ["z", 7]].map(([e, c]) => lect("Mirador", e, c, "La cita", { seg: 6 }));
+  // El folio de la empleada, en el núcleo de cada capítulo
+  const folios = [2, 3, 5, 8].map((c) => lect("Folio de la empleada", "z", c, "El folio", { seg: 9 }));
+  // Recorridos en otras gravedades y habitaciones
+  const Y = (k) => VID.enGravedad(k, "y");
+  const recorridos = [
+    { nombre: "Escalera desde la gravedad x", pasos: [{ camino: [X(I("Escalera", { atras: 10 })), X(I("Escalera", { t: 7 }))] }] },
+    { nombre: "Los pilonos, gravedad y", pasos: [{ camino: [Y(I("Pilonos", { atras: 12 })), Y(I("Pilonos", { t: 7 }))] }] },
+    { nombre: "El núcleo desde la gravedad x", pasos: [{ camino: [X(I("Aleph", { atras: 14 })), X(I("Aleph", { t: 7 }))] }] },
+    { nombre: "Habitación − − − (capítulo 6)", pasos: [{ camino: [S(I("Mausoleo", { atras: 16, mas: [0, 0, 4] }), [-1, -1, -1]), { ...S(I("Mausoleo"), [-1, -1, -1]), t: 8 }] }] },
+    { nombre: "Giro completo sobre la diagonal", pasos: [{ camino: VID.arco({ centro: [33, 33, 33], eje: [1, 1, 1], desde: [62, 14, 20], mira: [30, 30, 28],
+      a0: 0, a1: 360, seg: 24, pasos: 16, lente: 18, llevaArriba: true }) }] },
+    { nombre: "Entre las tres gravedades, de cerca", pasos: [{ camino: VID.arco({ centro: [22, 22, 22], eje: [1, 1, 1], desde: [34, 14, 9], mira: [20, 20, 20],
+      a0: 0, a1: -240, seg: 18, pasos: 12, lente: 16, llevaArriba: true }) }] },
+  ];
+  // Las columnatas: el glosario de cada cuento, 15 palabras corpóreas por franja, acostadas en los extremos de los
+  // rectángulos áureos (plano z = Babel, x = Jardín, y = Aleph). Se arman en el plano z (franja de y = 69,6 a 112,6,
+  // columnas cada 9,94 m en x) y se llevan a los otros planos con la misma permutación de las gravedades.
+  const LECT_ARRIBA = [1, 0, 0];                     // el «arriba» de las letras, visto desde +z
+  const sobre = (x, alto, t, lente = 24) => ({ p: [x, 91.1, -(1.76 + alto)], m: [x, 91.1, 0], u: LECT_ARRIBA, lente, t });   // se leen desde abajo del plano
+  const enPlano = (kfs, eje) => kfs.map((k) => VID.enGravedad(k, eje));
+  const CUENTO = { z: "Babel", x: "Jardín", y: "Aleph" };
+  const columnatas = [];
+  for (const eje of ["z", "x", "y"]) {
+    columnatas.push(
+      { nombre: "Glosario " + CUENTO[eje] + " · de frente", pasos: [{ camino: enPlano([sobre(62, 40, 0), sobre(-62, 40, 26)], eje), suave: false }] },
+      { nombre: "Glosario " + CUENTO[eje] + " · una palabra", pasos: [{ camino: enPlano([sobre(19.9, 46, 0), sobre(19.9, 34, 8)], eje) }] },
+      { nombre: "Glosario " + CUENTO[eje] + " · rasante", pasos: [{ camino: enPlano([
+        { p: [-9.94 * 2.5, 66, -6], m: [-9.94 * 2.5, 112, -1], u: [0, 0, -1], lente: 20, t: 0 },
+        { p: [-9.94 * 0.5, 80, -4], m: [9.94 * 2, 112, -1], u: [0, 0, -1], lente: 20, t: 6 },
+        { p: [9.94 * 2.5, 96, -5], m: [9.94 * 3, 113, 0], u: [0, 0, -1], lente: 20, t: 6 },
+      ], eje) }] });
+  }
+  columnatas.push({ nombre: "Glosario Babel · desde la habitación de abajo", pasos: [{ camino: [
+    { p: [30, 40, -18], m: [10, 95, -2], u: [0, 0, -1], lente: 22, t: 0 },
+    { p: [20, 58, -12], m: [0, 100, -1], u: [0, 0, -1], lente: 22, t: 8 }] }] });
+  return [...story, ...sitio, ...escaleras, ...muros, ...citas, ...folios, ...recorridos, ...columnatas, ...especiales];
 })();
 
 // ---------- Bucle ----------
