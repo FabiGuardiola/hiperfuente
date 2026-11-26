@@ -1419,14 +1419,17 @@ salasObj.forEach((sala) => GIROS.forEach((M, g) => {
   sala.add(c);
 }));
 
+// Las citas viejas del modelo (con «/») no se ven en ninguna habitación (2026-11-26): antes se descartaban solo en
+// la habitación escrita, y al cargar la página las otras mostraban los textos de versiones anteriores.
+salasObj.forEach((sala) => { for (const h of sala.children) if (h.userData.pieza === "TEXTOS")
+  h.traverse((o) => { if (o.isMesh) { o.userData.matOriginal = o.userData.matOriginal || o.material; o.material = materialSinCitas(o.userData.matOriginal); o.customDepthMaterial = profundidadSinCitas; } }); });
+
 // La habitación escrita: la del lector. Al cambiar de habitación se borra la anterior y se escribe la nueva.
 const escrita = { r: -1, nodos: [], filas: {} };
 function escribirSala(r) {
   if (escrita.r === r) return;
   for (const n of escrita.nodos) { n.parent && n.parent.remove(n); n.traverse((o) => o.geometry && o.geometry.dispose()); }
   if (escrita.r >= 0) for (const h of salasObj[escrita.r].children) if (h.userData.pieza === "SUPLENTE") h.visible = true;
-  if (escrita.r >= 0) for (const h of salasObj[escrita.r].children) if (h.userData.pieza === "TEXTOS")
-    h.traverse((o) => { if (o.isMesh && o.userData.matOriginal) { o.material = o.userData.matOriginal; o.customDepthMaterial = undefined; } });
   escrita.nodos = []; escrita.filas = {}; escrita.r = r;
   const S = salasM[r], espejo = S.determinant() < 0;
   const cap = datos.ciclo.indexOf(SALA_CLAVE[r]) + 1;
@@ -1450,8 +1453,6 @@ function escribirSala(r) {
     poner(ana && new THREE.Group().add(ana), "ANAMORFOSIS");
   });
   for (const h of salasObj[r].children) if (h.userData.pieza === "SUPLENTE") h.visible = false;
-  for (const h of salasObj[r].children) if (h.userData.pieza === "TEXTOS")
-    h.traverse((o) => { if (o.isMesh) { o.userData.matOriginal = o.userData.matOriginal || o.material; o.material = materialSinCitas(o.userData.matOriginal); o.customDepthMaterial = profundidadSinCitas; } });
   renderer.shadowMap.needsUpdate = true;
 }
 function salaDeCamara() {

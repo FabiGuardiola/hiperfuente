@@ -1416,14 +1416,17 @@ salasObj.forEach((sala) => GIROS.forEach((M, g) => {
   sala.add(c);
 }));
 
+// Las citas viejas del modelo (con «/») no se ven en ninguna habitación (2026-11-26): antes se descartaban solo en
+// la habitación escrita, y al cargar la página las otras mostraban los textos de versiones anteriores.
+salasObj.forEach((sala) => { for (const h of sala.children) if (h.userData.pieza === "TEXTOS")
+  h.traverse((o) => { if (o.isMesh) { o.userData.matOriginal = o.userData.matOriginal || o.material; o.material = materialSinCitas(o.userData.matOriginal); o.customDepthMaterial = profundidadSinCitas; } }); });
+
 // La habitación escrita: la del lector. Al cambiar de habitación se borra la anterior y se escribe la nueva.
 const escrita = { r: -1, nodos: [], filas: {} };
 function escribirSala(r) {
   if (escrita.r === r) return;
   for (const n of escrita.nodos) { n.parent && n.parent.remove(n); n.traverse((o) => o.geometry && o.geometry.dispose()); }
   if (escrita.r >= 0) for (const h of salasObj[escrita.r].children) if (h.userData.pieza === "SUPLENTE") h.visible = true;
-  if (escrita.r >= 0) for (const h of salasObj[escrita.r].children) if (h.userData.pieza === "TEXTOS")
-    h.traverse((o) => { if (o.isMesh && o.userData.matOriginal) { o.material = o.userData.matOriginal; o.customDepthMaterial = undefined; } });
   escrita.nodos = []; escrita.filas = {}; escrita.r = r;
   const S = salasM[r], espejo = S.determinant() < 0;
   const cap = datos.ciclo.indexOf(SALA_CLAVE[r]) + 1;
@@ -1447,8 +1450,6 @@ function escribirSala(r) {
     poner(ana && new THREE.Group().add(ana), "ANAMORFOSIS");
   });
   for (const h of salasObj[r].children) if (h.userData.pieza === "SUPLENTE") h.visible = false;
-  for (const h of salasObj[r].children) if (h.userData.pieza === "TEXTOS")
-    h.traverse((o) => { if (o.isMesh) { o.userData.matOriginal = o.userData.matOriginal || o.material; o.material = materialSinCitas(o.userData.matOriginal); o.customDepthMaterial = profundidadSinCitas; } });
   renderer.shadowMap.needsUpdate = true;
 }
 function salaDeCamara() {
@@ -2760,17 +2761,18 @@ addEventListener("blur", () => teclas.clear());
 // Un botón tocado con el mouse no se queda con el foco (si no, Espacio lo volvería a apretar).
 document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("button"); if (b && e.detail) b.blur(); });
 
-// ---------- Versión para video (2026-11-25): web/v3/video/ ----------
-// El mismo visor del sitio, sin interfaz, con tomas pregrabadas para grabar la pantalla (o grabar el lienzo
-// directamente a .webm). Lo arma armar_visor_v3.py; las tomas están en herramientas/video_tomas.js.
+// ---------- Versión para video (2026-11-25; 2026-11-26: instancias con flechas, todo dibujado en el lienzo) ----------
+// El mismo visor del sitio, sin interfaz, con instancias pregrabadas (tomas) para grabar. Lo arma armar_visor_v3.py;
+// las tomas están en herramientas/video_tomas.js y las pantallas especiales en herramientas/video_especiales.js.
+// Todo lo que se ve en la grabación (fundidos, carteles, pantallas especiales) se dibuja en el lienzo WebGL: así lo
+// toma el grabador del lienzo. Los botones (flechas, REC, panel) son de la página y no salen en la grabación.
 //
-// Teclas: H panel · Espacio guion completo · 1…9 una toma · Esc corta · F pantalla completa
+// Teclas: → / ← siguiente / anterior instancia · Espacio repite la actual · Esc corta · H panel · F pantalla completa
+//         G empieza / termina la grabación (.mp4 en Safari y Chrome; si no, .webm)
 //         P anota la pose actual en el borrador · Retroceso borra la última · B reproduce el borrador
-//         K copia el borrador (JSON) · N vacía el borrador · G graba la próxima reproducción a .webm
-//         C caminar / O cámara libre (para buscar poses) · E etiquetas de las esferas
-// Parámetros: ?vel=0.5 (todo más lento, para máquinas lentas: después se acelera en la edición)
-//             ?cuadros=30 (cuadro a cuadro: el tiempo avanza 1/30 s por cuadro, sin saltos; para grabar a .webm)
-//             ?ancho=1920&alto=1080 (tamaño fijo del lienzo) · ?toma=3 (arranca esa toma) · ?panel
+//         K copia el borrador (JSON) · N vacía el borrador · C caminar / O cámara libre · E etiquetas de las esferas
+// En el iPad: flechas abajo, REC, y dos toques en la esquina de arriba a la izquierda abren el panel.
+// Parámetros: ?ancho=1920&alto=1080 (tamaño fijo del lienzo, 16:9) · ?vel=0.5 · ?cuadros=30 · ?toma=3 · ?panel
 const VID = (() => {
   const P = new URLSearchParams(location.search);
   const vel = parseFloat(P.get("vel")) || 1;
@@ -2781,38 +2783,89 @@ const VID = (() => {
   const ahoraReal = performance.now.bind(performance);
   let real = ahoraReal(), virt = real;
   performance.now = () => virt;
+  let rep = null;                                    // la reproducción en curso: { pasos, i, t0, paso, ... }
   function tic() {
     const r = ahoraReal();
-    virt += fps ? 1000 / fps : Math.min(100, r - real) * vel;
+    const k = rep && rep.paso && rep.paso.vel ? rep.paso.vel : 1;      // un paso puede ir más rápido («vel»)
+    virt += (fps ? 1000 / fps : Math.min(100, r - real) * vel) * k;
     real = r;
   }
 
-  // --- capas propias: negro (fundidos) y carteles ---
+  // --- interfaz de la página (no sale en la grabación del lienzo) ---
   const est = document.createElement("style");
   est.textContent = `
 @font-face { font-family: "FabiBlock"; src: url("FabiBlock-Regular.otf"); }
-#vNegro { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 50; }
-#vCartel { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; gap: 2.2vh; pointer-events: none;
-  z-index: 51; opacity: 0; color: #E9E3D6; }
-#vCartel b { font: 400 11vh/0.9 "FabiBlock", sans-serif; letter-spacing: .04em; color: #E9E3D6; }
-#vCartel b.lacre { color: #9B3D2E; }
-#vCartel span { font: 400 2.6vh/1.4 "DM Mono", monospace; letter-spacing: .25em; text-transform: uppercase; color: #A8A398; }
-#vPanel { position: fixed; left: 12px; top: 12px; z-index: 60; max-width: min(460px, 90vw); max-height: 90vh; overflow: auto;
-  background: rgba(20,19,18,.92); color: #E9E3D6; font: 12px/1.45 "DM Mono", monospace; padding: 12px 14px; border-radius: 6px; }
-#vPanel h3 { font-size: 12px; margin: 10px 0 4px; color: #9B3D2E; letter-spacing: .12em; text-transform: uppercase; }
-#vPanel button { font: inherit; background: #2F4858; color: #E9E3D6; border: 0; padding: 3px 8px; margin: 2px; border-radius: 3px; cursor: pointer; }
-#vPanel button.rojo { background: #9B3D2E; }
+#vPanel { position: fixed; left: 12px; top: 12px; z-index: 60; max-width: min(480px, 92vw); max-height: 86vh; overflow: auto;
+  background: rgba(20,19,18,.94); color: #E9E3D6; font: 13px/1.45 "DM Mono", monospace; padding: 12px 14px; border-radius: 6px; }
+#vPanel h3 { font-size: 12px; margin: 10px 0 4px; color: #c0614f; letter-spacing: .12em; text-transform: uppercase; }
+#vPanel button { font: inherit; background: #2F4858; color: #E9E3D6; border: 0; padding: 5px 9px; margin: 2px; border-radius: 3px; cursor: pointer; }
+#vPanel button.rojo { background: #9B3D2E; } #vPanel button.act { outline: 2px solid #E9E3D6; }
 #vPanel pre { white-space: pre-wrap; color: #A8A398; margin: 4px 0; }
-#vAviso { position: fixed; right: 14px; bottom: 12px; z-index: 61; color: #E9E3D6; background: rgba(20,19,18,.85);
+#vAviso { position: fixed; left: 50%; transform: translateX(-50%); bottom: 74px; z-index: 61; color: #E9E3D6; background: rgba(20,19,18,.85);
   font: 12px "DM Mono", monospace; padding: 4px 9px; border-radius: 4px; opacity: 0; transition: opacity .3s; pointer-events: none; }
-#vGrabando { position: fixed; right: 14px; top: 12px; z-index: 61; width: 12px; height: 12px; border-radius: 50%; background: #c22; display: none; }
+#vNav { position: fixed; left: 0; right: 0; bottom: 10px; z-index: 59; display: flex; justify-content: center; align-items: center; gap: 10px;
+  pointer-events: none; font: 12px "DM Mono", monospace; color: #E9E3D6; }
+#vNav button { pointer-events: auto; width: 56px; height: 46px; border: 0; border-radius: 23px; background: rgba(20,19,18,.55);
+  color: #E9E3D6; font: 22px "DM Mono", monospace; cursor: pointer; }
+#vNav button.rec { width: 46px; font-size: 13px; }
+#vNav button.rec.on { background: #b3261e; }
+#vNav span { background: rgba(20,19,18,.55); padding: 5px 10px; border-radius: 12px; min-width: 210px; text-align: center; }
+body.vSinNav #vNav { display: none; }
 canvas { cursor: default; }`;
   document.head.appendChild(est);
   const capa = (id, tag = "div") => { const e = document.createElement(tag); e.id = id; document.body.appendChild(e); return e; };
-  const negro = capa("vNegro"), cartelE = capa("vCartel"), panel = capa("vPanel"), avisoE = capa("vAviso"), rec = capa("vGrabando");
+  const panel = capa("vPanel"), avisoE = capa("vAviso"), nav = capa("vNav");
+  nav.innerHTML = `<button data-a aria-label="Anterior">‹</button><span>—</span><button data-r aria-label="Repetir">↻</button>
+<button data-s aria-label="Siguiente">›</button><button class="rec" data-g aria-label="Grabar">REC</button>`;
+  const navTxt = nav.querySelector("span"), btnRec = nav.querySelector("[data-g]");
+  nav.querySelector("[data-a]").onclick = () => ir(-1);
+  nav.querySelector("[data-s]").onclick = () => ir(1);
+  nav.querySelector("[data-r]").onclick = () => ir(0);
+  btnRec.onclick = () => alternarGrabacion();
   panel.hidden = !P.has("panel");
   let avisoHasta = 0;
-  function aviso(t, seg = 2.5) { if (rep) return; avisoE.textContent = t; avisoE.style.opacity = 1; avisoHasta = ahoraReal() + seg * 1000; }
+  function aviso(t, seg = 2.5) { avisoE.textContent = t; avisoE.style.opacity = 1; avisoHasta = ahoraReal() + seg * 1000; }
+
+  // --- lo que se dibuja encima, en el lienzo: el negro de los fundidos y los carteles ---
+  const escEncima = new THREE.Scene(), camEncima = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const negroM = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false });
+  const lienzoCartel = document.createElement("canvas");
+  const texCartel = new THREE.CanvasTexture(lienzoCartel);
+  texCartel.encoding = THREE.sRGBEncoding;
+  const cartelM = new THREE.MeshBasicMaterial({ map: texCartel, transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false });
+  const quadNegro = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), negroM), quadCartel = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), cartelM);
+  quadCartel.renderOrder = 1;
+  escEncima.add(quadNegro, quadCartel);
+  let negroN = 0, cartelC = 0, quedaNegro = false;
+  const COLORES = { negro: "#000000", papel: "#E9E3D6", blanco: "#ffffff", lacre: "#9B3D2E" };
+  function pintarCartelTexto(p) {
+    const b = new THREE.Vector2();
+    renderer.getDrawingBufferSize(b);
+    lienzoCartel.width = b.x; lienzoCartel.height = b.y;
+    const g = lienzoCartel.getContext("2d"), H = b.y;
+    g.clearRect(0, 0, b.x, b.y);
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillStyle = p.lacre ? "#9B3D2E" : "#E9E3D6";
+    g.font = `${Math.round(H * 0.11)}px FabiBlock`;
+    if ("letterSpacing" in g) g.letterSpacing = Math.round(H * 0.004) + "px";
+    g.fillText(p.cartel, b.x / 2, H * (p.sub ? 0.47 : 0.5));
+    if (p.sub) {
+      g.fillStyle = "#A8A398";
+      g.font = `${Math.round(H * 0.026)}px "DM Mono", monospace`;
+      if ("letterSpacing" in g) g.letterSpacing = Math.round(H * 0.006) + "px";
+      g.fillText(p.sub.toUpperCase(), b.x / 2, H * 0.58);
+    }
+    texCartel.needsUpdate = true;
+  }
+  function encima() {
+    negroM.opacity = Math.min(1, Math.max(0, quedaNegro && !rep ? 1 : negroN));
+    cartelM.opacity = Math.min(1, Math.max(0, rep ? cartelC : 0));
+    if (negroM.opacity <= 0 && cartelM.opacity <= 0) return;
+    renderer.autoClear = false;
+    renderer.clearDepth();
+    renderer.render(escEncima, camEncima);
+    renderer.autoClear = true;
+  }
 
   // --- poses: en coordenadas de Blender. p = ojo, m = punto mirado, u = arriba, lente en mm ---
   const v3 = (b) => deBlender(b);
@@ -2830,7 +2883,7 @@ canvas { cursor: default; }`;
     const m = blenderAThree(ins.pos).addScaledVector(dir, d);
     const p = blenderAThree(ins.pos).addScaledVector(dir, -(extra.atras || 0));      // «atras»: retrocede sobre la mirada
     const u = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
-    const k = { p: enB(p), m: enB(m), u: enB(u), lente: ins.lente, t: extra.t || 0 };
+    const k = { p: enB(p), m: enB(m), u: enB(u), lente: extra.lente || ins.lente, t: extra.t || 0 };
     if (extra.mas) k.p = k.p.map((x, i) => x + extra.mas[i]);
     return k;
   }
@@ -2846,6 +2899,10 @@ canvas { cursor: default; }`;
     }
     return kfs;
   }
+  // la misma pose en otra gravedad (la x o la y: girada sobre la diagonal) o en otra habitación (reflejada)
+  const PERM = { z: (a) => a, x: (a) => [a[2], a[0], a[1]], y: (a) => [a[1], a[2], a[0]] };
+  const enGravedad = (k, eje) => ({ ...k, p: PERM[eje](k.p), m: PERM[eje](k.m), u: PERM[eje](k.u || [0, 0, 1]) });
+  const enSala = (k, s) => ({ ...k, p: k.p.map((x, i) => x * s[i]), m: k.m.map((x, i) => x * s[i]), u: (k.u || [0, 0, 1]).map((x, i) => x * s[i]) });
   function poseActual() {
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     let d = null;
@@ -2864,8 +2921,8 @@ canvas { cursor: default; }`;
     if (i >= kfs.length - 1) return kfs[kfs.length - 1];
     const k = kfs[i + 1].t ? (s - acum) / kfs[i + 1].t : 1;
     const A = kfs[Math.max(0, i - 1)], B = kfs[i], C = kfs[i + 1], D = kfs[Math.min(kfs.length - 1, i + 2)];
-    const mez = (c) => [0, 1, 2].map((j) => cr(A[c][j], B[c][j], C[c][j], D[c][j], k));
-    return { p: mez("p"), m: mez("m"), u: mez("u"), lente: B.lente + ((C.lente || B.lente) - B.lente) * k };
+    const mez = (c) => [0, 1, 2].map((j) => cr((A[c] || [0, 0, 1])[j], (B[c] || [0, 0, 1])[j], (C[c] || [0, 0, 1])[j], (D[c] || [0, 0, 1])[j], k));
+    return { p: mez("p"), m: mez("m"), u: mez("u"), lente: (B.lente || 24) + ((C.lente || B.lente || 24) - (B.lente || 24)) * k };
   }
   const mM = new THREE.Matrix4();
   function ponerPose(k) {
@@ -2878,37 +2935,33 @@ canvas { cursor: default; }`;
     camera.updateProjectionMatrix();
   }
 
-  // --- reproducción: una lista de pasos. Cada paso es un camino, un cartel o una lectura ---
-  let rep = null;                                    // { pasos, i, t0, ... }
+  // --- reproducción: una lista de pasos. Cada paso es un camino, un cartel, una lectura, un fundido o una pantalla especial ---
   const duracionCamino = (kfs) => kfs.reduce((a, k, i) => a + (i ? k.t : 0), 0);
-  function tomaAPasos(toma) {
-    const pasos = [];
-    for (const p of toma.pasos) pasos.push(p);
-    return pasos;
-  }
   function reproducir(tomas, nombre) {
     const pasos = [];
-    tomas.forEach((t, i) => { if (i) pasos.push({ fundido: t.fundido ?? 0.8 }); pasos.push(...tomaAPasos(t)); });
+    tomas.forEach((t, i) => { if (i) pasos.push({ fundido: t.fundido ?? 0.8 }); pasos.push(...t.pasos); });
     if (!pasos.length) return aviso("No hay pasos");
+    if (rep && rep.paso && rep.paso.especial) ESPECIALES.salir();
     if (vuelo) vuelo = null;
-    if (velo) terminarVelo();
+    if (velo) { velo.regreso = null; terminarVelo(); }
     ponerModo("orbitar");
     orbita.enabled = false;
-    rep = { pasos, i: -1, nombre, abre: tomas[0].abre ?? 1.2, cierra: tomas[tomas.length - 1].cierra ?? 1.2 };
-    rep.total = pasos.reduce((a, p) => a + durPaso(p), 0);
+    rep = { pasos, i: -1, nombre, abre: tomas[0].abre ?? 1.0, cierra: tomas[tomas.length - 1].cierra ?? 1.0 };
+    quedaNegro = false;
     avisoE.style.opacity = 0;
-    if (grabarProxima) empezarGrabacion();
     siguiente();
   }
   function durPaso(p) {
     if (p.camino) return duracionCamino(p.camino);
     if (p.cartel) return p.seg || 4;
+    if (p.especial) return p.seg || 15;
     if (p.lectura) return (p.seg || 10) + (p.viaje ?? 4);       // el viaje hasta la lectura es aproximado
     if (p.fundido) return p.fundido * 2;
     if (p.quieto) return p.quieto;
     return 0;
   }
   function siguiente() {
+    if (rep.paso && rep.paso.especial) ESPECIALES.salir();
     rep.i++;
     if (rep.i >= rep.pasos.length) return terminar();
     const p = rep.pasos[rep.i];
@@ -2926,49 +2979,55 @@ canvas { cursor: default; }`;
       rep.lectura = d;
       rep.llego = 0;
     }
-    if (p.cartel) {
-      cartelE.innerHTML = `<b class="${p.lacre ? "lacre" : ""}">${p.cartel}</b>` + (p.sub ? `<span>${p.sub}</span>` : "");
-    }
+    if (p.cartel) pintarCartelTexto(p);
+    if (p.especial) ESPECIALES.entrar(p);
   }
   function terminar() {
-    const fueGrabando = grabando;
+    const final = rep;
     rep = null;
-    cartelE.style.opacity = 0;
-    negro.style.opacity = 0;
+    negroN = 0;
+    quedaNegro = !!(final && final.cierra);               // queda en negro hasta la próxima instancia (o hasta que se mueva la cámara)
     const delante = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     orbita.target.copy(camera.position).addScaledVector(delante, 30);
     camera.up.set(0, 1, 0);
     orbita.enabled = true;
     orbita.update();
-    if (fueGrabando) pararGrabacion();
+  }
+  function cortar() {
+    if (!rep) return;
+    if (rep.paso && rep.paso.especial) ESPECIALES.salir();
+    if (velo) { velo.regreso = null; terminarVelo(); }
+    vuelo = null;
+    rep.paso = null;
+    terminar();
   }
   // devuelve true si la toma maneja la cámara en este cuadro (si no, sigue el visor: viajes y velos de las lecturas)
   function paso() {
     if (avisoHasta && ahoraReal() > avisoHasta) { avisoE.style.opacity = 0; avisoHasta = 0; }
-    if (!rep) return false;
+    if (!rep) { negroN = 0; return false; }
     const p = rep.paso, s = (performance.now() - rep.t0) / 1000, dur = durPaso(p);
-    // negro: al abrir el guion, al cerrarlo y en los fundidos entre tomas
+    // negro: al abrir, al cerrar, en los fundidos entre tomas y alrededor de las lecturas
     let n = 0;
-    if (p.fundido) n = 1 - Math.abs(s / p.fundido - 1);
+    if (p.fundido) { n = 1 - Math.abs(s / p.fundido - 1); negroM.color.set(COLORES[p.color] || p.color || "#000"); }
+    else negroM.color.set("#000");
     if (rep.i === 0 && rep.abre) n = Math.max(n, 1 - s / rep.abre);
     if (rep.i === rep.pasos.length - 1 && rep.cierra && !p.lectura) n = Math.max(n, 1 - (dur - s) / rep.cierra);
-    // la lectura: los «seg» cuentan desde que se cierra el velo (al llegar); se corta en negro
     if (p.lectura && rep.llego) n = Math.max(n, 1 - ((p.seg || 10) - (performance.now() - rep.llego) / 1000) / 0.8);
-    if (rep.trasLectura) n = Math.max(n, 1 - s / 0.8);            // y lo que sigue se abre desde negro
+    if (rep.trasLectura) n = Math.max(n, 1 - s / 0.8);
     if (p.cartel) n = Math.max(n, p.sobreNegro === false ? 0 : 1);
-    negro.style.opacity = Math.min(1, Math.max(0, n)).toFixed(3);
-    let c = 0;
-    if (p.cartel) { const f = p.fade || 0.9; c = Math.min(1, s / f, (dur - s) / f); }
-    cartelE.style.opacity = Math.max(0, c).toFixed(3);
+    negroN = n;
+    cartelC = 0;
+    if (p.cartel) { const f = p.fade || 0.9; cartelC = Math.min(1, s / f, (dur - s) / f); }
     if (p.camino) {
       const tt = p.suave === false ? s : dur * (0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, s / dur)));   // arranca y frena suave
       ponerPose(muestra(p.camino, tt));
     }
+    if (p.especial) ESPECIALES.paso(s, dur);
     if (p.lectura) {
-      // la lectura la hace el visor (viaje, velo, subida por la escalera); se corta a los «seg» segundos
+      // la lectura la hace el visor (viaje, velo, subida por la escalera); se corta a los «seg» segundos del velo
       if (velo && !rep.llego) rep.llego = performance.now();
       if (rep.llego && (performance.now() - rep.llego) / 1000 >= (p.seg || 10)) {
-        if (velo) { velo.regreso = null; terminarVelo(); }            // sin volver a la bandeja ni pasar a caminar
+        if (velo) { velo.regreso = null; terminarVelo(); }
         vuelo = null; siguiente(); return true;
       }
       return !(vuelo || velo);
@@ -2976,32 +3035,49 @@ canvas { cursor: default; }`;
     if (s >= dur) siguiente();
     return true;
   }
+  // dibuja la pantalla especial en lugar del espacio (true = ya dibujó)
+  function dibujar() { return !!(rep && rep.paso && rep.paso.especial && ESPECIALES.dibujar()); }
 
-  // --- grabación directa del lienzo (.webm) ---
-  let grabarProxima = false, grabando = null;
+  // --- instancias: se recorren con las flechas ---
+  let idx = -1;
+  const lista = () => window.TOMAS_VIDEO || [];
+  function ir(d) {
+    const T = lista();
+    if (!T.length) return;
+    idx = d === 0 ? Math.max(0, idx) : Math.min(T.length - 1, Math.max(0, idx + d));
+    tocarToma(idx);
+  }
+  function pintarNav() {
+    const T = lista();
+    navTxt.textContent = idx < 0 ? `${T.length} instancias · › para empezar` : `${idx + 1}/${T.length} · ${T[idx].nombre}`;
+  }
+
+  // --- grabación directa del lienzo: G o REC empiezan y terminan ---
+  let grabando = null;
+  function alternarGrabacion() { grabando ? pararGrabacion() : empezarGrabacion(); }
   function empezarGrabacion() {
-    grabarProxima = false;
+    if (!window.MediaRecorder || !renderer.domElement.captureStream) { aviso("Este navegador no puede grabar el lienzo", 5); return; }
     const canal = renderer.domElement.captureStream(fps ? 0 : 60);
     if (audioGrab && !fps) for (const t of audioGrab.stream.getAudioTracks()) canal.addTrack(t);   // el sonido, si está prendido
-    // Safari (iPad) graba .mp4; Chrome, .webm
     const tipo = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
-      .find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+      .find((t) => MediaRecorder.isTypeSupported(t));
     const ext = tipo && tipo.startsWith("video/mp4") ? "mp4" : "webm";
     const mr = new MediaRecorder(canal, { mimeType: tipo, videoBitsPerSecond: 24e6, audioBitsPerSecond: 192000 });
-    const partes = [];
+    const partes = [], nombre = "hiperfuente_" + new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     mr.ondataavailable = (e) => e.data.size && partes.push(e.data);
     mr.onstop = () => {
       const a = document.createElement("a");
-      a.href = URL.createObjectURL(new Blob(partes, { type: tipo.split(";")[0] }));
-      a.download = "hiperfuente_" + ultimoNombre.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\W+/g, "_") + "_" + Date.now() + "." + ext;
-      a.click();
-      aviso("Grabación guardada" + (fps ? ` · pasala a ${fps} cuadros con ffmpeg (setpts=N/${fps}/TB)` : ""), 8);
+      a.href = URL.createObjectURL(new Blob(partes, { type: (tipo || "video/webm").split(";")[0] }));
+      a.download = nombre + "." + ext;
+      document.body.appendChild(a); a.click(); a.remove();
+      aviso("Grabación guardada: " + a.download + (fps ? ` · pasala a ${fps} cuadros con ffmpeg (setpts=N/${fps}/TB)` : ""), 8);
     };
     mr.start(1000);
-    grabando = { mr, pista: canal.getVideoTracks()[0], nombre: rep?.nombre || "toma" };
-    rec.style.display = "block";
+    grabando = { mr, pista: canal.getVideoTracks()[0] };
+    btnRec.classList.add("on"); btnRec.textContent = "■";
+    aviso("Grabando", 1.5);
+    pintarPanel();
   }
-  let ultimoNombre = "toma";
   // El sonido del sitio: además de los parlantes, va a una pista que se suma a la grabación.
   let audioGrab = null;
   function salidaAudio(ctx) {
@@ -3010,7 +3086,12 @@ canvas { cursor: default; }`;
     try { audioGrab = ctx.createMediaStreamDestination(); g.connect(audioGrab); } catch (_) {}
     return g;
   }
-  function pararGrabacion() { if (!grabando) return; ultimoNombre = grabando.nombre; grabando.mr.stop(); grabando = null; rec.style.display = "none"; }
+  function pararGrabacion() {
+    if (!grabando) return;
+    grabando.mr.stop(); grabando = null;
+    btnRec.classList.remove("on"); btnRec.textContent = "REC";
+    pintarPanel();
+  }
   function cuadroHecho() { if (grabando && fps && grabando.pista.requestFrame) grabando.pista.requestFrame(); }
 
   // --- tamaño fijo del lienzo (para grabar a una resolución exacta) ---
@@ -3037,30 +3118,38 @@ canvas { cursor: default; }`;
   const tomaBorrador = () => ({ nombre: "Borrador", pasos: [{ camino: borrador.map((k, i) => ({ ...k, t: i ? k.t : 0 })) }] });
 
   function pintarPanel() {
-    const T = window.TOMAS_VIDEO || [];
-    panel.innerHTML = `<b>Hiperfuente · video</b> <small>(H oculta este panel)</small>
-<h3>Tomas</h3>${T.map((t, i) => `<button data-t="${i}">${i + 1} · ${t.nombre}</button>`).join("")}
-<br><button data-todo class="rojo">Espacio · guion completo</button> <button data-grabar>${grabarProxima ? "● grabará la próxima" : "G · grabar la próxima a .webm"}</button>
+    const T = lista();
+    panel.innerHTML = `<b>Hiperfuente · video</b> <small>(H o dos toques en la esquina cierran)</small>
+<h3>Instancias</h3>${T.map((t, i) => `<button data-t="${i}" class="${i === idx ? "act" : ""}">${i + 1} · ${t.nombre}</button>`).join("")}
+<br><button data-todo>Todas seguidas</button> <button data-grabar class="rojo">${grabando ? "■ Terminar grabación" : "● Grabar (G)"}</button>
+<h3>Pantalla</h3><button data-f>Pantalla completa (F)</button><button data-s>♪ Sonido</button><button data-nav>Flechas sí/no</button>
+<button data-e>Etiquetas (E)</button><button data-o>Cámara libre (O)</button><button data-c>Caminar (C)</button>
 <h3>Borrador (${borrador.length} poses)</h3>
-<button data-p>P · anotar pose</button><button data-b>B · reproducir</button><button data-k>K · copiar JSON</button><button data-x>⌫ última</button><button data-n>N · vaciar</button>
+<button data-p>P · anotar pose</button><button data-b>B · reproducir</button><button data-k>K · copiar</button><button data-x>⌫ última</button><button data-n>N · vaciar</button>
 <pre>${borrador.map((k, i) => `${i + 1}. t ${k.t}s · lente ${k.lente} · p ${k.p.map((x) => x.toFixed(1)).join(", ")}`).join("\n")}</pre>
-<h3>Pantalla</h3><button data-f>F · pantalla completa</button><button data-s>♪ sonido</button><button data-e>E · etiquetas</button><button data-o>O · cámara libre</button><button data-c>C · caminar</button>
-<h3>Navegar</h3><pre>Arrastrar: girar · rueda: acercar · WASD/QE: volar (Shift rápido)
-C: caminar · O: cámara libre · E: etiquetas · F: pantalla completa
-Tiempo: vel ${vel}${fps ? " · cuadro a cuadro a " + fps : ""}${tam ? " · lienzo " + tam.join("×") : ""}</pre>`;
-    panel.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => tocarToma(+b.dataset.t)));
+<pre>→ ← instancias · Espacio repite · Esc corta
+Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?ancho=1920&alto=1080)"}${vel !== 1 ? " · vel " + vel : ""}${fps ? " · cuadro a cuadro a " + fps : ""}</pre>`;
+    panel.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => { idx = +b.dataset.t; tocarToma(idx); }));
     const on = (sel, f) => { const b = panel.querySelector(sel); if (b) b.onclick = f; };
-    on("[data-todo]", () => { panel.hidden = true; reproducir(T, "Guion"); });
-    on("[data-grabar]", () => { grabarProxima = !grabarProxima; pintarPanel(); });
+    on("[data-todo]", () => { panel.hidden = true; idx = 0; reproducir(T, "Todas"); });
+    on("[data-grabar]", alternarGrabacion);
     on("[data-p]", anotar); on("[data-b]", () => { panel.hidden = true; reproducir([tomaBorrador()], "Borrador"); });
     on("[data-f]", pantallaCompleta);
     on("[data-s]", () => { document.getElementById("sonido").click(); });
+    on("[data-nav]", () => document.body.classList.toggle("vSinNav"));
     on("[data-e]", () => { etiquetas = !etiquetas; etiquetasClave = ""; });
-    on("[data-o]", () => { if (!rep) ponerModo("orbitar"); });
-    on("[data-c]", () => { if (!rep) recorrer(); });
+    on("[data-o]", () => { cortar(); quedaNegro = false; ponerModo("orbitar"); });
+    on("[data-c]", () => { cortar(); quedaNegro = false; recorrer(); });
     on("[data-k]", copiar); on("[data-x]", () => { borrador.pop(); guardar(); }); on("[data-n]", () => { borrador = []; guardar(); });
   }
-  function tocarToma(i) { const T = window.TOMAS_VIDEO || []; if (T[i]) { panel.hidden = true; reproducir([T[i]], T[i].nombre); } }
+  function tocarToma(i) {
+    const T = lista();
+    if (!T[i]) return;
+    idx = i;
+    panel.hidden = true;
+    pintarNav();
+    reproducir([T[i]], T[i].nombre);
+  }
   function anotar() { borrador.push(poseActual()); guardar(); aviso("Pose " + borrador.length + " anotada"); }
   function copiar() {
     const txt = JSON.stringify(borrador.map((k, i) => ({ ...k, t: i ? k.t : 0 })));
@@ -3076,96 +3165,362 @@ Tiempo: vel ${vel}${fps ? " · cuadro a cuadro a " + fps : ""}${tam ? " · lienz
   // En el iPad (sin teclado): dos toques seguidos en la esquina de arriba a la izquierda abren o cierran el panel.
   let toqueEsquina = 0;
   addEventListener("pointerdown", (e) => {
-    if (e.clientX > 90 || e.clientY > 90) return;
+    if (e.clientX > 90 || e.clientY > 90) {
+      if (!rep && e.target === renderer.domElement) quedaNegro = false;     // al mover la cámara a mano se ve el espacio
+      return;
+    }
     const t = ahoraReal();
     if (t - toqueEsquina < 450) { panel.hidden = !panel.hidden; pintarPanel(); toqueEsquina = 0; } else toqueEsquina = t;
   }, true);
   addEventListener("keydown", (e) => {
     if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
     const k = e.code;
-    if (k === "KeyH") { panel.hidden = !panel.hidden; pintarPanel(); }
-    else if (k === "Space" && modo !== "caminar") { e.preventDefault(); rep ? terminar() : reproducir(window.TOMAS_VIDEO || [], "Guion"); }
-    else if (/^Digit[1-9]$/.test(k)) tocarToma(+k.slice(5) - 1);
-    else if (k === "Escape" && rep) terminar();
+    const tomar = () => { e.preventDefault(); e.stopImmediatePropagation(); };
+    if (k === "ArrowRight" || k === "PageDown") { tomar(); ir(1); }
+    else if (k === "ArrowLeft" || k === "PageUp") { tomar(); ir(-1); }
+    else if (k === "Space" && modo !== "caminar") { tomar(); ir(0); }
+    else if (k === "KeyH") { panel.hidden = !panel.hidden; pintarPanel(); }
+    else if (k === "Escape" && rep) cortar();
     else if (k === "KeyF") pantallaCompleta();
+    else if (k === "KeyG") alternarGrabacion();
     else if (k === "KeyP") anotar();
     else if (k === "Backspace") { borrador.pop(); guardar(); aviso("Quedan " + borrador.length); }
     else if (k === "KeyB") reproducir([tomaBorrador()], "Borrador");
     else if (k === "KeyK") copiar();
     else if (k === "KeyN") { borrador = []; guardar(); aviso("Borrador vacío"); }
-    else if (k === "KeyG") { grabarProxima = !grabarProxima; aviso(grabarProxima ? "La próxima reproducción se graba" : "No se graba"); pintarPanel(); }
-    else if (k === "KeyC" && !rep) recorrer();
-    else if (k === "KeyO" && !rep) ponerModo("orbitar");
+    else if (k === "KeyC" && !rep) { quedaNegro = false; recorrer(); }
+    else if (k === "KeyO" && !rep) { quedaNegro = false; ponerModo("orbitar"); }
     else if (k === "KeyE") { etiquetas = !etiquetas; etiquetasClave = ""; }
   }, true);
 
   function empezar() {
+    fijo();
     pintarPanel();
+    pintarNav();
+    document.fonts && document.fonts.load("100px FabiBlock");
     const t = parseInt(P.get("toma"));
     if (t) setTimeout(() => tocarToma(t - 1), 600);
-    else aviso("H (o dos toques en la esquina): panel · Espacio: guion · 1–9: tomas", 6);
+    else aviso("› siguiente instancia · REC graba · dos toques en la esquina: panel", 6);
   }
-  return { salidaAudio, tic, paso, fijo, cuadroHecho, empezar, deInstancia, arco, poseActual, ponerPose, reproducir,
-           get activo() { return !!rep; }, get etiquetas() { return etiquetas; } };
+  return { salidaAudio, tic, paso, dibujar, encima, fijo, cuadroHecho, empezar, deInstancia, arco, enGravedad, enSala,
+           poseActual, ponerPose, reproducir, get activo() { return !!rep; }, get etiquetas() { return etiquetas; } };
 })();
 window.VID = VID;
 
-// ---------- Tomas del video (2026-11-25) ----------
-// Cada toma es una lista de pasos, uno después del otro:
+// ---------- Pantallas especiales del video (2026-11-26) ----------
+// Solo existen en la versión para video. Se dibujan en el lienzo en lugar del espacio:
+//   · "escaleras": la pantalla entera llena de las letras celestes de las escaleras (FabiBlock corpórea, cara cian
+//     claro y cantos cian oscuro, como en el sitio), sobre negro, armadas como un muro. Las letras giran y palabras
+//     al azar se detienen de frente un rato y vuelven a girar.
+//   · "cartel": el cartel de aeropuerto del Aleph a pantalla completa: las paletas giran revueltas y después se
+//     asientan una por una en el folio de la empleada; ya asentado, alguna letra da unas vueltas y vuelve.
+const ESPECIALES = (() => {
+  let actual = null;
+  const negroFondo = new THREE.Color(0x000000);
+
+  // ---------------- muro de escaleras ----------------
+  const escMuro = new THREE.Scene();
+  escMuro.background = negroFondo;
+  const camMuro = new THREE.PerspectiveCamera(30, 16 / 9, 0.5, 400);
+  const D = 40, FILAS_MURO = 13;
+  const uMuro = { uT: { value: 0 }, uEst: { value: null }, uN: { value: 1 } };
+  let muro = null, palabrasMuro = 0, estados = null, texEst = null, quietas = [];
+  function textoEscaleras() {
+    const t = [];
+    for (const k of Object.keys(datos.capas || {})) for (const v of "zxy") if (datos.capas[k][v]) t.push(datos.capas[k][v].narracion || "");
+    return mayus(t.join(" ")).replace(/\s*\/\s*/g, " ").split(/\s+/).filter(Boolean);
+  }
+  function materialMuro(nombre) {
+    const m = new THREE.MeshBasicMaterial({ color: colorDe(nombre), side: THREE.DoubleSide });
+    m.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, uMuro);
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", `#include <common>
+        attribute vec3 aC; attribute float aW; uniform float uT, uN; uniform sampler2D uEst;
+        mat3 giroY(float a){ float c = cos(a), s = sin(a); return mat3(c, 0., -s, 0., 1., 0., s, 0., c); }`)
+        .replace("#include <begin_vertex>", `#include <begin_vertex>
+        vec4 est = texture2D(uEst, vec2((aW + 0.5) / uN, 0.5));
+        float k = clamp((uT - est.r) / 0.8, 0.0, 1.0); k = k * k * (3.0 - 2.0 * k);
+        float gira = est.g > 0.5 ? 1.0 - k : k;                       // g = 1: se está deteniendo; 0: vuelve a girar
+        float azar = fract(sin(dot(aC.xy, vec2(12.9898, 78.233))) * 43758.5453);
+        float ritmo = 0.35 + 0.2 * azar, des = azar - aC.x * 0.015;     // giran sin parar, cada una a su ritmo
+        float fase = uT * ritmo + des, fase0 = est.r * ritmo + des;
+        // al detenerse, va a la vuelta entera más próxima (de frente); al arrancar, sale de ahí
+        float quieta = est.g > 0.5 ? ceil(fase0 + 0.3) : floor(fase0);
+        float ang = 6.28318 * mix(quieta, fase, gira);
+        transformed = aC + giroY(ang) * (transformed - aC);`);
+    };
+    m.customProgramCacheKey = () => "muroEsc";
+    return m;
+  }
+  function armarMuro() {
+    const pal = textoEscaleras();
+    const h = 2 * D * Math.tan(THREE.MathUtils.degToRad(15)), w = h * 2.1;   // un poco más ancho que 16:9: sangra por los lados
+    const alto = h / FILAS_MURO, tam = (alto * 0.74) / ALTO_REF, tr = 0.94, esp = glifo(" ", 0).adv * tam;
+    const prof = 0.1 / tam;
+    const pos = { f: [], c: [] }, ctr = { f: [], c: [] }, pw = { f: [], c: [] };
+    let k = 0, nPal = 0;
+    for (let r = 0; r < FILAS_MURO + 1; r++) {
+      const y = h / 2 - alto * (r + 0.5) + alto * 0.5;
+      let x = -w / 2 - Math.random() * 3;
+      while (x < w / 2) {
+        const p = pal[k++ % pal.length], id = nPal++;
+        for (const ch of p) {
+          const gl = glifo(ch, prof);
+          if (gl.caja) {
+            const ox = x, oy = y - ALTO_REF * tam / 2;
+            const cx = ox + (gl.caja.min.x + gl.caja.max.x) / 2 * tam, cy = oy + (gl.caja.min.y + gl.caja.max.y) / 2 * tam;
+            for (const [src, q] of [[gl.frente, "f"], [gl.canto, "c"]]) {
+              if (!src) continue;
+              for (let i = 0; i < src.length; i += 3) {
+                pos[q].push(ox + src[i] * tam, oy + src[i + 1] * tam, src[i + 2] * tam);
+                ctr[q].push(cx, cy, 0); pw[q].push(id);
+              }
+            }
+          }
+          x += gl.adv * tam * tr;
+        }
+        x += esp * tr * 1.4;
+      }
+    }
+    palabrasMuro = nPal;
+    estados = new Float32Array(nPal * 4);
+    for (let i = 0; i < nPal; i++) estados[i * 4] = -100;
+    texEst = new THREE.DataTexture(estados, nPal, 1, THREE.RGBAFormat, THREE.FloatType);
+    texEst.needsUpdate = true;
+    uMuro.uEst.value = texEst; uMuro.uN.value = nPal;
+    muro = new THREE.Group();
+    for (const [q, nombre] of [["f", "Color_5cc6d2"], ["c", "Color_1e6973"]]) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(pos[q], 3));
+      g.setAttribute("aC", new THREE.Float32BufferAttribute(ctr[q], 3));
+      g.setAttribute("aW", new THREE.Float32BufferAttribute(pw[q], 1));
+      const m = new THREE.Mesh(g, materialMuro(nombre));
+      m.frustumCulled = false;
+      muro.add(m);
+    }
+    escMuro.add(muro);
+  }
+  function pasoMuro(s, dur) {
+    uMuro.uT.value = s;
+    // cada tanto, una palabra que gira se detiene de frente; a los 2,5 a 6 s vuelve a girar
+    const meta = 0.06 + 0.3 * Math.min(1, s / (dur * 0.7));           // cada vez más palabras quietas
+    let cambio = false;
+    quietas = quietas.filter((q) => {
+      if (s < q.hasta) return true;
+      estados[q.i * 4] = s; estados[q.i * 4 + 1] = 0; cambio = true; return false;
+    });
+    let n = 0;
+    while (quietas.length < meta * palabrasMuro && n++ < 3 && s < dur - 2) {
+      const i = Math.floor(Math.random() * palabrasMuro);
+      if (quietas.some((q) => q.i === i)) continue;
+      estados[i * 4] = s; estados[i * 4 + 1] = 1; cambio = true;
+      quietas.push({ i, hasta: s + 2.5 + Math.random() * 3.5 });
+    }
+    if (cambio) texEst.needsUpdate = true;
+    // la cámara se acerca apenas
+    const u = s / dur;
+    camMuro.position.set(Math.sin(u * 2) * 0.6, Math.sin(u * 3 + 1) * 0.3, D + 3 - 5 * u);
+    camMuro.lookAt(0, 0, 0);
+  }
+
+  // ---------------- cartel de aeropuerto a pantalla completa ----------------
+  const escCartel = new THREE.Scene();
+  escCartel.background = negroFondo;
+  const camCartel = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 2);
+  const CCOLS = 40, CFILAS = 13, CW2 = 48, CH2 = 84;
+  const lz = document.createElement("canvas");
+  lz.width = CCOLS * CW2; lz.height = CFILAS * CH2;
+  const lg = lz.getContext("2d");
+  const texCartel = new THREE.CanvasTexture(lz);
+  texCartel.encoding = THREE.sRGBEncoding;
+  texCartel.anisotropy = 4;
+  const planoCartel = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.MeshBasicMaterial({ map: texCartel, toneMapped: false }));
+  escCartel.add(planoCartel);
+  let cartel = null;
+  function filasCartel() {
+    const palabras = (datos.folios || []).join(" ").toUpperCase().split(/\s+/).filter(Boolean);
+    const filas = [];
+    let f = "";
+    for (const w of palabras) {
+      if (filas.length >= CFILAS) break;
+      if (f && f.length + 1 + w.length > CCOLS) { filas.push(f); f = w; } else f = f ? f + " " + w : w;
+    }
+    while (filas.length < CFILAS) filas.push(f), f = "";
+    return filas.slice(0, CFILAS).map((l) => [...l.padEnd(CCOLS).slice(0, CCOLS)].map((ch) => (ALFABETO.includes(ch) ? ch : " ")));
+  }
+  const azarLetra = () => ALFABETO[Math.floor(Math.random() * ALFABETO.length)];
+  function dibujarCartelGrande() {
+    const c = cartel, w = CW2, h = CH2;
+    lg.fillStyle = "#16191c"; lg.fillRect(0, 0, lz.width, lz.height);
+    lg.font = `500 ${Math.round(h * 0.57)}px 'DM Mono', monospace`; lg.textAlign = "center"; lg.textBaseline = "middle";
+    for (let f = 0; f < CFILAS; f++) for (let k = 0; k < CCOLS; k++) {
+      lg.fillStyle = "#24282c"; lg.fillRect(k * w + 3, f * h + 5, w - 6, h - 10);
+      const ch = c.actual[f][k];
+      lg.fillStyle = ch === c.objetivo[f][k] ? "#f3efe4" : "#a8a398";
+      lg.fillText(ch, k * w + w / 2, f * h + h / 2 + 3);
+      lg.fillStyle = "#16191c"; lg.fillRect(k * w + 3, f * h + h / 2 - 1.5, w - 6, 3);     // la ranura de la paleta
+    }
+    texCartel.needsUpdate = true;
+  }
+  function pasoCartel(s, dur) {
+    const c = cartel;
+    if (s - c.ultimo < 0.05) return;
+    c.ultimo = s;
+    const revuelto = s < 3;                         // primero, todas revueltas; después se asientan de izquierda a derecha
+    for (let f = 0; f < CFILAS; f++) for (let k = 0; k < CCOLS; k++) {
+      const obj = c.objetivo[f][k], cur = c.actual[f][k];
+      if (revuelto) { if (Math.random() < 0.4) c.actual[f][k] = azarLetra(); continue; }
+      const giro = c.giros.find((g) => g.f === f && g.k === k);
+      if (giro) { giro.n--; c.actual[f][k] = giro.n > 0 ? ALFABETO[(ALFABETO.indexOf(obj) + giro.n) % ALFABETO.length] : obj; continue; }
+      if (cur !== obj && Math.random() < 0.95 - k * 0.015 - f * 0.01) c.actual[f][k] = ALFABETO[(ALFABETO.indexOf(cur) + 1) % ALFABETO.length];
+    }
+    c.giros = c.giros.filter((g) => g.n > 0);
+    if (!revuelto && s > c.proximoGiro) {
+      c.proximoGiro = s + 0.4 + Math.random() * 1.2;
+      const llenas = [];
+      c.objetivo.forEach((fila, f) => fila.forEach((ch, k) => { if (ch !== " " && c.actual[f][k] === ch) llenas.push([f, k]); }));
+      if (llenas.length) { const [f, k] = llenas[Math.floor(Math.random() * llenas.length)]; c.giros.push({ f, k, n: 3 + Math.floor(Math.random() * 5) }); }
+    }
+    dibujarCartelGrande();
+  }
+
+  // ---------------- común ----------------
+  const tamLienzo = new THREE.Vector2();
+  function entrar(p) {
+    actual = p.especial;
+    if (actual === "escaleras") {
+      if (!muro) armarMuro();
+      for (let i = 0; i < palabrasMuro; i++) { estados[i * 4] = -100; estados[i * 4 + 1] = 0; }
+      texEst.needsUpdate = true; quietas = [];
+    }
+    if (actual === "cartel") {
+      const objetivo = filasCartel();
+      cartel = { objetivo, actual: objetivo.map((f) => f.map(azarLetra)), giros: [], ultimo: -1, proximoGiro: 6 };
+      dibujarCartelGrande();
+    }
+  }
+  function salir() { actual = null; }
+  function paso(s, dur) {
+    if (actual === "escaleras") pasoMuro(s, dur);
+    if (actual === "cartel") pasoCartel(s, dur);
+  }
+  function dibujar() {
+    if (!actual) return false;
+    renderer.getDrawingBufferSize(tamLienzo);
+    const a = tamLienzo.x / tamLienzo.y;
+    if (actual === "escaleras") {
+      camMuro.aspect = a; camMuro.updateProjectionMatrix();
+      renderer.render(escMuro, camMuro);
+    } else if (actual === "cartel") {
+      // el cartel llena la pantalla (se recorta lo que sobra, sin deformar)
+      const ac = lz.width / lz.height;
+      planoCartel.scale.set(ac > a ? ac / a : 1, ac > a ? 1 : a / ac, 1);
+      renderer.render(escCartel, camCartel);
+    }
+    return true;
+  }
+  return { entrar, salir, paso, dibujar };
+})();
+
+// ---------- Instancias del video (2026-11-26) ----------
+// En orden: las 12 del storyboard (renders/… Storyboard.pdf), después las instancias del sitio y al final las
+// pantallas especiales (solo de esta versión). Se pasan con las flechas.
+// Cada instancia es una lista de pasos, uno después del otro:
 //   { camino: [cuadros clave] }       la cámara recorre los cuadros clave (arranca y frena suave)
-//   { cartel: "TEXTO", sub: "...", seg: 4, lacre: true }   un cartel sobre negro
-//   { lectura: "Muro M1", g: 0, seg: 10 }   abre la lectura del sitio (viaje, velo, escalera que sube) y la corta a los seg
-//   { quieto: 3 }                      se queda quieta
+//   { lectura: "Muro M1", g: 0, seg: 10 }   la lectura del sitio (viaje, velo, escalera que sube), cortada a los seg
+//   { fundido: 0.4, color: "papel" }  un fundido (negro, papel, blanco o lacre)
+//   { especial: "escaleras" | "cartel", seg: 20 }   una pantalla especial
+//   { cartel: "TEXTO", sub: "…", seg: 4 }   un cartel sobre negro · { quieto: 2 }
+// Cualquier paso acepta «vel» (1,6 = 60 % más rápido).
 // Un cuadro clave: { p: ojo, m: punto mirado, u: arriba, lente: mm, t: segundos desde el anterior }, en coordenadas
-// de Blender (metros). Se pueden anotar con la tecla P en la página /video y copiar con K.
-// Ayudas: VID.deInstancia("Mirador", { t, atras, mas, d }) toma la pose de una instancia del sitio;
-//         VID.arco({ centro, eje, desde, mira, a0, a1, seg, lente, llevaArriba }) gira la cámara alrededor de un eje.
-// Entre una toma y la siguiente hay un fundido a negro («fundido», 0,8 s por lado).
+// de Blender (metros), en la habitación +++ y la gravedad z. Se anotan con la tecla P y se copian con K.
+// Ayudas: I("Mirador", { t, atras, mas, d, lente }) = pose de una instancia del sitio; VID.arco({…}) gira alrededor
+// de un eje; X(k) / Y(k) = la misma pose en la gravedad x / y; S(k, [1, 1, -1]) = en la habitación reflejada.
 window.TOMAS_VIDEO = (() => {
-  const I = VID.deInstancia, quieto = (k, t) => ({ ...k, t });
+  const I = VID.deInstancia, X = (k) => VID.enGravedad(k, "x"), S = VID.enSala;
+  const quieto = (k, t) => ({ ...k, t });
   const panorama = I("Panorama");
-  return [
-    { nombre: "Título", pasos: [
-      { cartel: "HIPERFUENTE", sub: "un espacio de escritura", seg: 5 },
+  const ojo = 1.755 + 1.6;                          // altura de los ojos sobre el piso z
+  const story = [
+    { nombre: "01 · Hacia el mausoleo", pasos: [
+      { camino: [I("Mausoleo", { atras: 16, mas: [0, 0, 3] }), I("Mausoleo", { t: 5 })] },
+      { lectura: "Mausoleo · Aquí yacen", seg: 3 },
+      { lectura: "Mausoleo · Evidencias", seg: 3 },
+      { lectura: "Mausoleo · Las cotas", seg: 3 },
+      { lectura: "Mausoleo · Los retratos", seg: 3 },
     ] },
-    { nombre: "El objeto", pasos: [
-      { camino: VID.arco({ centro: [0, 0, 0], desde: panorama.p, mira: [0, 0, 0], a0: -20, a1: 50, seg: 16, lente: 30 }) },
-    ] },
-    { nombre: "Tres gravedades", pasos: [
-      // gira 240° sobre la diagonal (1,1,1) con el arriba: cada 120° la habitación se ve igual, desde otra gravedad
-      { camino: VID.arco({ centro: [34, 34, 34], eje: [1, 1, 1], desde: [118, 26, 92], mira: [32, 32, 30], a0: 0, a1: 240,
-                           seg: 22, pasos: 12, lente: 24, llevaArriba: true }) },
-    ] },
-    { nombre: "La H", pasos: [
+    { nombre: "02 · La H desde arriba", pasos: [
       { camino: [
-        { p: [18, 120, 46], m: [18, 55, 4], u: [0, 0, 1], lente: 24, t: 0 },
-        { p: [18, 78, 9], m: [18, 52, 5], u: [0, 0, 1], lente: 22, t: 7 },
-        I("La H", { t: 5 }),
+        { p: [18, 68, 24], m: [18, 56, 2], u: [0, 0, 1], lente: 22, t: 0 },
+        { p: [18, 64, 9], m: [18, 46, 7], u: [0, 0, 1], lente: 22, t: 4 },
+        { ...I("La H"), t: 3 },
       ] },
-      { quieto: 1.5 },
     ] },
-    { nombre: "Narración", pasos: [
-      { lectura: "Escalera E4", g: 0, seg: 24 },
+    { nombre: "03 · Lectura de la escalera", pasos: [
+      { lectura: "Escalera E4", seg: 14 },
     ] },
-    { nombre: "Testimonio", pasos: [
-      { lectura: "Muro M1", g: 0, seg: 10 },
+    { nombre: "04 · Portal de voz", pasos: [
+      // el rectángulo rojo de YU TSUN en la pared x = 0: se entra y se aparece al pie de la H de su gravedad
+      { camino: [{ p: [16, 35, ojo], m: [1.8, 35, 3.6], u: [0, 0, 1], lente: 22, t: 0 }, { p: [8.5, 35, ojo], m: [1.8, 35, 3.4], u: [0, 0, 1], lente: 22, t: 3 },
+                 { p: [2.9, 35, ojo - 0.3], m: [1.8, 35, 3.1], u: [0, 0, 1], lente: 22, t: 1.6 }] },
+      { fundido: 0.35, color: "lacre" },
+      { camino: [X(I("La H", { atras: 3 })), X(I("La H", { t: 3 }))] },
     ] },
-    { nombre: "La cita", pasos: [
-      // la anamorfosis se arma al llegar al mirador
-      { camino: [I("Mirador", { atras: 14, mas: [0, -6, 5] }), I("Mirador", { t: 9 }), quieto(I("Mirador"), 4)] },
+    { nombre: "05 · Recorrido, vistas abajo", pasos: [
+      { camino: [
+        { p: [46, 40, 16], m: [34, 30, 2], u: [0, 0, 1], lente: 20, t: 0 },
+        { p: [36, 46, 15], m: [24, 32, 3], u: [0, 0, 1], lente: 20, t: 3.5 },
+        { p: [26, 42, 14.5], m: [16, 24, 2], u: [0, 0, 1], lente: 20, t: 3.5 },
+      ] },
     ] },
-    { nombre: "Mausoleo", pasos: [
-      { camino: [I("Mausoleo", { atras: 9 }), I("Mausoleo", { t: 8 })] },
+    { nombre: "06 · Otra escalera, más rápido", pasos: [
+      { lectura: "Escalera E1", seg: 9, vel: 1.7 },
     ] },
-    { nombre: "Aleph", pasos: [
-      { camino: [I("Aleph", { atras: 10 }), I("Aleph", { t: 7 })] },
-      { lectura: "Folio de la empleada", g: 0, seg: 9 },
+    { nombre: "07 · Paneo caótico hacia arriba", cierra: 0.5, pasos: [
+      { vel: 1.2, camino: [
+        { p: [28, 30, ojo], m: [28, 46, 8], u: [0, 0, 1], lente: 18, t: 0 },
+        { p: [29, 31, ojo + 0.5], m: [30, 40, 30], u: [0.3, 0, 0.95], lente: 18, t: 2.2 },
+        { p: [30, 31, ojo + 1], m: [32, 33, 60], u: [1, 0.2, 0], lente: 16, t: 1.8 },
+        { p: [31, 31, ojo + 1.5], m: [34, 29, 60], u: [0, -1, 0.1], lente: 14, t: 1.8 },
+      ] },
     ] },
-    { nombre: "Cierre", pasos: [
-      { camino: VID.arco({ centro: [0, 0, 0], desde: panorama.p.map((x) => x * 0.55), mira: [0, 0, 0], a0: 40, a1: 120, seg: 14, lente: 26 }) },
-      { cartel: "HIPERFUENTE", sub: "Tipografía 2 · Longinotti · FADU-UBA · 2026", seg: 5, lacre: true },
+    { nombre: "08 · Cambio de eje", pasos: [
+      { camino: VID.arco({ centro: [31, 31, 31], eje: [1, 1, 1], desde: [52, 20, 12], mira: [30, 30, 26], a0: 0, a1: 120,
+                           seg: 6, pasos: 8, lente: 20, llevaArriba: true }) },
+    ] },
+    { nombre: "09 · La cita (anamorfosis)", pasos: [
+      { camino: [
+        I("Mirador", { atras: 12, mas: [0, -5, 3] }),
+        I("Mirador", { t: 4.5 }),
+        quieto(I("Mirador"), 1.5),
+        { ...I("Mirador"), m: [56, 40, 34], u: [0.3, -0.5, 0.8], t: 1.5 },
+      ] },
+    ] },
+    { nombre: "10 · El punto oculto (núcleo)", pasos: [
+      // del pasillo al cartel de la empleada: lejos las paletas giran; al acercarse se asientan
+      { camino: [{ p: [26, 7.5, ojo], m: [1.8, 7.5, 3.7], u: [0, 0, 1], lente: 24, t: 0 }, { p: [9, 7.5, 3.6], m: [1.8, 7.5, 3.65], u: [0, 0, 1], lente: 24, t: 8 }] },
+      { quieto: 10 },
+    ] },
+    { nombre: "11 · Salto de capítulo y eje", pasos: [
+      { camino: [{ p: [8, 8, 4.6], m: [2.6, 2.6, 1.8], u: [0, 0, 1], lente: 22, t: 0 }, { p: [4.6, 4.6, 3.9], m: [2.6, 2.6, 1.8], u: [0, 0, 1], lente: 22, t: 1.6 }] },
+      { fundido: 0.35, color: "papel" },
+      // capítulo 2 (habitación ++−), otra voz: la cámara se aleja
+      { camino: [S(X(I("La H")), [1, 1, -1]), { ...S(X({ p: [18, 92, 42], m: [18, 40, 4], u: [0, 0, 1] }), [1, 1, -1]), lente: 14, t: 3 }] },
+    ] },
+    { nombre: "12 · Último paneo", pasos: [
+      { camino: VID.arco({ centro: [0, 0, 0], desde: panorama.p, mira: [0, 0, 0], a0: -15, a1: 35, seg: 7, lente: 30 }) },
     ] },
   ];
+  // las instancias del sitio: la cámara llega a cada una (la del muro de texto abre su lectura)
+  const sitio = instancias.map((ins) => ins.titulo === "Muro de texto"
+    ? { nombre: "Sitio · Muro de texto", pasos: [{ lectura: "Muro M4", seg: 8 }] }
+    : { nombre: "Sitio · " + ins.titulo, pasos: [
+      { camino: [I(ins.titulo, { atras: ins.modo === "orbitar" ? 40 : 7 }), I(ins.titulo, { t: 6 })] }, { quieto: 2 }] });
+  const especiales = [
+    { nombre: "Especial · Muro de escaleras", pasos: [{ especial: "escaleras", seg: 22 }] },
+    { nombre: "Especial · Cartel del Aleph", pasos: [{ especial: "cartel", seg: 20 }] },
+  ];
+  return [...story, ...sitio, ...especiales];
 })();
 
 // ---------- Bucle ----------
@@ -3221,8 +3576,9 @@ function cuadro() {
   mostrarEtiquetas();
   if (velo && performance.now() > velo.fin) terminarVelo();
   cielo.position.copy(camera.position);
-  renderer.render(scene, camera);
+  if (!VID.dibujar()) renderer.render(scene, camera);
   dibujarFundidoVelo();
+  VID.encima();
 }
 function bucle() { VID.tic(); cuadro(); VID.cuadroHecho(); requestAnimationFrame(bucle); }
 irAInstancia(0, true);
