@@ -2168,6 +2168,8 @@ function actualizarMapa(dt) {
                ["Característica", N[(sp.tonic + md.semi[md.c]) % 12] + " · " + md.cname],
                ["Timbre", A.TIMBRES[sp.p].name.toLowerCase()],
                ["Espacio", (sp.i + 1) + " de 24"]);
+    const ob = obraDe(sp, plagalActual);
+    if (ob) filas.push(["Música", ob.titulo + " · " + ob.compositor], ["Fuente", "Glarean, " + ob.fuente.replace("Dodecachordon, ", "Dodecachordon ")]);
   }
   filas.push(["Posición", b.map((c, k) => "xyz"[k] + " " + Math.round(c)).join("  ") + " m"]);
   ficha.replaceChildren(...filas.flatMap(([k, v]) => {
@@ -2246,7 +2248,7 @@ function aplicarEspacio(sp, plagal, t, primera) {
     eng.bass.vca.gain.setTargetAtTime(esPiso ? 0.15 : 0, t, 0.5);
     eng.padB.vca.gain.setTargetAtTime(esPiso ? 0.11 : 0, t, 0.6);
   });
-  if (!primera) {
+  if (!primera && !obraDe(sp, plagal)) {
     // Señal de la modulación, en el tiempo fuerte: un arpegio agudo de las cuatro notas (tónica, las otras dos
     // de la tríada y la característica) en los timbres de las paredes, y el bajo que se hincha.
     const otros = audio.motores.filter((e, q) => q !== sp.p);
@@ -2260,8 +2262,9 @@ function aplicarEspacio(sp, plagal, t, primera) {
     piso.bass.vca.gain.setTargetAtTime(0.15, t + 3 * A.UNIT, 0.4);
   }
   // Aviso visible en el mapa, en el momento en que suena el cambio.
+  const ob_ = obraDe(sp, plagal);
   const texto = (primera ? "Suena: " : "Modula a: ") + N[sp.tonic] + " " + nombreModo(sp.mode, plagal).toLowerCase() +
-    " · característica " + N[(sp.tonic + md.semi[md.c]) % 12] + " (" + md.cname + ")";
+    (ob_ ? " · " + ob_.compositor + ", " + ob_.titulo : " · característica " + N[(sp.tonic + md.semi[md.c]) % 12] + " (" + md.cname + ")");
   clearTimeout(avisoReloj);
   setTimeout(() => {
     avisoSonido.textContent = texto;
@@ -2271,6 +2274,35 @@ function aplicarEspacio(sp, plagal, t, primera) {
   audio.sp = sp;
   audio.plagal = plagal;
   audio.frase = 0;
+  audio.obra = obraDe(sp, plagal);
+  audio.obraIntentada = !!OBRAS_DODECA;
+  audio.pos = 0;
+  if (audio.obra) {                                   // la obra lleva el bajo: sin el bajo sostenido; la característica, apenas
+    const piso = audio.motores[sp.p];
+    piso.bass.vca.gain.cancelScheduledValues(t); piso.bass.vca.gain.setTargetAtTime(0, t, 0.1);
+    piso.padB.vca.gain.setTargetAtTime(0.04, t, 0.6);
+  }
+}
+let OBRAS_DODECA = null;
+fetch("dodecachordon.json", { cache: "no-cache" }).then((r) => r.json()).then((d) => { OBRAS_DODECA = d.obras; }).catch(() => {});
+const NEGRA = 0.36;                                  // segundos por negra (la blanca, el tactus, a 0,72 s)
+const obraDe = (sp, plagal) => (OBRAS_DODECA || []).find((o) => o.modo === sp.mode && o.plagal === plagal) || null;
+function programarCompas(t) {
+  const o = audio.obra, sp = audio.sp, n = o.voces.length, desde = audio.pos, hasta = desde + 4;
+  const otras = [0, 1, 2].filter((q) => q !== sp.p);
+  o.voces.forEach((voz, k) => {
+    const esBajo = k === n - 1;
+    const eng = audio.motores[esBajo || k === 0 ? sp.p : otras[(k - 1) % 2]];
+    const v = esBajo ? eng.bass : eng.lead;
+    for (const [a, d, m] of voz) {
+      if (a < desde - 1e-6 || a >= hasta - 1e-6) continue;
+      const f = (sp.f0 / 2) * Math.pow(2, (m - o.final_midi) / 12);
+      eng.note(v, t + (a - desde) * NEGRA, d * NEGRA, f, esBajo ? 0.24 : k === 0 ? 0.22 : 0.17, esBajo ? 0.8 : 1);
+    }
+  });
+  audio.pos = hasta;
+  if (audio.pos >= o.largo - 1e-6) { audio.pos = 0; return (o.largo - desde + 2) * NEGRA; }   // un respiro de una blanca y vuelve a empezar
+  return 4 * NEGRA;
 }
 function programarFrase(t) {
   const A = window.Audio24, sp = audio.sp, eng = audio.motores[sp.p];
@@ -2284,6 +2316,8 @@ function sonidoPaso() {
   if (!audio.sp) { aplicarEspacio(espacioActual, plagalActual, ahora + 0.05, true); audio.prox = ahora + 0.1; }
   while (audio.prox < ahora + 0.6) {
     if (audio.sp.i !== espacioActual.i || audio.plagal !== plagalActual) aplicarEspacio(espacioActual, plagalActual, audio.prox, false);
+    if (audio.obra) { audio.prox += programarCompas(audio.prox); continue; }
+    if (!audio.obraIntentada && OBRAS_DODECA) { aplicarEspacio(audio.sp, audio.plagal, audio.prox, true); continue; }   // llegó el archivo
     programarFrase(audio.prox);
     audio.prox += A.PHRASE;
   }
@@ -2291,7 +2325,7 @@ function sonidoPaso() {
   const b = aBlender(camera.position), cents = 30 * desafino;
   audio.motores.forEach((eng, q) => {
     const cerca = 1 - THREE.MathUtils.smoothstep(Math.abs(b[q]) - MEDIO_PLANO, 3, 45);
-    eng.padA.vca.gain.setTargetAtTime(0.025 + 0.11 * cerca + (q === audio.sp.p ? 0.04 : 0), ahora, 0.4);
+    eng.padA.vca.gain.setTargetAtTime((0.025 + 0.11 * cerca + (q === audio.sp.p ? 0.04 : 0)) * (audio.obra ? 0.55 : 1), ahora, 0.4);
     eng.padA.c.detune.setTargetAtTime(q % 2 ? cents : -cents, ahora, 0.2);
   });
 }
