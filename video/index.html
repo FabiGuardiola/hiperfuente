@@ -3298,7 +3298,12 @@ canvas { cursor: default; }`;
     negroN = 0;
     quedaNegro = false;
     congelado = true;                                     // queda quieta en su último cuadro hasta la próxima instancia
+    if (autoAvance && final && !final.cortada && idx >= 0 && idx < lista().length - 1) {
+      const esta = idx;
+      setTimeout(() => { if (autoAvance && !rep && idx === esta) ir(1); }, 1500);
+    }
   }
+  let autoAvance = P.has("auto");
   // La cámara libre vuelve recién cuando se toca el lienzo (o con C / O): si no, la órbita la enderezaba al terminar.
   let congelado = false;
   // Mientras corre una instancia (o queda congelada), cambiar de modo no toca la cámara: el fin de una lectura
@@ -3320,6 +3325,7 @@ canvas { cursor: default; }`;
     if (velo) { velo.regreso = null; terminarVelo(); }
     vuelo = null;
     rep.paso = null;
+    rep.cortada = true;                                 // Esc: no avanza sola
     terminar();
   }
   // devuelve true si la toma maneja la cámara en este cuadro (si no, sigue el visor: viajes y velos de las lecturas)
@@ -3399,14 +3405,39 @@ canvas { cursor: default; }`;
   // almacenamiento privado del navegador (OPFS), no en la memoria: así una grabación de varios GB no llena la RAM del iPad.
   // Si el navegador no lo permite, queda en memoria (conviene grabar por tandas y guardar).
   const MBPS = parseFloat(P.get("mbps")) || 24, TRAMO = (parseFloat(P.get("tramo")) || 2) * 60000;
-  let carpeta = null;
+  // Escritura al disco (OPFS) desde un Worker con createSyncAccessHandle, que es lo que soporta Safari (createWritable no
+  // siempre). Cada pedazo de 1 s se escribe apenas llega: el video no se acumula en la RAM. Nada se borra solo: si la página
+  // se recarga, el video vuelve a aparecer en el panel; se borra solo con el botón «Borrar» o al grabar uno nuevo (pregunta).
+  let carpeta = null, disco = null;
+  const codigoDisco = `const h = {}; let cola = Promise.resolve();
+onmessage = (e) => { cola = cola.then(() => hacer(e.data)); };
+async function hacer(m) {
+  try {
+    if (m.tipo === "abrir") { const dir = await navigator.storage.getDirectory(); const fh = await dir.getFileHandle(m.nombre, { create: true });
+      const a = await fh.createSyncAccessHandle(); a.truncate(0); h[m.nombre] = { a, pos: 0 }; }
+    else if (m.tipo === "escribir") { const x = h[m.nombre]; x.pos += x.a.write(new Uint8Array(m.buf), { at: x.pos }); if ((x.n = (x.n || 0) + 1) % 10 === 0) x.a.flush(); }
+    else if (m.tipo === "cerrar") { const x = h[m.nombre]; if (x) { x.a.flush(); x.a.close(); delete h[m.nombre]; } }
+    postMessage({ id: m.id, ok: true });
+  } catch (err) { postMessage({ id: m.id, ok: false, error: String(err) }); }
+}`;
+  try {
+    const w = new Worker(URL.createObjectURL(new Blob([codigoDisco], { type: "text/javascript" })));
+    const espera = new Map();
+    let sig = 0;
+    w.onmessage = (e) => { const f = espera.get(e.data.id); espera.delete(e.data.id); if (f) f(e.data); };
+    disco = (tipo, nombre, buf) => new Promise((ok) => { const id = ++sig; espera.set(id, ok); w.postMessage({ id, tipo, nombre, buf }, buf ? [buf] : []); });
+  } catch (_) { disco = null; }
   (async () => {
     try { carpeta = await navigator.storage.getDirectory(); if (navigator.storage.persist) navigator.storage.persist(); } catch (_) { carpeta = null; return; }
-    // (2026-11-26) al abrir la página se borran las grabaciones de antes: en el panel solo está el video de esta sesión
+    // el video que quedó de antes (sin guardar) vuelve a la lista
     try {
-      const viejos = [];
-      for await (const [nombre, h] of carpeta.entries()) if (h.kind === "file" && /^hiperfuente_/.test(nombre)) viejos.push(nombre);
-      for (const n of viejos) await carpeta.removeEntry(n).catch(() => {});
+      for await (const [nombre, hh] of carpeta.entries()) {
+        if (hh.kind !== "file" || !/^hiperfuente_.*_parte\d+\.(mp4|webm)$/.test(nombre)) continue;
+        const archivo = await hh.getFile();
+        if (archivo.size) grabaciones.push({ nombre, url: URL.createObjectURL(archivo), archivo, mb: archivo.size / 1e6, disco: true, deAntes: true });
+      }
+      grabaciones.sort((x, y) => (x.nombre < y.nombre ? -1 : 1));
+      if (grabaciones.length) { pintarPanel(); pintarEstado(); }
     } catch (_) {}
   })();
   const grabaciones = [];                              // { nombre, url, archivo, mb }
@@ -3440,22 +3471,24 @@ canvas { cursor: default; }`;
     const n = g.n, partes = [], nombre = g.base + "_parte" + String(n).padStart(2, "0") + "." + g.ext;
     const tipoArchivo = (g.tipo || "video/webm").split(";")[0];
     const mr = new MediaRecorder(g.canal, { mimeType: g.tipo, videoBitsPerSecond: MBPS * 1e6, audioBitsPerSecond: 192000 });
-    // al disco (OPFS) si se puede: los pedazos se escriben en orden, uno tras otro
-    let escritor = null, cola = Promise.resolve(), enDisco = false;
-    if (carpeta) cola = carpeta.getFileHandle(nombre, { create: true }).then((h) => h.createWritable())
-      .then((w) => { escritor = w; enDisco = true; }).catch(() => { escritor = null; });
+    // al disco por el Worker si se puede; si no, en memoria
+    let enDisco = false, cola = Promise.resolve();
+    if (disco) cola = disco("abrir", nombre).then((x) => { enDisco = x.ok; });
     mr.ondataavailable = (e) => {
       if (!e.data.size) return;
-      cola = cola.then(() => (escritor ? escritor.write(e.data) : partes.push(e.data))).catch(() => partes.push(e.data));
+      const dato = e.data;
+      cola = cola.then(async () => {
+        if (enDisco) { const x = await disco("escribir", nombre, await dato.arrayBuffer()); if (!x.ok) { enDisco = false; partes.push(dato); } }
+        else partes.push(dato);
+      });
     };
     pendientes++;
     mr.onstop = () => {
       cola = cola.then(async () => {
         let archivo;
-        if (escritor && enDisco) {
-          await escritor.close();
+        if (enDisco) {
+          await disco("cerrar", nombre);
           archivo = await (await carpeta.getFileHandle(nombre)).getFile();      // un archivo del disco: no ocupa la RAM
-          if (partes.length) archivo = new Blob([archivo, ...partes], { type: tipoArchivo });
         } else archivo = new Blob(partes, { type: tipoArchivo });
         partes.length = 0;
         grabaciones.push({ nombre, url: URL.createObjectURL(archivo), archivo, mb: archivo.size / 1e6, disco: enDisco });
@@ -3463,6 +3496,7 @@ canvas { cursor: default; }`;
         pintarPanel(); pintarEstado();
       }).catch(() => { pendientes--; pintarEstado(); });
     };
+    g.enDisco = () => enDisco;
     mr.start(1000);
     g.mr = mr;
     clearTimeout(g.corte);
@@ -3471,20 +3505,23 @@ canvas { cursor: default; }`;
   // si quedan partes sin guardar, el navegador pregunta antes de cerrar o recargar
   addEventListener("beforeunload", (e) => { if (grabando || (grabaciones.length && !guardado)) { e.preventDefault(); e.returnValue = ""; } });
   let guardado = false;
+  const proxima = () => grabaciones.findIndex((x) => !x.guardada);
   async function guardarTodo() {
     if (!grabaciones.length) return;
-    const archivos = grabaciones.map((x) => new File([x.archivo], x.nombre, { type: x.archivo.type }));
     try {
       if (window.showDirectoryPicker) {                // compu (Chrome): se elige la carpeta y se escriben todas
         const dir = await window.showDirectoryPicker({ mode: "readwrite" });
-        for (const f of archivos) { const w = await (await dir.getFileHandle(f.name, { create: true })).createWritable(); await w.write(f); await w.close(); }
-      } else if (navigator.canShare && navigator.canShare({ files: archivos })) {   // iPad: menú de compartir → «Guardar en Archivos» → carpeta
-        await navigator.share({ files: archivos, title: "Hiperfuente" });
-      } else {                                          // otros: se descargan una por una
-        for (const x of grabaciones) { const a = document.createElement("a"); a.href = x.url; a.download = x.nombre; document.body.appendChild(a); a.click(); a.remove(); await new Promise((ok) => setTimeout(ok, 800)); }
+        for (const x of grabaciones) { const w = await (await dir.getFileHandle(x.nombre, { create: true })).createWritable(); await w.write(x.archivo); await w.close(); x.guardada = true; }
+      } else {                                          // iPad: de a una parte (Safari no puede con varios GB juntos)
+        const k = proxima();
+        if (k < 0) return;
+        const x = grabaciones[k], f = new File([x.archivo], x.nombre, { type: x.archivo.type });
+        if (navigator.canShare && navigator.canShare({ files: [f] })) await navigator.share({ files: [f] });
+        else { const a = document.createElement("a"); a.href = x.url; a.download = x.nombre; document.body.appendChild(a); a.click(); a.remove(); }
+        x.guardada = true;
       }
-      guardado = true;
-    } catch (_) { /* se canceló */ }
+    } catch (_) { /* se canceló: se puede volver a tocar */ }
+    guardado = grabaciones.length > 0 && proxima() < 0;
     pintarPanel(); pintarEstado();
   }
   // El sonido del sitio: además de los parlantes, va a una pista que se suma a la grabación.
@@ -3511,10 +3548,11 @@ canvas { cursor: default; }`;
     if (grabando) {
       const seg = Math.floor((ahoraReal() - grabando.t0) / 1000);
       estadoE.className = "rec";
-      estadoE.textContent = "● REC " + String(Math.floor(seg / 60)).padStart(2, "0") + ":" + String(seg % 60).padStart(2, "0") + " · parte " + grabando.n;
-    } else if (terminadaEn && ahoraReal() - terminadaEn < 60000) {
+      estadoE.textContent = "● REC " + String(Math.floor(seg / 60)).padStart(2, "0") + ":" + String(seg % 60).padStart(2, "0") + " · parte " + grabando.n +
+        (grabando.enDisco ? (grabando.enDisco() ? " · en disco" : " · EN MEMORIA: grabá por tandas") : "") + (autoAvance ? " · auto" : "");
+    } else if (grabaciones.length || pendientes > 0) {
       estadoE.className = "listo";
-      estadoE.textContent = pendientes > 0 ? "■ Terminada · procesando la última parte…" : (guardado ? "■ Video guardado ✓" : "■ Terminada · H para guardar el video");
+      estadoE.textContent = pendientes > 0 ? "■ Terminada · procesando la última parte…" : (guardado ? "■ Video guardado ✓" : "■ Video sin guardar · H para guardarlo");
     } else estadoE.className = "";
   }
   setInterval(pintarEstado, 500);
@@ -3547,10 +3585,12 @@ canvas { cursor: default; }`;
     const T = lista();
     panel.innerHTML = `<b>Hiperfuente · video</b> <small>(H o dos toques en la esquina cierran)</small>
 ${grabando ? `<h3>Video</h3><div>Grabando · parte ${grabando.n}</div>` : pendientes > 0 ? `<h3>Video</h3><div>Procesando la última parte…</div>` :
-  grabaciones.length ? `<h3>Video</h3><div>${grabaciones.length} ${grabaciones.length === 1 ? "parte" : "partes"} · ${(grabaciones.reduce((a, x) => a + x.mb, 0) / 1000).toFixed(2).replace(".", ",")} GB${guardado ? " · guardado ✓" : ""}</div>
-<button data-guardar class="rojo">Guardar en una carpeta</button>` : ""}
+  grabaciones.length ? `<h3>Video${grabaciones.some((x) => x.deAntes) ? " (grabado antes, sin borrar)" : ""}</h3><div>${grabaciones.length} ${grabaciones.length === 1 ? "parte" : "partes"} · ${(grabaciones.reduce((a, x) => a + x.mb, 0) / 1000).toFixed(2).replace(".", ",")} GB${grabaciones.some((x) => !x.disco) ? " · en memoria: guardalo antes de recargar" : ""}</div>
+${guardado ? `<div>Guardado ✓</div>` : window.showDirectoryPicker ? `<button data-guardar class="rojo">Guardar en una carpeta</button>`
+  : `<button data-guardar class="rojo">Guardar parte ${proxima() + 1} de ${grabaciones.length}</button><div><small>Guardar en Archivos → la misma carpeta para todas</small></div>`}
+<button data-borrar>Borrar este video</button>` : ""}
 <h3>Instancias</h3>${T.map((t, i) => `<button data-t="${i}" class="${i === idx ? "act" : ""}">${i + 1} · ${t.nombre}</button>`).join("")}
-<br><button data-todo>Todas seguidas</button> <button data-grabar class="rojo">${grabando ? "■ Terminar grabación" : "● Grabar (G)"}</button>
+<br><button data-auto class="${autoAvance ? "act" : ""}">Avanzar solo (A): ${autoAvance ? "sí" : "no"}</button> <button data-grabar class="rojo">${grabando ? "■ Terminar grabación" : "● Grabar (G)"}</button>
 
 <h3>Pantalla</h3><button data-f>Pantalla completa (F)</button><button data-s>♪ Sonido</button><button data-nav>Flechas sí/no</button>
 <button data-e>Etiquetas (E)</button><button data-o>Cámara libre (O)</button><button data-c>Caminar (C)</button>
@@ -3561,9 +3601,10 @@ ${grabando ? `<h3>Video</h3><div>Grabando · parte ${grabando.n}</div>` : pendie
 Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?ancho=1920&alto=1080)"}${vel !== 1 ? " · vel " + vel : ""}${fps ? " · cuadro a cuadro a " + fps : ""}</pre>`;
     panel.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => { idx = +b.dataset.t; tocarToma(idx); }));
     const on = (sel, f) => { const b = panel.querySelector(sel); if (b) b.onclick = f; };
-    on("[data-todo]", () => { panel.hidden = true; idx = 0; reproducir(T, "Todas"); });
+    on("[data-auto]", () => { autoAvance = !autoAvance; pintarPanel(); });
     on("[data-grabar]", alternarGrabacion);
     on("[data-guardar]", guardarTodo);
+    on("[data-borrar]", () => { if (confirm(guardado ? "¿Borrar el video del navegador? (ya está guardado)" : "El video no está guardado entero. ¿Borrarlo igual?")) { borrarVideo(); pintarPanel(); pintarEstado(); } });
     on("[data-p]", anotar); on("[data-b]", () => { panel.hidden = true; reproducir([tomaBorrador()], "Borrador"); });
     on("[data-f]", pantallaCompleta);
     on("[data-s]", () => { document.getElementById("sonido").click(); });
@@ -3617,6 +3658,7 @@ Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?a
     else if (k === "Escape" && rep) cortar();
     else if (k === "KeyF") pantallaCompleta();
     else if (k === "KeyG") alternarGrabacion();
+    else if (k === "KeyA") { autoAvance = !autoAvance; pintarPanel(); pintarEstado(); if (autoAvance && !rep && idx >= 0 && idx < lista().length - 1) setTimeout(() => { if (autoAvance && !rep) ir(1); }, 800); }
     else if (k === "KeyP") anotar();
     else if (k === "Backspace") { borrador.pop(); guardar(); aviso("Quedan " + borrador.length); }
     else if (k === "KeyB") reproducir([tomaBorrador()], "Borrador");
