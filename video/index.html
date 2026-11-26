@@ -3506,6 +3506,18 @@ async function hacer(m) {
   addEventListener("beforeunload", (e) => { if (grabando || (grabaciones.length && !guardado)) { e.preventDefault(); e.returnValue = ""; } });
   let guardado = false;
   const proxima = () => grabaciones.findIndex((x) => !x.guardada);
+  // descarga directa de la parte siguiente (sin el menú de compartir, que en el iPad se quedaba en gris con archivos grandes)
+  function descargarSiguiente() {
+    const k = proxima();
+    if (k < 0) return;
+    const x = grabaciones[k];
+    const a = document.createElement("a");
+    a.href = x.url; a.download = x.nombre; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+    x.guardada = true;
+    guardado = proxima() < 0;
+    pintarPanel(); pintarEstado();
+  }
   async function guardarTodo() {
     if (!grabaciones.length) return;
     try {
@@ -3587,7 +3599,8 @@ async function hacer(m) {
 ${grabando ? `<h3>Video</h3><div>Grabando · parte ${grabando.n}</div>` : pendientes > 0 ? `<h3>Video</h3><div>Procesando la última parte…</div>` :
   grabaciones.length ? `<h3>Video${grabaciones.some((x) => x.deAntes) ? " (grabado antes, sin borrar)" : ""}</h3><div>${grabaciones.length} ${grabaciones.length === 1 ? "parte" : "partes"} · ${(grabaciones.reduce((a, x) => a + x.mb, 0) / 1000).toFixed(2).replace(".", ",")} GB${grabaciones.some((x) => !x.disco) ? " · en memoria: guardalo antes de recargar" : ""}</div>
 ${guardado ? `<div>Guardado ✓</div>` : window.showDirectoryPicker ? `<button data-guardar class="rojo">Guardar en una carpeta</button>`
-  : `<button data-guardar class="rojo">Guardar parte ${proxima() + 1} de ${grabaciones.length}</button><div><small>Guardar en Archivos → la misma carpeta para todas</small></div>`}
+  : `<button data-descargar class="rojo">Descargar parte ${proxima() + 1} de ${grabaciones.length}</button> <button data-guardar>Compartir parte ${proxima() + 1}</button>
+<div><small>Descargar: queda en Archivos › Descargas. Si Safari pregunta, tocá «Descargar».</small></div>`}
 <button data-borrar>Borrar este video</button>` : ""}
 <h3>Instancias</h3>${T.map((t, i) => `<button data-t="${i}" class="${i === idx ? "act" : ""}">${i + 1} · ${t.nombre}</button>`).join("")}
 <br><button data-auto class="${autoAvance ? "act" : ""}">Avanzar solo (A): ${autoAvance ? "sí" : "no"}</button> <button data-grabar class="rojo">${grabando ? "■ Terminar grabación" : "● Grabar (G)"}</button>
@@ -3604,6 +3617,7 @@ Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?a
     on("[data-auto]", () => { autoAvance = !autoAvance; pintarPanel(); });
     on("[data-grabar]", alternarGrabacion);
     on("[data-guardar]", guardarTodo);
+    on("[data-descargar]", descargarSiguiente);
     on("[data-borrar]", () => { if (confirm(guardado ? "¿Borrar el video del navegador? (ya está guardado)" : "El video no está guardado entero. ¿Borrarlo igual?")) { borrarVideo(); pintarPanel(); pintarEstado(); } });
     on("[data-p]", anotar); on("[data-b]", () => { panel.hidden = true; reproducir([tomaBorrador()], "Borrador"); });
     on("[data-f]", pantallaCompleta);
