@@ -3030,11 +3030,14 @@ const VID = (() => {
 #vNav button.rec.on { background: #b3261e; }
 #vNav span { background: rgba(20,19,18,.55); padding: 5px 10px; border-radius: 12px; min-width: 210px; text-align: center; }
 body.vSinNav #vNav, body.vSinNav #vAviso { display: none; }
+#vEstado { position: fixed; right: 12px; top: 10px; z-index: 62; font: 13px "DM Mono", monospace; color: #E9E3D6; background: rgba(20,19,18,.8);
+  padding: 4px 10px; border-radius: 12px; pointer-events: none; display: none; }
+#vEstado.rec { display: block; color: #ffb4a8; } #vEstado.listo { display: block; }
 body.vSinNav canvas { cursor: none; }
 canvas { cursor: default; }`;
   document.head.appendChild(est);
   const capa = (id, tag = "div") => { const e = document.createElement(tag); e.id = id; document.body.appendChild(e); return e; };
-  const panel = capa("vPanel"), avisoE = capa("vAviso"), nav = capa("vNav");
+  const panel = capa("vPanel"), avisoE = capa("vAviso"), nav = capa("vNav"), estadoE = capa("vEstado");
   nav.innerHTML = `<button data-a aria-label="Anterior">‹</button><span>—</span><button data-r aria-label="Repetir">↻</button>
 <button data-s aria-label="Siguiente">›</button><button class="rec" data-g aria-label="Grabar">REC</button>`;
   const navTxt = nav.querySelector("span"), btnRec = nav.querySelector("[data-g]");
@@ -3420,7 +3423,8 @@ canvas { cursor: default; }`;
       .find((t) => MediaRecorder.isTypeSupported(t));
     const ext = tipo && tipo.startsWith("video/mp4") ? "mp4" : "webm";
     const base = "hiperfuente_" + new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    grabando = { canal, pista: canal.getVideoTracks()[0], tipo, ext, base, n: 0, mr: null, corte: null };
+    grabando = { canal, pista: canal.getVideoTracks()[0], tipo, ext, base, n: 0, mr: null, corte: null, t0: ahoraReal() };
+    pendientes = 0;
     nuevoTramo();
     btnRec.classList.add("on"); btnRec.textContent = "■";
     aviso("Grabando", 1.5);
@@ -3441,6 +3445,7 @@ canvas { cursor: default; }`;
       if (!e.data.size) return;
       cola = cola.then(() => (escritor ? escritor.write(e.data) : partes.push(e.data))).catch(() => partes.push(e.data));
     };
+    pendientes++;
     mr.onstop = () => {
       cola = cola.then(async () => {
         let archivo;
@@ -3451,8 +3456,9 @@ canvas { cursor: default; }`;
         } else archivo = new Blob(partes, { type: tipoArchivo });
         partes.length = 0;
         grabaciones.push({ nombre, url: URL.createObjectURL(archivo), archivo, mb: archivo.size / 1e6, disco: enDisco });
-        pintarPanel();
-      });
+        pendientes--;
+        pintarPanel(); pintarEstado();
+      }).catch(() => { pendientes--; pintarEstado(); });
     };
     mr.start(1000);
     g.mr = mr;
@@ -3488,9 +3494,22 @@ canvas { cursor: default; }`;
     clearTimeout(g.corte);
     g.mr.stop();
     btnRec.classList.remove("on"); btnRec.textContent = "REC";
-    panel.hidden = false;                               // al terminar, el panel muestra las partes para guardarlas
-    pintarPanel();
+    terminadaEn = ahoraReal();
+    pintarPanel(); pintarEstado();
   }
+  // el indicador de arriba a la derecha: grabando (tiempo y parte) o terminada (partes y cómo guardarlas)
+  let pendientes = 0, terminadaEn = 0;
+  function pintarEstado() {
+    if (grabando) {
+      const seg = Math.floor((ahoraReal() - grabando.t0) / 1000);
+      estadoE.className = "rec";
+      estadoE.textContent = "● REC " + String(Math.floor(seg / 60)).padStart(2, "0") + ":" + String(seg % 60).padStart(2, "0") + " · parte " + grabando.n;
+    } else if (terminadaEn && ahoraReal() - terminadaEn < 60000) {
+      estadoE.className = "listo";
+      estadoE.textContent = pendientes > 0 ? "■ Terminada · procesando la última parte…" : "■ Terminada · " + grabaciones.length + (grabaciones.length === 1 ? " parte" : " partes") + " · H para guardarlas";
+    } else estadoE.className = "";
+  }
+  setInterval(pintarEstado, 500);
   function cuadroHecho() { if (grabando && fps && grabando.pista.requestFrame) grabando.pista.requestFrame(); }
 
   // --- tamaño fijo del lienzo (para grabar a una resolución exacta) ---
@@ -3521,7 +3540,7 @@ canvas { cursor: default; }`;
     panel.innerHTML = `<b>Hiperfuente · video</b> <small>(H o dos toques en la esquina cierran)</small>
 <h3>Instancias</h3>${T.map((t, i) => `<button data-t="${i}" class="${i === idx ? "act" : ""}">${i + 1} · ${t.nombre}</button>`).join("")}
 <br><button data-todo>Todas seguidas</button> <button data-grabar class="rojo">${grabando ? "■ Terminar grabación" : "● Grabar (G)"}</button>
-${grabaciones.length || grabando ? `<h3>Grabaciones (${grabando ? "grabando parte " + grabando.n + " · " : ""}${MBPS} Mbps, partes de ${TRAMO / 60000} min)</h3>` +
+${grabaciones.length || grabando || pendientes ? `<h3>Grabaciones (${grabando ? "grabando parte " + grabando.n + " · " : pendientes > 0 ? "procesando · " : "terminada · "}${MBPS} Mbps, partes de ${TRAMO / 60000} min)</h3>` +
   grabaciones.map((x, k) => `<div>${x.nombre.replace(/^hiperfuente_/, "")} · ${x.mb.toFixed(0)} MB${x.disco ? "" : " (en memoria)"} <button data-gc="${k}" class="rojo">Guardar en Archivos</button><button data-gd="${k}">Descargar</button>${x.guardada ? " ✓" : ""}</div>`).join("") +
   (grabaciones.length ? `<button data-gb>Borrar las grabaciones (libera memoria)</button>` : "") : ""}
 <h3>Pantalla</h3><button data-f>Pantalla completa (F)</button><button data-s>♪ Sonido</button><button data-nav>Flechas sí/no</button>
