@@ -2825,7 +2825,7 @@ function terminarFundidoVelo() {
   fundidoVelo = null;
   if (f.alFin) f.alFin();
 }
-const OPACIDAD_VELO = 0.6;
+const OPACIDAD_VELO = 0.75;
 function dibujarFundidoVelo(cam) {
   if (window.VRvisor && !cam) return;               // en el VR se dibuja en cada ojo (vr_visor.js)
   const f = fundidoVelo;

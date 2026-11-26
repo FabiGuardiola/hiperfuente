@@ -2830,7 +2830,7 @@ function terminarFundidoVelo() {
   fundidoVelo = null;
   if (f.alFin) f.alFin();
 }
-const OPACIDAD_VELO = 0.6;
+const OPACIDAD_VELO = 0.75;
 function dibujarFundidoVelo(cam) {
   if (window.VRvisor && !cam) return;               // en el VR se dibuja en cada ojo (vr_visor.js)
   const f = fundidoVelo;
@@ -3176,6 +3176,36 @@ canvas { cursor: default; }`;
              u: enB(new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion)), lente: Math.round(lenteDeFov(camera.fov) * 10) / 10, t: 4 };
   }
 
+  // --- aproximaciones a una lectura (2026-11-26): distintos movimientos que terminan justo en la pose de lectura ---
+  // tipos: orbita, picado, contrapicado, travelling, lejos, macro, espiral, gravedad, atraviesa, corte
+  function aproximacion(tipo, T) {
+    const Q = T.q, P = T.p.clone();
+    const fw = new THREE.Vector3(0, 0, -1).applyQuaternion(Q), up = new THREE.Vector3(0, 1, 0).applyQuaternion(Q), rt = new THREE.Vector3(1, 0, 0).applyQuaternion(Q);
+    let dist = null;
+    try { dist = rayoLargo(P, fw, 200); } catch (_) {}
+    dist = Math.min(60, Math.max(4, dist || 15));
+    const F = P.clone().addScaledVector(fw, dist), L = lenteDeFov(T.f);
+    const k = (pos, t = 0, mira = F, u = up, lente = L) => ({ p: enB(pos), m: enB(mira), u: enB(u.clone().normalize()), lente, t });
+    const en = (a, b, c) => F.clone().addScaledVector(rt, a).addScaledVector(up, b).addScaledVector(fw, -c);   // a derecha, b arriba, c delante
+    const gira = (th, R, h) => { const a = THREE.MathUtils.degToRad(th); return en(R * Math.sin(a), h, R * Math.cos(a)); };
+    const rodar = (deg) => up.clone().applyAxisAngle(fw, THREE.MathUtils.degToRad(deg));
+    const fin = (t) => k(P, t);
+    const D = dist;
+    switch (tipo) {
+      case "orbita": return [k(gira(125, D * 1.5, D * 0.5)), k(gira(75, D * 1.3, D * 0.3), 3), k(gira(28, D * 1.1, D * 0.1), 3), fin(2.5)];
+      case "picado": return [k(en(D * 0.2, D * 2.6, D * 0.35), 0, F, fw, L * 0.75), k(en(0, D * 1.2, D * 0.9), 3), fin(3)];
+      case "contrapicado": return [k(en(D * 0.4, -D * 1.4, D * 0.6), 0, F, fw.clone().negate()), k(en(0, -D * 0.5, D * 0.95), 3), fin(3)];
+      case "travelling": return [k(en(D * 2.4, D * 0.15, D), 0, F.clone().addScaledVector(rt, D * 1.7)), k(en(D * 1.1, D * 0.08, D), 4, F.clone().addScaledVector(rt, D * 0.6)), fin(3)];
+      case "lejos": return [k(en(D * 0.9, D * 2.4, D * 6), 0, F, up, L * 0.6), k(en(D * 0.35, D * 1.0, D * 3), 5, F, up, L * 0.8), fin(5)];
+      case "macro": return [k(P.clone().addScaledVector(fw, D * 0.84), 0, F.clone().addScaledVector(rt, D * 0.12), up, L * 1.8),
+                            k(P.clone().addScaledVector(fw, D * 0.55), 2.5, F, up, L * 1.3), fin(3)];
+      case "espiral": return [k(en(0, 0, D * 3), 0, F, rodar(180)), k(en(D * 0.7, D * 0.2, D * 2), 3, F, rodar(90)), k(en(D * 0.2, 0, D * 1.3), 2.5, F, rodar(25)), fin(2)];
+      case "gravedad": return [k(en(-D * 1.6, D * 0.9, D * 1.8), 0, F, rt), k(en(-D * 0.7, D * 0.35, D * 1.25), 3, F, rt.clone().add(up)), fin(3)];
+      case "atraviesa": return [k(P.clone().addScaledVector(up, -26).addScaledVector(fw, -5), 0, F, fw), k(P.clone().addScaledVector(up, -7).addScaledVector(fw, -2), 4, F, fw.clone().add(up)), fin(3)];
+      default: return [k(P.clone().addScaledVector(fw, -D * 0.4)), fin(2.5)];        // corte: un empuje corto
+    }
+  }
+
   // --- interpolación: Catmull-Rom en p, m y u; la lente, lineal. Suave al empezar y al terminar el camino ---
   const cr = (a, b, c, d, t) => { const t2 = t * t, t3 = t2 * t;
     return 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3); };
@@ -3246,9 +3276,15 @@ canvas { cursor: default; }`;
         camera.quaternion.copy(q); camera.up.copy(up); camera.fov = d.pose.f; camera.updateProjectionMatrix();
       }
       escribirSala(d.r);                              // la habitación de la lectura, escrita antes del viaje (si no, el texto aparecía recién en el velo)
-      irALectura(d);
       rep.lectura = d;
-      rep.llego = 0; rep.finLect = 0;
+      rep.llego = 0; rep.finLect = 0; rep.aprox = null;
+      if (p.aprox) {                                  // la toma llega con su propio movimiento y la lectura empieza ahí mismo
+        const T = d.L.tipo === "texto" && d.L.caja && !d.L.escalera ? poseCaja(d.L, d.W) : d.pose;
+        d.pose = T;
+        const kfs = aproximacion(p.aprox, T);
+        rep.aprox = { kfs, dur: duracionCamino(kfs), t0: performance.now(), listo: false };
+        ponerPose(kfs[0]);
+      } else irALectura(d);
     }
     if (p.cartel) pintarCartelTexto(p);
     if (p.especial) ESPECIALES.entrar(p);
@@ -3305,6 +3341,20 @@ canvas { cursor: default; }`;
     if (p.especial) ESPECIALES.paso(s, dur);
     if (p.lectura) {
       // la lectura la hace el visor (viaje, velo, subida por la escalera); se corta a los «seg» segundos del velo
+      if (rep.aprox && !rep.aprox.listo) {
+        const s2 = (performance.now() - rep.aprox.t0) / 1000, D = rep.aprox.dur;
+        ponerPose(muestra(rep.aprox.kfs, D * (0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, s2 / D)))));
+        if (s2 >= D) {
+          rep.aprox.listo = true;
+          if (p.velo === false) rep.llego = performance.now();          // sin velo: se lee en el espacio
+          else { try { pintarCaratula(rep.lectura); } catch (_) {} iniciarVelo(rep.lectura, null); }
+        }
+        return true;
+      }
+      if (p.velo === false) {
+        if (performance.now() - rep.llego >= (p.seg || 5) * 1000) siguiente();
+        return true;
+      }
       if (velo && !rep.llego) { rep.llego = performance.now(); velo.regreso = null; }
       // las escaleras, sin «seg», se leen enteras: termina cuando termina su velo (y un segundo y medio más)
       if (p.seg === undefined && rep.lectura.L.escalera) {
@@ -3812,26 +3862,58 @@ window.TOMAS_VIDEO = (() => {
   // ---------- más puntos de vista (2026-11-26) ----------
   const G = { z: 0, x: 1, y: 2 }, VOZ = datos.voces;
   const R = (cap) => Math.max(0, SALA_CLAVE.indexOf(datos.ciclo[cap - 1]));      // la habitación de cada capítulo
-  const lect = (titulo, eje, cap, nombre, extra = {}) =>
-    ({ nombre: nombre + " · " + VOZ[eje] + " · cap. " + cap, pasos: [{ lectura: titulo, g: G[eje], r: R(cap), cerca: 12, ...extra }] });
+  // Cada lectura llega con su propio movimiento («aprox»): orbita, picado, contrapicado, travelling, lejos, macro,
+  // espiral, gravedad (arranca con el arriba de otra voz), atraviesa (viene de la habitación de abajo) o corte.
+  // «velo: false» la deja en el espacio, sin el fondo de lectura; «seg» es cuánto dura la lectura.
+  const APROX = { orbita: "órbita", picado: "picado", contrapicado: "contrapicado", travelling: "travelling", lejos: "desde lejos",
+                  macro: "macro", espiral: "espiral", gravedad: "desde otra gravedad", atraviesa: "atravesando el plano", corte: "corte" };
+  const lect = (titulo, eje, cap, nombre, aprox, extra = {}) =>
+    ({ nombre: nombre + " · " + VOZ[eje] + " · cap. " + cap + " · " + APROX[aprox] + (extra.velo === false ? " · sin velo" : ""),
+       pasos: [{ lectura: titulo, g: G[eje], r: R(cap), aprox, ...extra }] });
   // Las escaleras (la narración), enteras
   const escaleras = [
-    lect("Escalera E4", "x", 1, "Narración I"), lect("Escalera E4", "y", 1, "Narración I"),
-    lect("Escalera E1", "z", 1, "Narración II"), lect("Escalera E3", "x", 1, "Narración III"),
-    lect("Escalera E5", "y", 1, "Narración IV"), lect("Escalera E7", "z", 1, "Narración V"),
-    lect("Escalera E4", "z", 2, "Narración I"), lect("Escalera E3", "y", 4, "Narración III"),
+    lect("Escalera E4", "x", 1, "Narración I", "picado"),
+    lect("Escalera E4", "y", 1, "Narración I", "gravedad"),
+    lect("Escalera E1", "z", 1, "Narración II", "travelling"),
+    lect("Escalera E3", "x", 1, "Narración III", "contrapicado"),
+    lect("Escalera E5", "y", 1, "Narración IV", "lejos"),
+    lect("Escalera E7", "z", 1, "Narración V", "orbita"),
+    lect("Escalera E4", "z", 2, "Narración I", "atraviesa"),
+    lect("Escalera E3", "y", 4, "Narración III", "espiral"),
+    lect("Escalera E5", "x", 7, "Narración IV", "macro", { velo: false, seg: 6 }),
+    lect("Escalera E1", "y", 8, "Narración II", "orbita", { velo: false, seg: 5 }),
   ];
   // Los muros (el testimonio y las citas)
   const muros = [
-    lect("Muro M1", "x", 1, "Testimonio I"), lect("Muro M3", "x", 1, "Testimonio II"),
-    lect("Muro M1", "y", 1, "Testimonio I"), lect("Muro M3", "z", 1, "Testimonio II"),
-    lect("Muro M1", "z", 3, "Testimonio I"), lect("Muro M1", "y", 6, "Testimonio I"),
-    lect("Muro M6", "z", 1, "Las citas II"), lect("Muro M4", "x", 2, "Las citas I"),
-  ].map((t) => (t.pasos[0].seg = 9, t));
-  // Las citas (anamorfosis): desde el mirador de cada voz
-  const citas = [["z", 2], ["x", 1], ["y", 1], ["x", 3], ["y", 5], ["z", 7]].map(([e, c]) => lect("Mirador", e, c, "La cita", { seg: 6 }));
-  // El folio de la empleada, en el núcleo de cada capítulo
-  const folios = [2, 3, 5, 8].map((c) => lect("Folio de la empleada", "z", c, "El folio", { seg: 9 }));
+    lect("Muro M1", "x", 1, "Testimonio I", "macro", { seg: 8 }),
+    lect("Muro M3", "x", 1, "Testimonio II", "orbita", { seg: 6 }),
+    lect("Muro M1", "y", 1, "Testimonio I", "lejos", { seg: 9 }),
+    lect("Muro M3", "z", 1, "Testimonio II", "travelling", { velo: false, seg: 5 }),
+    lect("Muro M1", "z", 3, "Testimonio I", "atraviesa", { seg: 7 }),
+    lect("Muro M1", "y", 6, "Testimonio I", "picado", { seg: 6 }),
+    lect("Muro M3", "x", 5, "Testimonio II", "gravedad", { velo: false, seg: 4 }),
+    lect("Muro M6", "z", 1, "Las citas II", "contrapicado", { seg: 8 }),
+    lect("Muro M4", "x", 2, "Las citas I", "espiral", { seg: 7 }),
+    lect("Muro M4", "y", 4, "Las citas I", "corte", { velo: false, seg: 4 }),
+  ];
+  // Las citas (anamorfosis): la frase se arma al llegar al mirador
+  const citas = [
+    lect("Mirador", "z", 2, "La cita", "orbita", { velo: false, seg: 4 }),
+    lect("Mirador", "x", 1, "La cita", "travelling", { seg: 5 }),
+    lect("Mirador", "y", 1, "La cita", "espiral", { velo: false, seg: 4 }),
+    lect("Mirador", "x", 3, "La cita", "lejos", { seg: 6 }),
+    lect("Mirador", "y", 5, "La cita", "gravedad", { velo: false, seg: 5 }),
+    lect("Mirador", "z", 7, "La cita", "contrapicado", { seg: 5 }),
+    lect("Mirador", "z", 4, "La cita", "picado", { velo: false, seg: 3 }),
+    lect("Mirador", "y", 8, "La cita", "atraviesa", { seg: 5 }),
+  ];
+  // El folio de la empleada, en el núcleo de cada capítulo (el cartel se asienta al acercarse)
+  const folios = [
+    lect("Folio de la empleada", "z", 2, "El folio", "travelling", { velo: false, seg: 8 }),
+    lect("Folio de la empleada", "x", 3, "El folio", "macro", { seg: 8 }),
+    lect("Folio de la empleada", "y", 5, "El folio", "orbita", { velo: false, seg: 7 }),
+    lect("Folio de la empleada", "z", 8, "El folio", "lejos", { seg: 9 }),
+  ];
   // Recorridos en otras gravedades y habitaciones
   const Y = (k) => VID.enGravedad(k, "y");
   const recorridos = [
