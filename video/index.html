@@ -3392,7 +3392,24 @@ canvas { cursor: default; }`;
   // Grabación (2026-11-26, segunda versión): a 10 Mbps (?mbps=) y en partes de 3 minutos (?tramo=minutos). Una sola
   // grabación larga pasaba el gigabyte y Safari no la terminaba de descargar. Nada se descarga solo: al terminar, el panel
   // muestra las partes y cada una se guarda con su botón («Guardar en Archivos» usa el menú de compartir del iPad).
-  const MBPS = parseFloat(P.get("mbps")) || 10, TRAMO = (parseFloat(P.get("tramo")) || 3) * 60000;
+  // 2026-11-26: calidad completa (24 Mbps) y partes de 2 minutos (~360 MB). Cada parte se escribe mientras se graba en el
+  // almacenamiento privado del navegador (OPFS), no en la memoria: así una grabación de varios GB no llena la RAM del iPad.
+  // Si el navegador no lo permite, queda en memoria (conviene grabar por tandas y guardar).
+  const MBPS = parseFloat(P.get("mbps")) || 24, TRAMO = (parseFloat(P.get("tramo")) || 2) * 60000;
+  let carpeta = null;
+  (async () => {
+    try { carpeta = await navigator.storage.getDirectory(); if (navigator.storage.persist) navigator.storage.persist(); } catch (_) { carpeta = null; return; }
+    // las partes que quedaron de antes (si Safari se cerró o se recargó la página) vuelven a la lista
+    try {
+      for await (const [nombre, h] of carpeta.entries()) {
+        if (h.kind !== "file" || !/^hiperfuente_.*_parte\d+\.(mp4|webm)$/.test(nombre) || grabaciones.some((x) => x.nombre === nombre)) continue;
+        const archivo = await h.getFile();
+        if (archivo.size) grabaciones.push({ nombre, url: URL.createObjectURL(archivo), archivo, mb: archivo.size / 1e6, disco: true, recuperada: true });
+      }
+      grabaciones.sort((x, y) => (x.nombre < y.nombre ? -1 : 1));
+      if (grabaciones.length) { pintarPanel(); aviso("Hay " + grabaciones.length + " partes grabadas sin borrar: están en el panel", 6); }
+    } catch (_) {}
+  })();
   const grabaciones = [];                              // { nombre, url, archivo, mb }
   function alternarGrabacion() { grabando ? pararGrabacion() : empezarGrabacion(); }
   function empezarGrabacion() {
@@ -3413,15 +3430,29 @@ canvas { cursor: default; }`;
     const g = grabando;
     if (!g) return;
     g.n++;
-    const n = g.n, partes = [];
-    const mr = new MediaRecorder(g.canal, { mimeType: g.tipo, videoBitsPerSecond: MBPS * 1e6, audioBitsPerSecond: 160000 });
-    mr.ondataavailable = (e) => e.data.size && partes.push(e.data);
+    const n = g.n, partes = [], nombre = g.base + "_parte" + String(n).padStart(2, "0") + "." + g.ext;
+    const tipoArchivo = (g.tipo || "video/webm").split(";")[0];
+    const mr = new MediaRecorder(g.canal, { mimeType: g.tipo, videoBitsPerSecond: MBPS * 1e6, audioBitsPerSecond: 192000 });
+    // al disco (OPFS) si se puede: los pedazos se escriben en orden, uno tras otro
+    let escritor = null, cola = Promise.resolve(), enDisco = false;
+    if (carpeta) cola = carpeta.getFileHandle(nombre, { create: true }).then((h) => h.createWritable())
+      .then((w) => { escritor = w; enDisco = true; }).catch(() => { escritor = null; });
+    mr.ondataavailable = (e) => {
+      if (!e.data.size) return;
+      cola = cola.then(() => (escritor ? escritor.write(e.data) : partes.push(e.data))).catch(() => partes.push(e.data));
+    };
     mr.onstop = () => {
-      const archivo = new Blob(partes, { type: (g.tipo || "video/webm").split(";")[0] });
-      partes.length = 0;
-      const nombre = g.base + "_parte" + String(n).padStart(2, "0") + "." + g.ext;
-      grabaciones.push({ nombre, url: URL.createObjectURL(archivo), archivo, mb: archivo.size / 1e6 });
-      pintarPanel();
+      cola = cola.then(async () => {
+        let archivo;
+        if (escritor && enDisco) {
+          await escritor.close();
+          archivo = await (await carpeta.getFileHandle(nombre)).getFile();      // un archivo del disco: no ocupa la RAM
+          if (partes.length) archivo = new Blob([archivo, ...partes], { type: tipoArchivo });
+        } else archivo = new Blob(partes, { type: tipoArchivo });
+        partes.length = 0;
+        grabaciones.push({ nombre, url: URL.createObjectURL(archivo), archivo, mb: archivo.size / 1e6, disco: enDisco });
+        pintarPanel();
+      });
     };
     mr.start(1000);
     g.mr = mr;
@@ -3491,7 +3522,7 @@ canvas { cursor: default; }`;
 <h3>Instancias</h3>${T.map((t, i) => `<button data-t="${i}" class="${i === idx ? "act" : ""}">${i + 1} · ${t.nombre}</button>`).join("")}
 <br><button data-todo>Todas seguidas</button> <button data-grabar class="rojo">${grabando ? "■ Terminar grabación" : "● Grabar (G)"}</button>
 ${grabaciones.length || grabando ? `<h3>Grabaciones (${grabando ? "grabando parte " + grabando.n + " · " : ""}${MBPS} Mbps, partes de ${TRAMO / 60000} min)</h3>` +
-  grabaciones.map((x, k) => `<div>${x.nombre.replace(/^hiperfuente_/, "")} · ${x.mb.toFixed(0)} MB <button data-gc="${k}" class="rojo">Guardar en Archivos</button><button data-gd="${k}">Descargar</button>${x.guardada ? " ✓" : ""}</div>`).join("") +
+  grabaciones.map((x, k) => `<div>${x.nombre.replace(/^hiperfuente_/, "")} · ${x.mb.toFixed(0)} MB${x.disco ? "" : " (en memoria)"} <button data-gc="${k}" class="rojo">Guardar en Archivos</button><button data-gd="${k}">Descargar</button>${x.guardada ? " ✓" : ""}</div>`).join("") +
   (grabaciones.length ? `<button data-gb>Borrar las grabaciones (libera memoria)</button>` : "") : ""}
 <h3>Pantalla</h3><button data-f>Pantalla completa (F)</button><button data-s>♪ Sonido</button><button data-nav>Flechas sí/no</button>
 <button data-e>Etiquetas (E)</button><button data-o>Cámara libre (O)</button><button data-c>Caminar (C)</button>
@@ -3507,7 +3538,8 @@ Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?a
     panel.querySelectorAll("[data-gc]").forEach((b) => (b.onclick = () => guardarGrabacion(+b.dataset.gc, true)));
     panel.querySelectorAll("[data-gd]").forEach((b) => (b.onclick = () => guardarGrabacion(+b.dataset.gd, false)));
     on("[data-gb]", () => { if (!confirm("¿Borrar las grabaciones de la memoria? Las que no guardaste se pierden.")) return;
-      for (const x of grabaciones) URL.revokeObjectURL(x.url); grabaciones.length = 0; pintarPanel(); });
+      for (const x of grabaciones) { URL.revokeObjectURL(x.url); if (x.disco && carpeta) carpeta.removeEntry(x.nombre).catch(() => {}); }
+      grabaciones.length = 0; pintarPanel(); });
     on("[data-p]", anotar); on("[data-b]", () => { panel.hidden = true; reproducir([tomaBorrador()], "Borrador"); });
     on("[data-f]", pantallaCompleta);
     on("[data-s]", () => { document.getElementById("sonido").click(); });
