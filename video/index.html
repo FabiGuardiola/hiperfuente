@@ -2810,7 +2810,8 @@ const VID = (() => {
 #vNav button.rec { width: 46px; font-size: 13px; }
 #vNav button.rec.on { background: #b3261e; }
 #vNav span { background: rgba(20,19,18,.55); padding: 5px 10px; border-radius: 12px; min-width: 210px; text-align: center; }
-body.vSinNav #vNav { display: none; }
+body.vSinNav #vNav, body.vSinNav #vAviso { display: none; }
+body.vSinNav canvas { cursor: none; }
 canvas { cursor: default; }`;
   document.head.appendChild(est);
   const capa = (id, tag = "div") => { const e = document.createElement(tag); e.id = id; document.body.appendChild(e); return e; };
@@ -2824,7 +2825,9 @@ canvas { cursor: default; }`;
   btnRec.onclick = () => alternarGrabacion();
   panel.hidden = !P.has("panel");
   let avisoHasta = 0;
-  function aviso(t, seg = 2.5) { avisoE.textContent = t; avisoE.style.opacity = 1; avisoHasta = ahoraReal() + seg * 1000; }
+  // con teclado (iPad con teclado o compu) no se muestra nada encima: así no sale en el grabador de pantalla
+  let conTeclado = false;
+  function aviso(t, seg = 2.5) { if (conTeclado) return; avisoE.textContent = t; avisoE.style.opacity = 1; avisoHasta = ahoraReal() + seg * 1000; }
 
   // --- lo que se dibuja encima, en el lienzo: el negro de los fundidos y los carteles ---
   const escEncima = new THREE.Scene(), camEncima = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -3127,7 +3130,7 @@ canvas { cursor: default; }`;
 <h3>Borrador (${borrador.length} poses)</h3>
 <button data-p>P · anotar pose</button><button data-b>B · reproducir</button><button data-k>K · copiar</button><button data-x>⌫ última</button><button data-n>N · vaciar</button>
 <pre>${borrador.map((k, i) => `${i + 1}. t ${k.t}s · lente ${k.lente} · p ${k.p.map((x) => x.toFixed(1)).join(", ")}`).join("\n")}</pre>
-<pre>→ ← instancias · Espacio repite · Esc corta
+<pre>→ ← instancias · Espacio repite · Esc corta · G graba · M muestra u oculta los botones de abajo
 Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?ancho=1920&alto=1080)"}${vel !== 1 ? " · vel " + vel : ""}${fps ? " · cuadro a cuadro a " + fps : ""}</pre>`;
     panel.querySelectorAll("[data-t]").forEach((b) => (b.onclick = () => { idx = +b.dataset.t; tocarToma(idx); }));
     const on = (sel, f) => { const b = panel.querySelector(sel); if (b) b.onclick = f; };
@@ -3175,6 +3178,8 @@ Lienzo: ${tam ? tam.join("×") : "tamaño de la pantalla (para 16:9 abrí con ?a
   addEventListener("keydown", (e) => {
     if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
     const k = e.code;
+    if (!conTeclado) { conTeclado = true; document.body.classList.add("vSinNav"); avisoE.style.opacity = 0; }
+    if (k === "KeyM") { document.body.classList.toggle("vSinNav"); return; }
     const tomar = () => { e.preventDefault(); e.stopImmediatePropagation(); };
     if (k === "ArrowRight" || k === "PageDown") { tomar(); ir(1); }
     else if (k === "ArrowLeft" || k === "PageUp") { tomar(); ir(-1); }
