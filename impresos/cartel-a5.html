@@ -32,6 +32,7 @@
   .control svg { width: 100%; height: 100%; display: block; }
   .pie { display: flex; gap: 6mm; justify-content: space-between; font-size: 7pt; color: var(--gris); border-top: .3mm solid var(--piedra); padding-top: 1.6mm; }
   .paso span .sim, .paso span strong { display: inline; }
+  .paso span strong.ojo { color: var(--lacre); }
   .pie span:last-child { white-space: nowrap; }
   .sim { font-family: "DejaVu Sans", sans-serif; }
 </style>
@@ -45,7 +46,7 @@
 
   <div class="pasos">
     <div class="paso"><div class="n">1</div><div><b>COLOCATE EL VISOR</b><span>Ajustá la correa hasta que la imagen se vea nítida. Tomá el control con las dos manos.</span></div></div>
-    <div class="paso clave"><div class="n">2</div><div><b>APRETÁ «REINICIO»</b><span>Es la tecla <strong>OPTIONS</strong> del control. Recarga todo y empieza desde el principio, con la introducción.</span></div></div>
+    <div class="paso clave"><div class="n">2</div><div><b>MANTENÉ «REINICIO»</b><span>Es la tecla <strong>OPTIONS</strong>. <strong class="ojo">Un toque no alcanza: mantenela apretada mientras contás hasta dos.</strong> Recarga todo y empieza desde la introducción.</span></div></div>
     <div class="paso"><div class="n">3</div><div><b>SEGUÍ LA INTRODUCCIÓN</b><span><span class="sim">✕</span> sigue · <span class="sim">○</span> vuelve atrás · <span class="sim">△</span> la saltea. Al final, <span class="sim">✕</span> para entrar.</span></div></div>
   </div>
 
@@ -92,6 +93,10 @@
         <!-- OPTIONS = REINICIO, en lacre -->
         <rect x="652" y="232" width="18" height="34" rx="6" fill="#9b3d2e" stroke="#9b3d2e" stroke-width="3" />
         <rect x="640" y="222" width="42" height="54" rx="10" fill="#9b3d2e" fill-opacity=".15" stroke="#9b3d2e" stroke-width="3" />
+        <!-- mantener: un anillo que se completa -->
+        <circle cx="661" cy="249" r="40" fill="none" stroke="#9b3d2e" stroke-width="2" stroke-opacity=".3" />
+        <path d="M661,209 A40,40 0 1,1 621,249" fill="none" stroke="#9b3d2e" stroke-width="5" stroke-linecap="round" />
+        <path d="M613,240 L621,251 L631,242" fill="none" stroke="#9b3d2e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
       </g>
 
       <!-- guías (en coordenadas de la hoja: control desplazado +210, −90) -->
@@ -118,9 +123,9 @@
       <path class="guia" d="M1040,63 H1225" /><circle class="punto" cx="1040" cy="63" r="4" />
       <text class="t" x="1235" y="56"><tspan class="k">MÁS RÁPIDO</tspan> R2</text>
 
-      <path class="guia-l" d="M871,132 V110 H1225" /><circle cx="871" cy="132" r="5" fill="#9b3d2e" />
+      <path class="guia-l" d="M871,119 V110 H1225" /><circle cx="871" cy="119" r="5" fill="#9b3d2e" />
       <text class="tl" x="1235" y="106"><tspan class="k">REINICIO</tspan> OPTIONS</text>
-      <text class="g" x="1235" y="132">vuelve al principio</text>
+      <text class="tl" x="1235" y="132" font-size="21">mantenela apretada ≈ 2 s</text>
 
       <path class="guia" d="M1012,160 V172 H1225" /><circle class="punto" cx="1012" cy="160" r="4" />
       <text class="t" x="1235" y="180"><tspan class="k">GRAVEDAD</tspan> △</text>
