@@ -3161,7 +3161,7 @@ const VR = (() => {
 
   // ---------- El control de PS4 (mapeo estándar), el teclado y la pantalla ----------
   //   palanca izq. camina · palanca der., L1/R1 o cruz ← → giran 30° · cruz ↑ ↓ camina · R2 acelera
-  //   X elige · △ gravedad · ○ entrada · □ dónde estoy · Options mantenido: vuelve al principio (recarga)
+  //   X elige · △ gravedad · ○ entrada · □ dónde estoy · Options: REINICIO (recarga la página y vuelve a la introducción)
   //   L2 + cruz / △ / □ / X: calibración del visor
   const EVENTOS = { 0: "elegir", 1: "entrada", 2: "donde", 3: "gravedad" };
   const CALIBRAR = { 14: "sep-", 15: "sep+", 12: "fov+", 13: "fov-", 3: "dist", 2: "prof", 0: "reset" };
@@ -3181,7 +3181,7 @@ const VR = (() => {
       if (ap(4)) gira = -1;
       if (ap(5)) gira = 1;
       if (!cal) { if (ap(14)) gira = -1; if (ap(15)) gira = 1; if (ap(12)) y = -1; if (ap(13)) y = 1; }
-      if (std) { rapido = Math.max(rapido, B[7] ? B[7].value : 0); if (ap(9)) options = ap(8) ? "recargar" : true; }
+      if (std) { rapido = Math.max(rapido, B[7] ? B[7].value : 0); if (ap(9)) options = true; }
       B.forEach((b, i) => {
         const k = g.index + ":" + i, on = ap(i);
         if (on && !antes.get(k)) {
@@ -3204,11 +3204,18 @@ const VR = (() => {
     return { x: THREE.MathUtils.clamp(x, -1, 1), y: THREE.MathUtils.clamp(y, -1, 1), gira, rapido, eventos, mx, my, options };
   }
   const colaEventos = [];
+  // Reinicio: recarga la página (la versión más nueva) y, como siempre al cargar, empieza por la introducción
+  window.__reiniciarVR = window.__reiniciarVR || function () {
+    if (window.__reiniciandoVR) return;
+    window.__reiniciandoVR = true;
+    setTimeout(() => location.reload(), 300);
+  };
   addEventListener("keydown", (e) => {
     if (e.repeat || onb()) return;
     const T = { Enter: "elegir", Space: "elegir", KeyG: "gravedad", KeyH: "entrada", KeyI: "donde",
                 BracketLeft: "sep-", BracketRight: "sep+", Equal: "fov+", Minus: "fov-", KeyK: "dist", KeyL: "prof", Digit0: "reset" };
     if (T[e.code]) colaEventos.push(T[e.code]);
+    if (e.code === "KeyR") { aviso("Reiniciando…", 5); window.__reiniciarVR(); }
   });
   // La pantalla (o el botón del visor): un toque corto elige; mantenerla camina. En compu, arrastrar mira.
   let tocando = null, arrastreVR = null;
@@ -3309,12 +3316,8 @@ const VR = (() => {
     const ahora = performance.now();
     if (ahora - tFps > 1000) { fps = Math.round(cuadros * 1000 / (ahora - tFps)); cuadros = 0; tFps = ahora; }
     const c = leerControl(dt);
-    if (optionsT > 0 && optionsT - dt <= 0) aviso("Mantené Options para volver al principio…", 1.6);
-    if (optionsT > 1.5) {
-      optionsT = -1e9;
-      if (c.options === "recargar") { aviso("Recargando…", 5); setTimeout(() => location.reload(), 250); }
-      else if (window.__onbVR && window.__onbVR.reabrir) { sonido(false); window.__onbVR.reabrir(); }
-    }
+    // Reinicio (2026-11-27): una sola pulsación de Options recarga la página entera; al cargar se abre la introducción
+    if (optionsT > 0 && optionsT - dt <= 0) { aviso("Reiniciando…", 5); window.__reiniciarVR(); }
     if (onb()) { colaEventos.length = 0; return; }
     for (const e of [...c.eventos, ...colaEventos.splice(0)]) evento(e);
 
@@ -3477,8 +3480,8 @@ addEventListener("resize", ajustarTamano);
 <!-- Onboarding VR (2026-11-24). Lo agrega herramientas/armar_visor_v3.py al final de web/v3/vr/index.html.
      Muestra las escenas de onboarding-vr/ (HyperFrames, 1080 × 1080) adentro del visor: cada escena va dos veces, una por
      ojo, centrada en su lente (la misma separación que el visor), en dos iframes que se mueven con un solo reloj.
-     Se abre siempre al cargar la página (y al volver al principio con Options mantenido). Mientras tanto, el espacio
-     carga detrás. Control: ✕ sigue · ○ o L1 vuelve · △ saltea al final · L2 + cruz ← → separa las imágenes.
+     Se abre siempre al cargar la página (y al reiniciar con Options, que recarga la página). Mientras tanto, el espacio
+     carga detrás. Control: ✕ sigue · ○ o L1 vuelve · △ saltea al final · Options reinicia · L2 + cruz ← → separa las imágenes.
      Sin control: tocar la pantalla sigue. En compu: → / Enter siguen, ← vuelve, Esc saltea. ?sinintro no la muestra. -->
 <style>
   #onbvr { position: fixed; inset: 0; z-index: 2000; background: #000; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -3497,7 +3500,7 @@ addEventListener("resize", ajustarTamano);
   "use strict";
   const ESCENAS = [
     { id: "vr-hero", loop: true, pie: "Tocá la pantalla · después <b>✕</b> empezar" },
-    { id: "vr-proyecto" }, { id: "vr-instancia" }, { id: "vr-control" }, { id: "vr-recorrer" }, { id: "vr-leer" },
+    { id: "vr-proyecto" }, { id: "vr-instancia" }, { id: "vr-control" }, { id: "vr-recorrer" }, { id: "vr-escrituras" }, { id: "vr-leer" },
     { id: "vr-entrar", loop: true, entrar: true },
   ];
   const capa = document.getElementById("onbvr");
@@ -3646,8 +3649,9 @@ addEventListener("resize", ajustarTamano);
         antes.set(k, on);
       });
     }
+    // Options: reinicio (recarga la página); acá también, por si el visor todavía no terminó de cargar
+    if (options && !optionsT) { if (window.__reiniciarVR) window.__reiniciarVR(); else location.reload(); }
     optionsT = options ? optionsT + dt : 0;
-    if (optionsT > 1.5 && !window.VRvisor) { optionsT = -1e9; location.reload(); }
   }
   addEventListener("keydown", (e) => {
     if (!estado.abierto) return;
@@ -3655,6 +3659,7 @@ addEventListener("resize", ajustarTamano);
     if (e.key === "ArrowRight" || e.key === "Enter" || e.key === " ") { e.preventDefault(); seguir(); }
     else if (e.key === "ArrowLeft") ir(actual - 1);
     else if (e.key === "Escape") ir(ESCENAS.length - 1);
+    else if (e.code === "KeyR") { if (window.__reiniciarVR) window.__reiniciarVR(); else location.reload(); }
   }, true);
   capa.addEventListener("pointerup", () => {
     // el primer toque: pantalla completa y el audio (el control no cuenta como gesto para el navegador)
@@ -3667,7 +3672,7 @@ addEventListener("resize", ajustarTamano);
     seguir();
   });
 
-  estado.reabrir = abrir;                         // Options mantenido: vuelve al principio sin recargar
+  estado.reabrir = abrir;                         // vuelve a la introducción sin recargar (el reinicio, Options, recarga)
   // instalable (Agregar a la pantalla principal → Instalar): se abre a pantalla completa, sin la barra del navegador
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("vr/sw.js", { scope: "vr/" }).catch(() => {});
   if (!/[?&]sinintro/.test(location.search)) abrir();
