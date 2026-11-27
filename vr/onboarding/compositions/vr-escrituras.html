@@ -1,0 +1,296 @@
+<template>
+  <!-- Las formas de escritura, versión VR (2026-11-27): la misma escena que onboarding/compositions/escrituras.html
+       (gráficos simplificados del modelo, no capturas), recompuesta para 1080 × 1080: el gráfico arriba, el texto abajo.
+       Seis formas (testimonio, narración, cita, folio, mausoleo, glosario) y al final un cuadro que las agrupa.
+       6 × 6,5 s + 7 s = 46 s. -->
+  <style>
+    @font-face { font-family: "FabiBlock"; src: url("assets/fonts/FabiBlock-Regular.otf"); }
+    #root { position: absolute; inset: 0; background: #e9e3d6; overflow: hidden; }
+    #ve-cabeza { position: absolute; left: 90px; right: 90px; top: 46px; text-align: center; font-family: "IBM Plex Mono"; font-size: 34px; color: #1f1d1b; white-space: nowrap; }
+    /* el gráfico conserva el lienzo de 1040 × 585 del navegador, escalado a 880 de ancho */
+    .ve-g { position: absolute; left: 100px; top: 118px; width: 1040px; height: 585px; transform: scale(.8462); transform-origin: 0 0; }
+    .ve-g .marco { position: absolute; inset: 0; overflow: hidden; border: 3px solid #1f1d1b; background: #e9e3d6; }
+    .ve-g svg { position: absolute; inset: 0; width: 1040px; height: 585px; }
+    .ve-texto { position: absolute; left: 80px; right: 80px; top: 640px; text-align: center; }
+    .ve-texto b { display: block; font-family: "FabiBlock"; font-weight: 400; font-size: 64px; line-height: 1.1; color: #1f1d1b; white-space: nowrap; }
+    .ve-texto > span { display: block; margin-top: 14px; font-family: "IBM Plex Mono"; font-size: 32px; line-height: 1.38; color: #1f1d1b; }
+    .ve-texto > i { display: block; margin-top: 10px; font-style: normal; font-family: "IBM Plex Mono"; font-size: 26px; line-height: 1.38; color: #6f6a60; }
+    .ve-texto > em { display: inline-block; margin-top: 14px; font-style: normal; font-family: "IBM Plex Mono"; font-size: 22px;
+                     letter-spacing: .12em; text-transform: uppercase; padding: 5px 12px; border: 2px solid currentColor; }
+    .cambia { color: #9b3d2e; } .unavoz { color: #2f4858; } .igual { color: #6f6a60; }
+    .letra { opacity: 0; }
+    /* letras que giran (escalera, anamorfosis) */
+    .fila { position: absolute; left: 0; right: 0; display: flex; justify-content: center; perspective: 600px; }
+    .fila span, .ana span { display: inline-block; font-family: "FabiBlock"; color: #1f1d1b; }
+    .ana span { position: absolute; color: #9b3d2e; }
+    /* cartel */
+    #ve-tablero { position: absolute; left: 60px; top: 80px; width: 920px; height: 425px; background: #16191c; display: grid;
+                  grid-template-columns: repeat(22, 1fr); gap: 4px; padding: 10px; box-sizing: border-box; }
+    #ve-tablero div { background: #24282c; color: #f3efe4; font-family: "IBM Plex Mono"; font-size: 30px; display: grid; place-items: center; position: relative; }
+    #ve-tablero div::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: #16191c; }
+    /* resumen */
+    #ve-resumen { position: absolute; left: 110px; right: 110px; top: 70px; }
+    #ve-resumen > div { margin-bottom: 34px; }
+    #ve-resumen h4 { margin: 0 0 12px; font-family: "IBM Plex Mono"; font-weight: 400; font-size: 24px; letter-spacing: .12em; text-transform: uppercase;
+                     border-bottom: 2px solid currentColor; padding-bottom: 8px; }
+    #ve-resumen p { margin: 0 0 6px; font-family: "IBM Plex Mono"; font-size: 28px; line-height: 1.3; color: #1f1d1b; }
+    #ve-resumen p b { display: inline-block; min-width: 330px; font-family: "FabiBlock"; font-weight: 400; font-size: 42px; color: #1f1d1b; }
+    #ve-frase { position: absolute; left: 80px; right: 80px; top: 960px; text-align: center; font-family: "IBM Plex Mono"; font-size: 32px; color: #1f1d1b; white-space: nowrap; }
+  </style>
+  <div id="root" data-composition-id="vr-escrituras" data-width="1080" data-height="1080">
+    <div id="ve-cabeza" class="clip" data-start="0" data-duration="39">Seis formas de escritura:</div>
+    <!-- 1 · muro de texto: dos páginas (M1 sigue en M3) -->
+    <div id="ve-g1" class="ve-g clip" data-start="0" data-duration="6.7"><div class="marco">
+      <svg data-layout-ignore viewBox="0 0 1040 585" id="ve-s1"></svg></div></div>
+    <!-- 2 · escalera: renglones que giran y se asientan subiendo -->
+    <div id="ve-g2" class="ve-g clip" data-start="6.5" data-duration="6.7"><div class="marco">
+      <svg data-layout-ignore viewBox="0 0 1040 585" id="ve-s2"></svg><div id="ve-filas" data-layout-ignore></div></div></div>
+    <!-- 3 · anamorfosis: letras sueltas sobre sus rayos, que se ordenan vistas desde el mirador -->
+    <div id="ve-g3" class="ve-g clip" data-start="13" data-duration="6.7"><div class="marco">
+      <svg data-layout-ignore viewBox="0 0 1040 585" id="ve-s3"></svg><div id="ve-ana" class="ana" data-layout-ignore></div></div></div>
+    <!-- 4 · cartel de aeropuerto -->
+    <div id="ve-g4" class="ve-g clip" data-start="19.5" data-duration="6.7"><div class="marco" style="background:#1f1d1b">
+      <div id="ve-tablero" data-layout-ignore></div></div></div>
+    <!-- 5 · mausoleo -->
+    <div id="ve-g5" class="ve-g clip" data-start="26" data-duration="6.7"><div class="marco">
+      <svg data-layout-ignore viewBox="0 0 1040 585" id="ve-s5"></svg></div></div>
+    <!-- 6 · columnatas -->
+    <div id="ve-g6" class="ve-g clip" data-start="32.5" data-duration="6.5"><div class="marco">
+      <svg data-layout-ignore viewBox="0 0 1040 585" id="ve-s6"></svg></div></div>
+
+    <div id="ve-t1" class="ve-texto clip" data-start="0" data-duration="6.5"><b>MURO DE TEXTO</b>
+      <span>El testimonio: lo que declara el personaje. Empieza en un muro y sigue en otro.</span>
+      <i>Muros M1 y M3.</i><em class="cambia">Cambia con el capítulo y la voz</em></div>
+    <div id="ve-t2" class="ve-texto clip" data-start="6.5" data-duration="6.5"><b>ESCALERA</b>
+      <span>La narración de lo que vivió ese día. Se lee subiendo: cada renglón se detiene de frente.</span>
+      <i>Cinco escaleras, desde la H.</i><em class="cambia">Cambia con el capítulo y la voz</em></div>
+    <div id="ve-t3" class="ve-texto clip" data-start="13" data-duration="6.5"><b>ANAMORFOSIS</b>
+      <span>La cita: una frase del personaje partida en letras sueltas. Solo se arma desde el mirador.</span>
+      <i>El mirador, sobre una bandeja alta.</i><em class="cambia">Cambia con el capítulo y la voz</em></div>
+    <div id="ve-t4" class="ve-texto clip" data-start="19.5" data-duration="6.5"><b>CARTEL DEL ALEPH</b>
+      <span>El folio de la empleada, la narradora que espía. Las paletas giran hasta asentarse.</span>
+      <i>En el núcleo, donde se tocan las tres voces.</i><em class="unavoz">Cambia con el capítulo</em></div>
+    <div id="ve-t5" class="ve-texto clip" data-start="26" data-duration="6.5"><b>MAUSOLEO</b>
+      <span>El expediente del caso: muertos, evidencias, cotas y retratos. Con las 24 citas de los muros M4 y M6, es el anexo.</span>
+      <i>El ábside al pie del pilono gigante.</i><em class="igual">Igual en todo el cuento</em></div>
+    <div id="ve-t6" class="ve-texto clip" data-start="32.5" data-duration="6.5"><b>COLUMNATAS</b>
+      <span>El glosario de los tres cuentos: 90 palabras, una por columna, en los bordes de los rectángulos áureos.</span>
+      <i>Afuera de las habitaciones.</i><em class="igual">Igual en todo el cuento</em></div>
+
+    <div id="ve-resumen" class="clip" data-start="39" data-duration="7">
+      <div class="cambia"><h4>Cambia con cada capítulo y cada voz</h4>
+        <p><b>TESTIMONIO</b>muro de texto</p><p><b>NARRACIÓN</b>escaleras</p><p><b>CITA</b>anamorfosis</p></div>
+      <div class="unavoz"><h4>Cambia con cada capítulo</h4>
+        <p><b>FOLIO</b>cartel del Aleph</p></div>
+      <div class="igual"><h4>Igual en todo el cuento</h4>
+        <p><b>LAS CITAS</b>muros M4 y M6</p><p><b>EXPEDIENTE</b>mausoleo</p><p><b>GLOSARIO</b>columnatas</p></div>
+    </div>
+    <div id="ve-frase" class="clip" data-start="39" data-duration="7">Cada forma de escribir cuenta algo distinto.</div>
+  </div>
+  <script>
+    (function () {
+      const NS = "http://www.w3.org/2000/svg", CARBON = "#1f1d1b", PIEDRA = "#a8a398", LACRE = "#9b3d2e", TINTA = "#2f4858";
+      const $ = (s) => document.querySelector(s);
+      // azar determinista
+      const azar = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+      function el(svg, tag, at) { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); svg.appendChild(e); return e; }
+      const trazos = [];                                    // [elemento, inicio]: se dibujan con stroke-dashoffset
+      function linea(svg, d, t0, extra = {}) {
+        const e = el(svg, "path", { d, fill: "none", stroke: CARBON, "stroke-width": 2, ...extra });
+        trazos.push([e, t0]); return e;
+      }
+
+      // ---------- 1 · muro de texto ----------
+      const s1 = $("#ve-s1"), barras = [];
+      [[110, "M1"], [560, "M3"]].forEach(([x0, nombre], p) => {
+        linea(s1, `M${x0} 50 H${x0 + 370} V535 H${x0} Z`, 0.2 + p * 0.3);
+        el(s1, "text", { x: x0, y: 30, "font-family": "IBM Plex Mono", "font-size": 18, fill: "#6f6a60" }).textContent = nombre;
+        if (!p) {
+          el(s1, "text", { x: x0 + 25, y: 85, "font-family": "IBM Plex Mono", "font-size": 15, fill: TINTA, "letter-spacing": 4 }).textContent = "TESTIMONIO - MADDEN";
+          el(s1, "rect", { x: x0 + 25, y: 97, width: 320, height: 2, fill: CARBON });
+          el(s1, "text", { x: x0 + 25, y: 172, "font-family": "FabiBlock", "font-size": 82, fill: LACRE }).textContent = "C";
+        }
+        const n = p ? 15 : 13;
+        for (let i = 0; i < n; i++) {
+          const y = p ? 80 + i * 28 : 118 + i * 28, sangria = !p && i < 3 ? 72 : 0;
+          const ultimo = p && i === n - 1, w = ultimo ? 150 : 320 - sangria;
+          barras.push([el(s1, "rect", { x: x0 + 25 + sangria, y, width: w, height: 9, fill: CARBON }), 0.7 + p * 2.1 + i * 0.13]);
+        }
+        if (p) {
+          el(s1, "text", { x: x0 + 345, y: 515, "text-anchor": "end", "font-family": "IBM Plex Mono", "font-size": 15, fill: TINTA }).textContent = "- MADDEN";
+        }
+      });
+      linea(s1, "M488 290 H548 M536 280 L548 290 L536 300", 2.4, { stroke: LACRE });
+
+      // ---------- 2 · escalera ----------
+      const s2 = $("#ve-s2"), cajaFilas = $("#ve-filas");
+      const RENGLONES = ["SUENA EL TELÉFONO A LAS ONCE", "Y DIEZ. LEVANTO EL TUBO CON", "LA MANO DE LOS CATÁLOGOS Y", "CONTESTO EN ALEMÁN ANTES DE",
+                         "PENSAR. PREGUNTAN POR LA", "SEÑORA VITERBO. MIRO EL", "PASILLO: ESTÁ ENTRE EL", "ANAQUEL CUARTO Y EL QUINTO"];
+      const filas = [];
+      RENGLONES.forEach((txt, k) => {
+        const esc = 1 - k * 0.075, y = 505 - k * 58 * (1 - k * 0.035), w = 820 * esc;
+        linea(s2, `M${520 - w / 2} ${y + 6} H${520 + w / 2}`, 0.1 + k * 0.04, { stroke: PIEDRA, "stroke-width": 1.5 });
+        const f = document.createElement("div");
+        f.className = "fila"; f.style.top = (y - 44 * esc) + "px";
+        f.innerHTML = [...txt].map((ch) => `<span style="font-size:${Math.round(36 * esc)}px">${ch === " " ? "&nbsp;" : ch}</span>`).join("");
+        cajaFilas.appendChild(f);
+        filas.push([...f.children]);
+      });
+      const lector = el(s2, "circle", { r: 8, fill: LACRE, cx: 90, cy: 505 });
+      const T_FILA = 0.62;
+      function escalera(t) {
+        const k = Math.min(RENGLONES.length - 1, Math.max(0, Math.floor((t - 0.5) / T_FILA)));
+        const ts = 0.5 + k * T_FILA;
+        filas.forEach((letras, r) => {
+          let gira = 1;
+          if (t >= 0.5 && r === k) gira = 1 - Math.min(1, Math.max(0, (t - ts) / 0.35));
+          if (t >= 0.5 && r === k - 1) gira = Math.min(1, Math.max(0, (t - ts) / 0.45));
+          if (r === RENGLONES.length - 1 && t > ts && k === r) gira = 1 - Math.min(1, (t - ts) / 0.35);
+          letras.forEach((s, i) => {
+            const ang = 360 * ((t * 0.7 + azar(r * 31 + i)) % 1) * gira;
+            s.style.transform = "rotateY(" + ang.toFixed(1) + "deg)";
+            s.style.color = r === k && t >= 0.5 ? LACRE : CARBON;
+          });
+        });
+        const y = 505 - k * 58 * (1 - k * 0.035);
+        lector.setAttribute("cy", y - 14);
+        lector.setAttribute("cx", 520 - 410 * (1 - k * 0.075) - 20);
+      }
+
+      // ---------- 3 · anamorfosis ----------
+      const s3 = $("#ve-s3"), cajaAna = $("#ve-ana");
+      const OJO = [90, 300], LINEAS = ["ATENDÍ", "EN LA LENGUA", "EQUIVOCADA"];
+      el(s3, "circle", { cx: OJO[0], cy: OJO[1], r: 11, fill: LACRE });
+      el(s3, "text", { x: OJO[0] - 20, y: OJO[1] + 46, "font-family": "IBM Plex Mono", "font-size": 18, fill: LACRE }).textContent = "mirador";
+      const letrasAna = [];
+      LINEAS.forEach((txt, l) => {
+        const tam = 54, y = 200 + l * 92, ancho0 = txt.length * tam * 0.66, x0 = 680 - ancho0 / 2;
+        [...txt].forEach((ch, i) => {
+          if (ch === " ") return;
+          const fx = x0 + i * tam * 0.66 + tam * 0.33, fy = y;
+          const d = 0.38 + azar(l * 17 + i) * 1.15;               // la profundidad: más cerca o más lejos sobre su rayo
+          const rayo = el(s3, "path", { d: `M${OJO[0]} ${OJO[1]} L${OJO[0] + (fx - OJO[0]) * 1.6} ${OJO[1] + (fy - OJO[1]) * 1.6}`,
+                                         stroke: PIEDRA, "stroke-width": 1.2, fill: "none" });
+          const s = document.createElement("span");
+          s.textContent = ch; cajaAna.appendChild(s);
+          letrasAna.push({ s, fx, fy, d, tam, rayo });
+        });
+      });
+      function anamorfosis(t) {
+        let u = Math.min(1, Math.max(0, (t - 2.0) / 3.0)); u = u * u * (3 - 2 * u);
+        for (const a of letrasAna) {
+          const d = a.d + (1 - a.d) * u;
+          const x = OJO[0] + (a.fx - OJO[0]) * d, y = OJO[1] + (a.fy - OJO[1]) * d, tam = a.tam * d;
+          a.s.style.fontSize = tam.toFixed(1) + "px";
+          a.s.style.left = (x - tam * 0.33).toFixed(1) + "px";
+          a.s.style.top = (y - tam * 0.8).toFixed(1) + "px";
+          a.rayo.setAttribute("opacity", (1 - u * 0.75).toFixed(2));
+        }
+      }
+
+      // ---------- 4 · cartel ----------
+      const tablero = $("#ve-tablero"), COLS = 22, FILAS = 7;
+      const FOLIO = "FOLIO 1. EXPEDIENTE DE LA BIBLIOTECA BABEL DE FENTON. YO LIMPIABA LOS HEXÁGONOS ANTES DE QUE LLEGARAN LOS LECTORES. NADIE MIRA A QUIEN LIMPIA: POR ESO VI TODO.";
+      const filasCartel = [];
+      { let f = ""; for (const w of FOLIO.split(" ")) { if (f && f.length + 1 + w.length > COLS) { filasCartel.push(f); f = w; } else f = f ? f + " " + w : w; } filasCartel.push(f); }
+      const ALFA = "ABCDEFGHIJKLMNÑOPQRSTUVWXYZÁÉÍÓÚ0123456789.,:";
+      const celdas = [];
+      for (let r = 0; r < FILAS; r++) for (let c = 0; c < COLS; c++) {
+        const d = document.createElement("div"); tablero.appendChild(d);
+        celdas.push({ d, r, c, obj: (filasCartel[r] || "").padEnd(COLS)[c] });
+      }
+      function cartel(t) {
+        const paso = Math.floor(t * 14);
+        for (const x of celdas) {
+          const asienta = 1.0 + x.c * 0.07 + x.r * 0.32 + azar(x.r * 40 + x.c) * 0.25;
+          x.d.textContent = t >= asienta ? x.obj : ALFA[Math.floor(azar(x.r * 97 + x.c * 13 + paso) * ALFA.length)];
+          x.d.style.color = t >= asienta ? "#f3efe4" : "#a8a398";
+        }
+      }
+
+      // ---------- 5 · mausoleo ----------
+      const s5 = $("#ve-s5");
+      const PANOS = [[110, 200, 0.86], [310, 210, 1], [520, 210, 1], [730, 200, 0.86]];
+      const titulos = ["AQUÍ YACEN", "EVIDENCIAS", "LAS COTAS", "LOS RETRATOS"];
+      PANOS.forEach(([x, w, k], i) => {
+        const top = 60 + (1 - k) * 60, bot = 480 - (1 - k) * 20;
+        linea(s5, `M${x} ${top} H${x + w} V${bot} H${x} Z`, 0.2 + i * 0.12);
+        el(s5, "text", { x: x + w / 2, y: top + 38, "text-anchor": "middle", "font-family": "FabiBlock", "font-size": 22, fill: CARBON }).textContent = titulos[i];
+        linea(s5, `M${x + 20} ${top + 52} H${x + w - 20}`, 0.6 + i * 0.12, { "stroke-width": 1.5 });
+        if (i === 0) for (let n = 0; n < 4; n++) linea(s5, `M${x + 45} ${top + 95 + n * 60} H${x + w - 45} M${x + 70} ${top + 115 + n * 60} H${x + w - 70}`, 1.0 + n * 0.15, { "stroke-width": 4 });
+        if (i === 1) for (let n = 0; n < 9; n++) linea(s5, `M${x + 20} ${top + 80 + n * 32} H${x + w - 20}` + (n === 0 ? ` M${x + 75} ${top + 80} V${top + 336} M${x + 140} ${top + 80} V${top + 336}` : ""), 1.0 + n * 0.08, { "stroke-width": 1.5 });
+        if (i === 2) {
+          const pts = [...Array(8)].map((_, n) => [x + 30 + n * (w - 60) / 7, top + 120 + (n % 2 ? 120 : 0)]);
+          linea(s5, "M" + pts.map((p) => p.join(" ")).join(" L"), 1.0, { stroke: LACRE });
+          pts.forEach((p, n) => { const c = el(s5, "circle", { cx: p[0], cy: p[1], r: 5, fill: CARBON }); trazos.push([c, 1.2 + n * 0.1, true]); });
+        }
+        if (i === 3) for (let n = 0; n < 6; n++) {
+          const cx = x + 28 + (n % 2) * 82, cy = top + 75 + Math.floor(n / 2) * 105;
+          linea(s5, `M${cx} ${cy} h64 v76 h-64 Z M${cx + 8} ${cy + 90} h48`, 1.0 + n * 0.12, { "stroke-width": 1.5 });
+        }
+      });
+      for (let g = 0; g < 3; g++) linea(s5, `M${90 - g * 20} ${490 + g * 22} H${950 + g * 20}`, 0.1 + g * 0.08, { stroke: PIEDRA });
+
+      // ---------- 6 · columnatas ----------
+      const s6 = $("#ve-s6");
+      const RW = 880, RH = RW / 1.618, RX = 80, RY = (585 - RH) / 2, FRANJA = RW * 43 / 225.2;
+      linea(s6, `M${RX} ${RY} h${RW} v${RH} h${-RW} Z`, 0.2);
+      el(s6, "rect", { x: RX + FRANJA, y: RY, width: RW - 2 * FRANJA, height: RH, fill: PIEDRA, "fill-opacity": 0.18 });
+      linea(s6, `M${RX + FRANJA} ${RY} V${RY + RH} M${RX + RW - FRANJA} ${RY} V${RY + RH}`, 0.5, { "stroke-dasharray": "6 6" });
+      el(s6, "text", { x: RX + RW / 2, y: RY + RH / 2, "text-anchor": "middle", "font-family": "IBM Plex Mono", "font-size": 22, fill: "#6f6a60" }).textContent = "habitaciones";
+      const GLOSARIO = ["HEXÁGONO", "ESPEJO", "LABERINTO", "SENDERO", "BEATRIZ", "INEFABLE", "ORBE", "MEMORIA", "UNIVERSO", "RETRATO",
+                        "ESCALÓN", "SÓTANO", "VITERBO", "GARAY", "OLVIDO", "ANAQUEL", "CATÁLOGO", "BIFURCAR", "LÁMPARA", "CIFRA",
+                        "ALBERT", "TÚNEL", "ESFERA", "POLVO", "VERSO", "MAÑANA", "LETRA", "PISO", "PUERTA", "SILENCIO"];
+      const palabras = [];
+      [RX, RX + RW - FRANJA].forEach((x, lado) => {
+        for (let n = 0; n < 15; n++) {
+          const y = RY + (n + 0.5) * RH / 15;
+          const t = el(s6, "text", { x: x + FRANJA / 2, y: y + 7, "text-anchor": "middle", "font-family": "FabiBlock", "font-size": 19, fill: CARBON,
+                                     textLength: FRANJA - 18, lengthAdjust: "spacingAndGlyphs" });
+          t.textContent = GLOSARIO[(n + lado * 15) % GLOSARIO.length];
+          palabras.push([t, 0.6 + n * 0.12 + lado * 0.2, y]);
+        }
+      });
+
+      // ---------- texto letra por letra ----------
+      for (const e of document.querySelectorAll("#ve-cabeza, #root .ve-texto b, #ve-frase")) {
+        e.innerHTML = [...e.textContent].map((ch) => '<span class="letra">' + ch + "</span>").join("");
+      }
+
+      const tl = gsap.timeline({ paused: true });
+      tl.set({}, {}, 46);
+      tl.fromTo("#ve-cabeza .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.03, ease: "none" }, 0.1);
+      const T = [0, 6.5, 13, 19.5, 26, 32.5];
+      T.forEach((t, i) => {
+        const n = i + 1;
+        tl.fromTo("#ve-g" + n + " .marco", { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.7, ease: "power3.inOut" }, t + 0.1);
+        tl.fromTo("#ve-t" + n + " b .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.04, ease: "none" }, t + 0.3);
+        tl.fromTo("#ve-t" + n + " > span, #ve-t" + n + " > i", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "sine.out", stagger: 0.3 }, t + 0.9);
+        tl.fromTo("#ve-t" + n + " > em", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, t + 1.8);
+        // los trazos de cada gráfico se dibujan desde el comienzo de su página
+        for (const [e, t0, punto] of trazos.filter(([e]) => e.closest("#ve-g" + n))) {
+          if (punto) { tl.fromTo(e, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "none" }, t + t0); continue; }
+          const L = e.getTotalLength ? e.getTotalLength() : 1000;
+          tl.fromTo(e, { strokeDasharray: L, strokeDashoffset: L }, { strokeDashoffset: 0, duration: 0.6, ease: "power2.inOut" }, t + t0);
+        }
+      });
+      // el muro se escribe (renglones que crecen) y las columnas se llenan de palabras
+      for (const [b, t0] of barras) tl.fromTo(b, { scaleX: 0 }, { scaleX: 1, duration: 0.25, ease: "power1.out", transformOrigin: "0% 50%" }, t0);
+      for (const [p, t0] of palabras) tl.fromTo(p, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "sine.out" }, T[5] + t0);
+      // lo que gira: escalera, anamorfosis y cartel, en función del tiempo de su página
+      const reloj = { t: 0 };
+      tl.fromTo(reloj, { t: 0 }, { t: 46, duration: 46, ease: "none", onUpdate: () => {
+        const t = reloj.t;
+        if (t >= 6.5 && t < 13.3) escalera(t - 6.5);
+        if (t >= 13 && t < 19.8) anamorfosis(t - 13);
+        if (t >= 19.5 && t < 26.3) cartel(t - 19.5);
+      } }, 0);
+      escalera(0); anamorfosis(0); cartel(0);
+      // el resumen
+      tl.fromTo("#ve-resumen > div", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out", stagger: 0.5 }, 39.2);
+      tl.fromTo("#ve-resumen p", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "sine.out", stagger: 0.18 }, 39.6);
+      tl.fromTo("#ve-frase .letra", { opacity: 0 }, { opacity: 1, duration: 0.01, stagger: 0.03, ease: "none" }, 41.5);
+      window.__timelines["vr-escrituras"] = tl;
+    })();
+  </script>
+</template>
